@@ -5,3 +5,7 @@ dep/*.d
 .*.sw?
 .~lock*
 .buildnum
+
+# ignore ROMs and techref
+roms
+TRM
