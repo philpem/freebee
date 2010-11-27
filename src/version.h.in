@@ -1,0 +1,16 @@
+#define VER_COMPILE_DATE	"@@date@@"
+#define VER_COMPILE_TIME	"@@time@@"
+#define VER_COMPILE_BY		"@@whoami@@"
+#define VER_COMPILE_HOST	"@@hostname@@"
+#define VER_COMPILER		"@@compiler@@"
+#define VER_BUILD_TYPE		"@@buildtype@@"
+#define VER_CFLAGS			"@@cflags@@"
+
+#define VER_MAJOR			@@majorver@@
+#define VER_MINOR			@@minorver@@
+#define VER_BUILDNUM		@@buildnum@@
+#define VER_EXTRA			"@@extraver@@"
+#define VER_VCSREV			"@@vcsstr@@"
+
+#define VER_FULLSTR			"@@fullverstr@@"
+

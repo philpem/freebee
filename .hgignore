@@ -1,0 +1,7 @@
+syntax: glob
+obj/*.o
+dep/*.d
+*~
+.*.sw?
+.~lock*
+.buildnum

@@ -1,0 +1,16 @@
+From private email, dated 2010-Nov-26, 20:43 GMT:
+
+From: Karl Stenerud <kstenerud@gmail.com>
+Subject: Re: Musashi 68k emulator
+
+On 2010-11-26, at 12:36 PM, Philip Pemberton wrote:
+
+> > I do have one question, though more related to licensing than the core itself...
+> > 
+> > I was planning to release my emulator under an open-source licence, probably the GPL or something along those lines (the worst case scenario IMO would be someone adding a ton of nice features then refusing to release the source).
+> > 
+> > The "non-commercial use only" restriction in the Musashi license would seem to be at odds with the GPL, and would make it somewhat more difficult to tie in GPL-licensed libraries. Is there any possibility of getting v3.31 released under a less restrictive license, maybe GPL or LGPL?
+> > 
+
+Sure, no problem.  I usually release stuff under an Apache license nowadays, but feel free to pick any FOSS license.
+
