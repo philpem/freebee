@@ -6,6 +6,22 @@ dep/*.d
 .~lock*
 .buildnum
 
+# musashi build artefacts
+src/musashi/m68kopac.c
+src/musashi/m68kopdm.c
+src/musashi/m68kopnz.c
+src/musashi/m68kops.c
+src/musashi/m68kops.h
+dep/musashi/*.d
+obj/musashi/*.o
+obj/musashi/m68kmake
+
+# version header
+src/version.h
+
+# final executable binary
+3b1emu
+
 # ignore ROMs and techref
 roms
 TRM
