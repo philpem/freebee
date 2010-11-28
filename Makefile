@@ -112,7 +112,7 @@ PLATFORM	?=	linux
 BUILD_TYPE	?=	debug
 
 # target executable
-TARGET		=	3b1emu
+TARGET		=	freebee
 
 # source files that produce object files
 SRC			=	main.c musashi/m68kcpu.c musashi/m68kops.c musashi/m68kopac.c musashi/m68kopdm.c musashi/m68kopnz.c
