@@ -82,10 +82,6 @@ int state_init()
 				(romdat2[i+1]));
 	}
 
-	for (int i=0; i<8; i++)
-		printf("%02X %02X ", romdat1[i], romdat2[i]);
-	printf("\n%08X %08X\n", state.rom[0], state.rom[1]);
-
 	// free the data arrays and close the files
 	free(romdat1);
 	free(romdat2);
@@ -115,7 +111,6 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		// TODO
 	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		printf("%08X\n", state.rom[(address & (ROM_SIZE-1)) / 4]);
 		return state.rom[(address & (ROM_SIZE-1)) / 4];
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O Registers A
@@ -245,7 +240,7 @@ int main(void)
 	// repeat:
 	// 		m68k_execute()
 	// 		m68k_set_irq() every 60ms
-	m68k_execute(100000);
+	printf("ran for %d cycles\n", m68k_execute(100000));
 
 	// shut down and exit
 
