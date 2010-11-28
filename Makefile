@@ -1,6 +1,6 @@
 # Phil's multiplatform makefile template
 # With auto-incrementing build number and automatic version.h generation
-# Version 1.8, 2010-02-15
+# Version 1.9, 2010-02-15
 #
 # The latest version of this Makefile can be found at http://www.philpem.me.uk/
 #
@@ -84,6 +84,9 @@
 #
 #
 # Change history:
+#   1.9 - Bugfix -- if CFLAGS contained a forward-slash, sed would fall over.
+#         Also added SDL support and fixed the date/time formats. To use SDL,
+#         set ENABLE_SDL to "yes".
 #   1.8 - Now supports the use of the wxWidgets GUI framework. To turn
 #         this on, set ENABLE_WX to "yes".
 #   1.7 - Now creates a basic Hgignore file and directory keepers for the
@@ -337,7 +340,7 @@ versionheader:
 		 -e 's/@@vcsrev@@/$(VER_VCSREV)/g'					\
 		 -e 's/@@vcsstr@@/$(VER_VCSSTR)/g'					\
 		 -e 's/@@fullverstr@@/$(VER_FULLSTR)/g'				\
-		 -e 's:@@cflags@@:$(CFLAGS):g'						\
+		 -e 's#@@cflags@@#$(CFLAGS)#g'						\
 		 < src/version.h.in > src/version.h
 
 # version.h creation stuff based on code from the Xen makefile
@@ -359,22 +362,22 @@ init:
 	@echo '*~' >> .hgignore
 	@echo '.*.sw?' >> .hgignore
 	@echo '#define VER_COMPILE_DATETIME	"@@datetime@@"'			> src/version.h.in
-	@echo '#define VER_COMPILE_DATE	"@@date@@"'				>> src/version.h.in
-	@echo '#define VER_COMPILE_TIME	"@@time@@"'				>> src/version.h.in
-	@echo '#define VER_COMPILE_BY		"@@whoami@@"'		>> src/version.h.in
-	@echo '#define VER_COMPILE_HOST	"@@hostname@@"'			>> src/version.h.in
-	@echo '#define VER_COMPILER		"@@compiler@@"'			>> src/version.h.in
-	@echo '#define VER_BUILD_TYPE		"@@buildtype@@"'	>> src/version.h.in
-	@echo '#define VER_CFLAGS			"@@cflags@@"'		>> src/version.h.in
-	@echo ''												>> src/version.h.in
-	@echo '#define VER_MAJOR			@@majorver@@'		>> src/version.h.in
-	@echo '#define VER_MINOR			@@minorver@@'		>> src/version.h.in
-	@echo '#define VER_BUILDNUM		@@buildnum@@'			>> src/version.h.in
-	@echo '#define VER_EXTRA			"@@extraver@@"'		>> src/version.h.in
-	@echo '#define VER_VCSREV			"@@vcsstr@@"'		>> src/version.h.in
-	@echo ''												>> src/version.h.in
-	@echo '#define VER_FULLSTR			"@@fullverstr@@"'	>> src/version.h.in
-	@echo ''												>> src/version.h.in
+	@echo '#define VER_COMPILE_DATE		"@@date@@"'				>> src/version.h.in
+	@echo '#define VER_COMPILE_TIME		"@@time@@"'				>> src/version.h.in
+	@echo '#define VER_COMPILE_BY			"@@whoami@@"'		>> src/version.h.in
+	@echo '#define VER_COMPILE_HOST		"@@hostname@@"'			>> src/version.h.in
+	@echo '#define VER_COMPILER			"@@compiler@@"'			>> src/version.h.in
+	@echo '#define VER_BUILD_TYPE			"@@buildtype@@"'	>> src/version.h.in
+	@echo '#define VER_CFLAGS				"@@cflags@@"'		>> src/version.h.in
+	@echo ''													>> src/version.h.in
+	@echo '#define VER_MAJOR				@@majorver@@'		>> src/version.h.in
+	@echo '#define VER_MINOR				@@minorver@@'		>> src/version.h.in
+	@echo '#define VER_BUILDNUM			@@buildnum@@'			>> src/version.h.in
+	@echo '#define VER_EXTRA				"@@extraver@@"'		>> src/version.h.in
+	@echo '#define VER_VCSREV				"@@vcsstr@@"'		>> src/version.h.in
+	@echo ''													>> src/version.h.in
+	@echo '#define VER_FULLSTR				"@@fullverstr@@"'	>> src/version.h.in
+	@echo ''													>> src/version.h.in
 	@echo Build system initialised
 
 # remove the dependency files
