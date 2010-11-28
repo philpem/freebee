@@ -78,10 +78,7 @@ int state_init()
 		state.rom[i+1] = romdat2[i/2];
 	}
 
-	for (size_t i=0; i<16; i++) printf("%02X ", state.rom[i]);
-	printf("\n");
-
-	// TODO: if ROM buffer not filled, repeat the ROM data we read until it is.
+	// TODO: if ROM buffer not filled, repeat the ROM data we read until it is (wraparound emulation)
 
 	// free the data arrays and close the files
 	free(romdat1);
