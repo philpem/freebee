@@ -40,11 +40,13 @@ int state_init()
 	// Initialise hardware registers
 	state.romlmap = false;
 
-	// Allocate RAM
-	// TODO: make sure ram size selection is valid (512K, 1MB, 1.5MB, 2MB, 2.5MB, 3MB or 4MB)!
+	// Allocate RAM, making sure the user has specified a valid RAM amount first
+	// Basically: 512KiB minimum, 4MiB maximum, in increments of 512KiB.
+	if ((state.ram_size < 512*1024) || ((state.ram_size % (512*1024)) != 0))
+		return -1;
 	state.ram = malloc(state.ram_size);
 	if (state.ram == NULL)
-		return -1;
+		return -2;
 
 	// Load ROMs
 	FILE *r14c, *r15c;
