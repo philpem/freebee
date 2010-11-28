@@ -7,8 +7,6 @@
 #include "musashi/m68k.h"
 #include "version.h"
 
-#define ROM_SIZE (32768/2)
-
 void state_done(void);
 
 void FAIL(char *err)
@@ -18,15 +16,16 @@ void FAIL(char *err)
 	exit(EXIT_FAILURE);
 }
 
+// Maximum size of the Boot PROMs. Must be a binary power of two.
+#define ROM_SIZE 32768
 
 struct {
 	// Boot PROM can be up to 32Kbytes total size
-	uint16_t	rom[ROM_SIZE];
+	uint8_t		rom[ROM_SIZE];
 
 	// Main system RAM
-	uint16_t	*ram;
+	uint8_t		*ram;
 	size_t		ram_size;			// number of RAM bytes allocated
-	uint32_t	ram_addr_mask;		// address mask
 
 	// GENERAL CONTROL REGISTER
 	bool		romlmap;
@@ -42,11 +41,10 @@ int state_init()
 	state.romlmap = false;
 
 	// Allocate RAM
-	// TODO: make sure ram size selection is valid!
+	// TODO: make sure ram size selection is valid (512K, 1MB, 1.5MB, 2MB, 2.5MB, 3MB or 4MB)!
 	state.ram = malloc(state.ram_size);
 	if (state.ram == NULL)
 		return -1;
-	state.ram_addr_mask = state.ram_size - 1;
 
 	// Load ROMs
 	FILE *r14c, *r15c;
@@ -63,8 +61,7 @@ int state_init()
 	size_t romlen2 = ftell(r15c);
 	fseek(r15c, 0, SEEK_SET);
 	if (romlen2 != romlen) FAIL("ROMs are not the same size!");
-	if ((romlen / 4) > (ROM_SIZE / 2)) FAIL("ROM 14C is too big!");
-	if ((romlen2 / 4) > (ROM_SIZE / 2)) FAIL("ROM 15C is too big!");
+	if ((romlen + romlen2) > ROM_SIZE) FAIL("ROMs are too large to fit in memory!");
 
 	// sanity checks completed; load the ROMs!
 	uint8_t *romdat1, *romdat2;
@@ -74,9 +71,15 @@ int state_init()
 	fread(romdat2, 1, romlen2, r14c);
 
 	// convert the ROM data
-	for (size_t i=0; i<romlen; i++) {
-		state.rom[i] = ((romdat1[i] << 8) | (romdat2[i]));
+	for (size_t i=0; i<(romlen + romlen2); i+=2) {
+		state.rom[i+0] = romdat1[i/2];
+		state.rom[i+1] = romdat2[i/2];
 	}
+
+	for (size_t i=0; i<16; i++) printf("%02X ", state.rom[i]);
+	printf("\n");
+
+	// TODO: if ROM buffer not filled, repeat the ROM data we read until it is.
 
 	// free the data arrays and close the files
 	free(romdat1);
@@ -94,8 +97,6 @@ void state_done()
 }
 
 // read m68k memory
-// TODO: refactor musashi to use stdint, and properly sized integers!
-// TODO: find a way to make musashi use function pointers instead of hard coded callbacks, maybe use a context struct too
 uint32_t m68k_read_memory_32(uint32_t address)
 {
 	uint32_t data = 0xFFFFFFFF;
@@ -108,13 +109,19 @@ uint32_t m68k_read_memory_32(uint32_t address)
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		data = ((state.rom[(address & (ROM_SIZE-1)) / 2] << 16) | (state.rom[((address & (ROM_SIZE-1)) / 2)+1]));
-	} else if (address <= 0x3FFFFF) {
+		data = (((uint32_t)state.rom[(address + 0) & (ROM_SIZE - 1)] << 24) |
+				((uint32_t)state.rom[(address + 1) & (ROM_SIZE - 1)] << 16) |
+				((uint32_t)state.rom[(address + 2) & (ROM_SIZE - 1)] << 8)  |
+				((uint32_t)state.rom[(address + 3) & (ROM_SIZE - 1)]));
+	} else if (address < state.ram_size - 1) {
 		// RAM
-		data = state.ram[(address & state.ram_addr_mask) / 2];
+		data = (((uint32_t)state.ram[address + 0] << 24) |
+				((uint32_t)state.ram[address + 1] << 16) |
+				((uint32_t)state.ram[address + 2] << 8)  |
+				((uint32_t)state.ram[address + 3]));
 	}
 
-	printf(" ==> %04X\n", data);
+	printf(" ==> %08X\n", data);
 	return data;
 }
 
@@ -128,7 +135,15 @@ uint32_t m68k_read_memory_16(uint32_t address)
 	if (!state.romlmap)
 		address |= 0x800000;
 
-	data = (m68k_read_memory_32(address) >> 16) & 0xFFFF;
+	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+		// ROM access
+		data = ((state.rom[(address + 0) & (ROM_SIZE - 1)] << 8) |
+				(state.rom[(address + 1) & (ROM_SIZE - 1)]));
+	} else if (address < state.ram_size - 1) {
+		// RAM
+		data = ((state.ram[address + 0] << 8) |
+				(state.ram[address + 1]));
+	}
 
 	printf(" ==> %04X\n", data);
 	return data;
@@ -144,7 +159,13 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	if (!state.romlmap)
 		address |= 0x800000;
 
-	data = m68k_read_memory_32(address) & 0xFF;
+	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+		// ROM access
+		data = state.rom[(address + 0) & (ROM_SIZE - 1)];
+	} else if (address < state.ram_size) {
+		// RAM access
+		data = state.ram[address + 0];
+	}
 
 	printf("==> %02X\n", data);
 	return data;
@@ -162,10 +183,12 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		// TODO: bus error here? can't write to rom!
-	} else if (address <= 0x3FFFFF) {
-		// RAM
-		state.ram[(address & state.ram_addr_mask) / 2] = (value >> 16);
-		state.ram[((address & state.ram_addr_mask) / 2)+1] = value & 0xffff;
+	} else if (address < state.ram_size) {
+		// RAM access
+		state.ram[address + 0] = (value >> 24) & 0xff;
+		state.ram[address + 1] = (value >> 16) & 0xff;
+		state.ram[address + 2] = (value >> 8)  & 0xff;
+		state.ram[address + 3] =  value        & 0xff;
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000);
@@ -184,9 +207,10 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		// TODO: bus error here? can't write to rom!
-	} else if (address <= 0x3FFFFF) {
-		// RAM
-		state.ram[(address & state.ram_addr_mask) / 2] = value & 0xFFFF;
+	} else if (address < state.ram_size) {
+		// RAM access
+		state.ram[address + 0] = (value >> 8)  & 0xff;
+		state.ram[address + 1] =  value        & 0xff;
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000);
@@ -205,15 +229,8 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		// TODO: bus error here? can't write to rom!
-	} else if (address <= 0x3FFFFF) {
-		// RAM
-		switch (address & 3) {
-			// FIXME
-			case 3:		state.ram[(address & state.ram_addr_mask) / 4] = (state.ram[(address & state.ram_addr_mask) / 4] & 0xFFFFFF00) | (value & 0xFF);
-			case 2:		state.ram[(address & state.ram_addr_mask) / 4] = (state.ram[(address & state.ram_addr_mask) / 4] & 0xFFFF00FF) | ((value & 0xFF) << 8);
-			case 1:		state.ram[(address & state.ram_addr_mask) / 4] = (state.ram[(address & state.ram_addr_mask) / 4] & 0xFF00FFFF) | ((value & 0xFF) << 16);
-			case 0:		state.ram[(address & state.ram_addr_mask) / 4] = (state.ram[(address & state.ram_addr_mask) / 4] & 0x00FFFFFF) | ((value & 0xFF) << 24);
-		}
+	} else if (address < state.ram_size) {
+		state.ram[address] = value & 0xff;
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80);
@@ -221,6 +238,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 	}
 }
 
+// for the disassembler
 uint32_t m68k_read_disassembler_32(uint32_t addr) { return m68k_read_memory_32(addr); }
 uint32_t m68k_read_disassembler_16(uint32_t addr) { return m68k_read_memory_16(addr); }
 uint32_t m68k_read_disassembler_8 (uint32_t addr) { return m68k_read_memory_8 (addr); }
