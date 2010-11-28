@@ -245,8 +245,11 @@ uint32_t m68k_read_disassembler_8 (uint32_t addr) { return m68k_read_memory_8 (a
 int main(void)
 {
 	// copyright banner
-	printf("FreeBee: A Quick-and-Dirty AT&T 3B1 Emulator\n");
+	printf("FreeBee: A Quick-and-Dirty AT&T 3B1 Emulator. Version %s, %s mode.\n", VER_FULLSTR, VER_BUILD_TYPE);
 	printf("Copyright (C) 2010 P. A. Pemberton.\n");
+	printf("Built %s by %s@%s.\n", VER_COMPILE_DATETIME, VER_COMPILE_BY, VER_COMPILE_HOST);
+	printf("Compiler: %s\n", VER_COMPILER);
+	printf("CFLAGS: %s\n", VER_CFLAGS);
 	printf("Musashi M680x0 emulator engine developed by Karl Stenerud <kstenerud@gmail.com>\n");
 
 	// set up system state
@@ -268,7 +271,24 @@ int main(void)
 	// repeat:
 	// 		m68k_execute()
 	// 		m68k_set_irq() every 60ms
-	printf("ran for %d cycles\n", m68k_execute(100000));
+	int32_t dwTimerTickCounter, dwCpuCycles;
+	const int32_t CLOCKS_PER_TIMER_TICK = 10e6/60;		//< number of clocks per 60Hz timer tick
+
+	// initialise emulation variables
+	dwTimerTickCounter = CLOCKS_PER_TIMER_TICK;
+	bool exitEmu = false;
+	for (;;) {
+		dwCpuCycles = m68k_execute(10e6/60);
+		dwTimerTickCounter -= dwCpuCycles;
+
+		// check for timer tick expiry
+		if (dwTimerTickCounter <= 0) {
+			// TODO: Timer Tick IRQ
+			
+		}
+
+		if (exitEmu) break;
+	}
 
 	// shut down and exit
 
