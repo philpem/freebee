@@ -115,7 +115,7 @@ BUILD_TYPE	?=	debug
 TARGET		=	3b1emu
 
 # source files that produce object files
-SRC			=	main.c musashi/m68kcpu.c musashi/m68kops.c
+SRC			=	main.c musashi/m68kcpu.c musashi/m68kops.c musashi/m68kopac.c musashi/m68kopdm.c musashi/m68kopnz.c
 
 # source type - either "c" or "cpp" (C or C++)
 SRC_TYPE	=	c
@@ -124,12 +124,12 @@ SRC_TYPE	=	c
 EXT_OBJ		=
 # libraries to link in -- these will be specified as "-l" parameters, the -l
 # is prepended automatically
-LIB			=	sdl
+LIB			=
 # library paths -- where to search for the above libraries
-LIBPATH		=	musashi
+LIBPATH		=
 # include paths -- where to search for #include files (in addition to the
 # standard paths
-INCPATH		=	musashi
+INCPATH		=
 # garbage files that should be deleted on a 'make clean' or 'make tidy'
 GARBAGE		=	obj/musashi/m68kmake obj/musashi/m68kmake.exe obj/musashi/m68kmake.o
 
@@ -143,6 +143,8 @@ EXTDEP		=
 ENABLE_WX	=	no
 # wxWidgets: list of wxWidgets libraries to enable
 WX_LIBS		=	std
+# SDL: set to "yes" to enable, anything else to disable
+ENABLE_SDL	=	yes
 
 ####
 # Win32 target-specific settings
@@ -273,6 +275,15 @@ ifeq ($(ENABLE_WX),yes)
 endif
 
 ####
+# SDL support
+####
+ifeq ($(ENABLE_SDL),yes)
+	LIBLNK		+=	`sdl-config --libs`
+	CFLAGS		+=	`sdl-config --cflags`
+endif
+
+
+####
 # rules
 ####
 
@@ -400,7 +411,7 @@ endif
 obj/musashi/m68kmake:	obj/musashi/m68kmake.o
 	$(CC) $(CFLAGS) $(CPPFLAGS) obj/musashi/m68kmake.o -o $@
 # 68k CPU sources
-src/musashi/m68kops.h src/musashi/m68kops.c:	obj/musashi/m68kmake src/musashi/m68k_in.c
+src/musashi/m68kops.h src/musashi/m68kops.c src/musashi/m68kopac.c src/musashi/m68kopdm.c src/musashi/m68kopnz.c:	obj/musashi/m68kmake src/musashi/m68k_in.c
 	./obj/musashi/m68kmake src/musashi src/musashi/m68k_in.c
 
 ####
