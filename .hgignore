@@ -20,6 +20,7 @@ obj/musashi/m68kmake
 src/version.h
 
 # final executable binary
+freebee
 3b1emu
 
 # ignore ROMs and techref
