@@ -916,6 +916,7 @@ INLINE void m68ki_exception_trap(uint vector);
 INLINE void m68ki_exception_trapN(uint vector);
 INLINE void m68ki_exception_trace(void);
 INLINE void m68ki_exception_privilege_violation(void);
+INLINE void m68ki_exception_bus_error(void);
 INLINE void m68ki_exception_1010(void);
 INLINE void m68ki_exception_1111(void);
 INLINE void m68ki_exception_illegal(void);
@@ -1683,6 +1684,18 @@ INLINE void m68ki_exception_privilege_violation(void)
 	/* Use up some clock cycles and undo the instruction's cycles */
 	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_PRIVILEGE_VIOLATION] - CYC_INSTRUCTION[REG_IR]);
 }
+
+/* Exception for bus error */
+INLINE void m68ki_exception_bus_error(void)
+{
+	uint sr = m68ki_init_exception();
+	m68ki_stack_frame_0000(REG_PC, sr, EXCEPTION_BUS_ERROR);
+	m68ki_jump_vector(EXCEPTION_BUS_ERROR);
+
+	/* Use up some clock cycles and undo the instruction's cycles */
+	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_BUS_ERROR] - CYC_INSTRUCTION[REG_IR]);
+}
+
 
 /* Exception for A-Line instructions */
 INLINE void m68ki_exception_1010(void)

@@ -724,6 +724,13 @@ void m68k_set_irq(unsigned int int_level)
 }
 
 
+/* Trigger a Bus Error exception */
+void m68k_pulse_buserr(void)
+{
+	m68ki_exception_bus_error();
+}
+
+
 /* Pulse the RESET line on the CPU */
 void m68k_pulse_reset(void)
 {

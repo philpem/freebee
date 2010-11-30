@@ -280,6 +280,10 @@ void m68k_set_irq(unsigned int int_level);
 void m68k_pulse_halt(void);
 
 
+/* Trigger a bus error exception */
+void m68k_pulse_bus_error(void);
+
+
 /* Context switching to allow multiple CPUs */
 
 /* Get the size of the cpu context in bytes */
