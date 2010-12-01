@@ -5,8 +5,9 @@
 #include <malloc.h>
 #include <string.h>
 
-#include "musashi/m68k.h"
+#include "SDL.h"
 
+#include "musashi/m68k.h"
 #include "version.h"
 #include "state.h"
 
@@ -179,40 +180,74 @@ int main(void)
 	// 512K of RAM
 	state_init(512*1024);
 
-	// set up musashi
+	// set up musashi and reset the CPU
 	m68k_set_cpu_type(M68K_CPU_TYPE_68010);
 	m68k_pulse_reset();
-
-	char dasm[512];
-	m68k_disassemble(dasm, 0x80001a, M68K_CPU_TYPE_68010);
-	printf("%s\n", dasm);
+/*
+	size_t i = 0x80001a;
+	size_t len;
+	do {
+		char dasm[512];
+		len = m68k_disassemble(dasm, i, M68K_CPU_TYPE_68010);
+		printf("%06X: %s\n", i, dasm);
+		i += len;
+	} while (i < 0x8000ff);
+*/
 
 	// set up SDL
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == -1) {
+		printf("Could not initialise SDL: %s.\n", SDL_GetError());
+		return -1;
+	}
 
-	// emulation loop!
-	// repeat:
-	// 		m68k_execute()
-	// 		m68k_set_irq() every 60ms
-	int32_t dwTimerTickCounter, dwCpuCycles;
-	const int32_t CLOCKS_PER_TIMER_TICK = 10e6/60;		//< number of clocks per 60Hz timer tick
-
-	// initialise emulation variables
-	dwTimerTickCounter = CLOCKS_PER_TIMER_TICK;
+	/***
+	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
+	 * around 60Hz (???), with a 60Hz periodic interrupt.
+	 */
+	const uint32_t TIMESLOT_FREQUENCY = 240;	// Hz
+	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
+	const uint32_t CLOCKS_PER_60HZ = (10e6 / 60);
+	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
+	uint32_t clock_cycles = 0;
 	bool exitEmu = false;
 	for (;;) {
-		dwCpuCycles = m68k_execute(10e6/60);
-		dwTimerTickCounter -= dwCpuCycles;
+		// Run the CPU for however many cycles we need to. CPU core clock is
+		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
+		// 41667 cycles per timeslot.
+		clock_cycles += m68k_execute(10e6/TIMESLOT_FREQUENCY);
 
-		// check for timer tick expiry
-		if (dwTimerTickCounter <= 0) {
-			// TODO: Timer Tick IRQ
-			
+		// TODO: run DMA here
+
+		// Is it time to run the 60Hz periodic interrupt yet?
+		if (clock_cycles > CLOCKS_PER_60HZ) {
+			// TODO: refresh screen
+			// TODO: trigger periodic interrupt (if enabled)
+			// decrement clock cycle counter, we've handled the intr.
+			clock_cycles -= CLOCKS_PER_60HZ;
 		}
 
+		printf("timeslot\n");
+
+		// make sure frame rate is equal to real time
+		uint32_t now = SDL_GetTicks();
+		if (now < next_timeslot) {
+			// timeslot finished early -- eat up some time
+			SDL_Delay(next_timeslot - now);
+		} else {
+			// timeslot finished late -- skip ahead to gain time
+			// TODO: if this happens a lot, we should let the user know
+			// that their PC might not be fast enough...
+			next_timeslot = now;
+		}
+		// advance to the next timeslot
+		next_timeslot += MILLISECS_PER_TIMESLOT;
+
+		// if we've been asked to exit the emulator, then do so.
 		if (exitEmu) break;
 	}
 
 	// shut down and exit
+	SDL_Quit();
 
 	return 0;
 }
