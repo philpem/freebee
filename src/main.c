@@ -222,8 +222,6 @@ int main(void)
 			clock_cycles -= CLOCKS_PER_60HZ;
 		}
 
-		printf("timeslot\n");
-
 		// make sure frame rate is equal to real time
 		uint32_t now = SDL_GetTicks();
 		if (now < next_timeslot) {
