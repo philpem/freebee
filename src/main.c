@@ -41,7 +41,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 				((uint32_t)state.ram[address + 3]));
 	} else {
 		// I/O register -- TODO
-		printf("RD32 %08X [unknown I/O register]\n", address);
+		printf("RD32 0x%08X [unknown I/O register]\n", address);
 	}
 	return data;
 }
@@ -64,7 +64,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 				(state.ram[address + 1]));
 	} else {
 		// I/O register -- TODO
-		printf("RD16 %08X [unknown I/O register]\n", address);
+		printf("RD16 0x%08X [unknown I/O register]\n", address);
 	}
 
 	return data;
@@ -86,7 +86,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		data = state.ram[address + 0];
 	} else {
 		// I/O register -- TODO
-		printf("RD 8 %08X [unknown I/O register]\n", address);
+		printf("RD08 0x%08X [unknown I/O register]\n", address);
 	}
 
 	return data;
@@ -111,7 +111,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
-			default:		printf("WR32 %08X ==> %02X\n", address, state.romlmap, value); break;
+			default:		printf("WR32 0x%08X ==> 0x%08X\n", address, value); break;
 		}
 	}
 }
@@ -132,7 +132,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
-			default:		printf("WR16 %08X %d %02X\n", address, state.romlmap, value); break;
+			default:		printf("WR16 0x%08X ==> 0x%04X\n", address, value); break;
 		}
 	}
 }
@@ -151,7 +151,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80); break;	// GCR3: ROMLMAP
-			default:		printf("WR 8 %08X %d %02X\n", address, state.romlmap, value); break;
+			default:		printf("WR08 0x%08X ==> 0x%02X\n", address, value); break;
 		}
 	}
 }
