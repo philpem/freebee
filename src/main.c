@@ -157,6 +157,14 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
 			default:		printf("WR16 0x%08X ==> 0x%04X\n", address, value); break;
 		}
+		if (address == 0x4A0000) {
+			printf("\tLED WRITE: %s %s %s %s\n",
+					value & 0x800 ? "-" : "R",
+					value & 0x400 ? "-" : "G",
+					value & 0x200 ? "-" : "Y",
+					value & 0x100 ? "-" : "R"
+					);
+		}
 	}
 }
 
