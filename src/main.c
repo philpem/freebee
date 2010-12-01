@@ -23,8 +23,6 @@ uint32_t m68k_read_memory_32(uint32_t address)
 {
 	uint32_t data = 0xFFFFFFFF;
 
-	printf("RD32 %08X %d", address, state.romlmap);
-
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
@@ -41,17 +39,16 @@ uint32_t m68k_read_memory_32(uint32_t address)
 				((uint32_t)state.ram[address + 1] << 16) |
 				((uint32_t)state.ram[address + 2] << 8)  |
 				((uint32_t)state.ram[address + 3]));
+	} else {
+		// I/O register -- TODO
+		printf("RD32 %08X [unknown I/O register]\n", address);
 	}
-
-	printf(" ==> %08X\n", data);
 	return data;
 }
 
 uint32_t m68k_read_memory_16(uint32_t address)
 {
 	uint16_t data = 0xFFFF;
-
-	printf("RD16 %08X %d", address, state.romlmap);
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -65,17 +62,17 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		// RAM
 		data = ((state.ram[address + 0] << 8) |
 				(state.ram[address + 1]));
+	} else {
+		// I/O register -- TODO
+		printf("RD16 %08X [unknown I/O register]\n", address);
 	}
 
-	printf(" ==> %04X\n", data);
 	return data;
 }
 
 uint32_t m68k_read_memory_8(uint32_t address)
 {
 	uint8_t data = 0xFF;
-
-	printf("RD 8 %08X %d ", address, state.romlmap);
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -87,9 +84,11 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	} else if (address < state.ram_size) {
 		// RAM access
 		data = state.ram[address + 0];
+	} else {
+		// I/O register -- TODO
+		printf("RD 8 %08X [unknown I/O register]\n", address);
 	}
 
-	printf("==> %02X\n", data);
 	return data;
 }
 
@@ -99,8 +98,6 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
-
-	printf("WR32 %08X %d %02X\n", address, state.romlmap, value);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -113,7 +110,8 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		state.ram[address + 3] =  value        & 0xff;
 	} else {
 		switch (address) {
-			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000);
+			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
+			default:		printf("WR32 %08X ==> %02X\n", address, state.romlmap, value); break;
 		}
 	}
 }
@@ -124,8 +122,6 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 	if (!state.romlmap)
 		address |= 0x800000;
 
-	printf("WR16 %08X %d %02X\n", address, state.romlmap, value);
-
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		// TODO: bus error here? can't write to rom!
@@ -135,7 +131,8 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		state.ram[address + 1] =  value        & 0xff;
 	} else {
 		switch (address) {
-			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000);
+			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
+			default:		printf("WR16 %08X %d %02X\n", address, state.romlmap, value); break;
 		}
 	}
 }
@@ -146,8 +143,6 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 	if (!state.romlmap)
 		address |= 0x800000;
 
-	printf("WR 8 %08X %d %02X\n", address, state.romlmap, value);
-
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		// TODO: bus error here? can't write to rom!
@@ -155,7 +150,8 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		state.ram[address] = value & 0xff;
 	} else {
 		switch (address) {
-			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80);
+			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80); break;	// GCR3: ROMLMAP
+			default:		printf("WR 8 %08X %d %02X\n", address, state.romlmap, value); break;
 		}
 	}
 }
