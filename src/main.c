@@ -62,7 +62,6 @@ void FAIL(char *err)
  * m68k memory read/write support functions for Musashi
  ********************************************************/
 
-
 // read m68k memory
 uint32_t m68k_read_memory_32(uint32_t address)
 {
@@ -76,11 +75,14 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		// ROM access
 		data = RD32(state.rom, address, ROM_SIZE - 1);
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM
+		// RAM access -- TODO: mapping
 		data = RD32(state.ram, address, state.ram_size - 1);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM
+		// VRAM access
 		data = RD32(state.vram, address, 0x7FFF);
+	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
+		// Map RAM access
+		data = RD32(state.map, address, 0x7FF);
 	} else {
 		// I/O register -- TODO
 		printf("RD32 0x%08X [unknown I/O register]\n", address);
@@ -100,11 +102,14 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		// ROM access
 		data = RD16(state.rom, address, ROM_SIZE - 1);
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM
+		// RAM access -- TODO: mapping
 		data = RD16(state.ram, address, state.ram_size - 1);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM
+		// VRAM access
 		data = RD16(state.vram, address, 0x7FFF);
+	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
+		// Map RAM access
+		data = RD16(state.map, address, 0x7FF);
 	} else {
 		// I/O register -- TODO
 		printf("RD16 0x%08X [unknown I/O register]\n", address);
@@ -125,11 +130,14 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		// ROM access
 		data = RD8(state.rom, address, ROM_SIZE - 1);
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM
+		// RAM access -- TODO: mapping
 		data = RD8(state.ram, address, state.ram_size - 1);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM
+		// VRAM access
 		data = RD8(state.vram, address, 0x7FFF);
+	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
+		// Map RAM access
+		data = RD8(state.map, address, 0x7FF);
 	} else {
 		// I/O register -- TODO
 		printf("RD08 0x%08X [unknown I/O register]\n", address);
@@ -149,11 +157,14 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		// ROM access
 		// TODO: bus error here? can't write to rom!
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access
+		// RAM -- TODO: mapping
 		WR32(state.ram, address, state.ram_size - 1, value);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		WR32(state.vram, address, 0x7fff, value);
+	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
+		// Map RAM access
+		WR32(state.map, address, 0x7FF, value);
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
@@ -172,11 +183,14 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		// ROM access
 		// TODO: bus error here? can't write to rom!
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access
+		// RAM access -- TODO: mapping
 		WR16(state.ram, address, state.ram_size - 1, value);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		WR16(state.vram, address, 0x7fff, value);
+	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
+		// Map RAM access
+		WR16(state.map, address, 0x7FF, value);
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
@@ -203,11 +217,14 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		// ROM access
 		// TODO: bus error here? can't write to rom!
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access
+		// RAM access -- TODO: mapping
 		WR8(state.ram, address, state.ram_size - 1, value);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		WR8(state.vram, address, 0x7fff, value);
+	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
+		// Map RAM access
+		WR8(state.map, address, 0x7FF, value);
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80); break;	// GCR3: ROMLMAP
@@ -220,6 +237,11 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 uint32_t m68k_read_disassembler_32(uint32_t addr) { return m68k_read_memory_32(addr); }
 uint32_t m68k_read_disassembler_16(uint32_t addr) { return m68k_read_memory_16(addr); }
 uint32_t m68k_read_disassembler_8 (uint32_t addr) { return m68k_read_memory_8 (addr); }
+
+
+/****************************
+ * blessed be thy main()...
+ ****************************/
 
 int main(void)
 {
