@@ -21,10 +21,13 @@ typedef struct {
 	uint8_t		*ram;				///< RAM data buffer
 	size_t		ram_size;			///< Size of RAM buffer in bytes
 
+	// Video RAM
+	uint8_t		vram[0x8000];		///< Video RAM
+
 	// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.
-	bool		romlmap;			
+	bool		romlmap;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't

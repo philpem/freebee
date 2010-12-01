@@ -39,6 +39,12 @@ uint32_t m68k_read_memory_32(uint32_t address)
 				((uint32_t)state.ram[address + 1] << 16) |
 				((uint32_t)state.ram[address + 2] << 8)  |
 				((uint32_t)state.ram[address + 3]));
+	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
+		// VRAM
+		data = (((uint32_t)state.vram[(address + 0) & 0x7fff] << 24) |
+				((uint32_t)state.vram[(address + 1) & 0x7fff] << 16) |
+				((uint32_t)state.vram[(address + 2) & 0x7fff] << 8)  |
+				((uint32_t)state.vram[(address + 3) & 0x7fff]));
 	} else {
 		// I/O register -- TODO
 		printf("RD32 0x%08X [unknown I/O register]\n", address);
@@ -62,6 +68,10 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		// RAM
 		data = ((state.ram[address + 0] << 8) |
 				(state.ram[address + 1]));
+	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
+		// VRAM
+		data = (((uint16_t)state.vram[(address + 0) & 0x7fff] << 8)  |
+				((uint16_t)state.vram[(address + 1) & 0x7fff]));
 	} else {
 		// I/O register -- TODO
 		printf("RD16 0x%08X [unknown I/O register]\n", address);
@@ -84,6 +94,9 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	} else if (address < state.ram_size) {
 		// RAM access
 		data = state.ram[address + 0];
+	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
+		// VRAM
+		data = state.vram[(address + 0) & 0x7fff];
 	} else {
 		// I/O register -- TODO
 		printf("RD08 0x%08X [unknown I/O register]\n", address);
@@ -108,6 +121,12 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		state.ram[address + 1] = (value >> 16) & 0xff;
 		state.ram[address + 2] = (value >> 8)  & 0xff;
 		state.ram[address + 3] =  value        & 0xff;
+	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
+		// VRAM access
+		state.vram[(address + 0) & 0x7fff] = (value >> 24) & 0xff;
+		state.vram[(address + 1) & 0x7fff] = (value >> 16) & 0xff;
+		state.vram[(address + 2) & 0x7fff] = (value >> 8)  & 0xff;
+		state.vram[(address + 3) & 0x7fff] =  value        & 0xff;
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
@@ -129,6 +148,10 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		// RAM access
 		state.ram[address + 0] = (value >> 8)  & 0xff;
 		state.ram[address + 1] =  value        & 0xff;
+	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
+		// VRAM access
+		state.vram[(address + 0) & 0x7fff] = (value >> 8) & 0xff;
+		state.vram[(address + 1) & 0x7fff] =  value       & 0xff;
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
@@ -148,6 +171,9 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		// TODO: bus error here? can't write to rom!
 	} else if (address < state.ram_size) {
 		state.ram[address] = value & 0xff;
+	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
+		// VRAM access
+		state.vram[address & 0x7fff] = value;
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80); break;	// GCR3: ROMLMAP
