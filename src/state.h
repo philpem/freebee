@@ -24,6 +24,9 @@ typedef struct {
 	// Video RAM
 	uint8_t		vram[0x8000];		///< Video RAM
 
+	// Map RAM
+	uint8_t		map[0x800];			///< Map RAM
+
 	// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.
