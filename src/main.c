@@ -19,6 +19,99 @@ void FAIL(char *err)
 	exit(EXIT_FAILURE);
 }
 
+/**
+ * @brief Set the pixel at (x, y) to the given value
+ * @note The surface must be locked before calling this!
+ * @param	surface		SDL surface upon which to draw
+ * @param	x			X co-ordinate
+ * @param	y			Y co-ordinate
+ * @param	pixel		Pixel value (from SDL_MapRGB)
+ */
+void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
+{
+	int bpp = surface->format->BytesPerPixel;
+	/* Here p is the address to the pixel we want to set */
+	Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+	switch (bpp) {
+		case 1:
+			*p = pixel;
+			break;
+
+		case 2:
+			*(Uint16 *)p = pixel;
+			break;
+
+		case 3:
+			if (SDL_BYTEORDER == SDL_BIG_ENDIAN) {
+				p[0] = (pixel >> 16) & 0xff;
+				p[1] = (pixel >> 8) & 0xff;
+				p[2] = pixel & 0xff;
+			}
+			else {
+				p[0] = pixel & 0xff;
+				p[1] = (pixel >> 8) & 0xff;
+				p[2] = (pixel >> 16) & 0xff;
+			}
+			break;
+
+		case 4:
+			*(Uint32 *)p = pixel;
+			break;
+
+		default:
+			break;           /* shouldn't happen, but avoids warnings */
+	} // switch
+}
+
+
+/**
+ * @brief	Refresh the screen.
+ * @param	surface		SDL surface upon which to draw.
+ */
+void refreshScreen(SDL_Surface *s)
+{
+	// Lock the screen surface (if necessary)
+	if (SDL_MUSTLOCK(s)) {
+		if (SDL_LockSurface(s) < 0) {
+			fprintf(stderr, "ERROR: Unable to lock screen!\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	// Map the foreground and background colours
+	Uint32 fg = SDL_MapRGB(s->format, 0, 255, 0);	// green foreground
+	Uint32 bg = SDL_MapRGB(s->format, 0, 0, 0);		// black background
+
+	// Refresh the 3B1 screen area first. TODO: only do this if VRAM has actually changed!
+	uint32_t vram_address = 0;
+	for (int y=0; y<348; y++) {
+		for (int x=0; x<720; x+=16) {	// 720 pixels, monochrome, packed into 16bit words
+			// Get the pixel
+			uint16_t val = RD16(state.vram, vram_address, sizeof(state.vram)-1);
+			vram_address += 2;
+			// Now copy it to the video buffer
+			for (int px=0; px<16; px++) {
+				if (val & 1)
+					putpixel(s, x+px, y, fg);
+				else
+					putpixel(s, x+px, y, bg);
+			}
+		}
+	}
+
+	// TODO: blit LEDs and status info
+
+	// Unlock the screen surface
+	if (SDL_MUSTLOCK(s)) {
+		SDL_UnlockSurface(s);
+	}
+
+	// Trigger a refresh -- TODO: partial refresh depending on whether we
+	// refreshed the screen area, status area, both, or none. Use SDL_UpdateRect() for this.
+	SDL_Flip(s);
+}
+
 /****************************
  * blessed be thy main()...
  ****************************/
@@ -80,7 +173,8 @@ int main(void)
 
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
-			// TODO: refresh screen
+			// Refresh the screen
+			refreshScreen(screen);
 			// TODO: trigger periodic interrupt (if enabled)
 			// decrement clock cycle counter, we've handled the intr.
 			clock_cycles -= CLOCKS_PER_60HZ;
