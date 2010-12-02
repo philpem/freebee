@@ -271,7 +271,6 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-//		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD32 from MapRAM mirror, addr=0x%08X\n", address);
