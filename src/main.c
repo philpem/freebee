@@ -57,6 +57,83 @@ void FAIL(char *err)
 #define WR8(array, address, andmask, value)						\
 	array[(address + 0) & (andmask)] =  value        & 0xff;
 
+/******************
+ * Memory mapping
+ ******************/
+
+#define MAPRAM(addr) (((uint16_t)state.map[addr*2] << 8) + ((uint16_t)state.map[(addr*2)+1]))
+
+uint32_t mapAddr(uint32_t addr, bool writing)
+{
+	if (addr < 0x400000) {
+		// RAM access. Check against the Map RAM
+		// Start by getting the original page address
+		uint16_t page = (addr >> 12) & 0x3FF;
+
+		// Look it up in the map RAM and get the physical page address
+		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
+
+		// Update the Page Status bits
+		uint8_t pagebits = (MAPRAM(page) >> 13) & 0x03;
+		if (pagebits != 0) {
+			if (writing)
+				state.map[addr*2] |= 0x60;		// Page written to (dirty)
+			else
+				state.map[addr*2] |= 0x40;		// Page accessed but not written
+		}
+
+		// Return the address with the new physical page spliced in
+		return (new_page_addr << 12) + (addr & 0xFFF);
+	} else {
+		// I/O, VRAM or MapRAM space; no mapping is performed or required
+		// TODO: assert here?
+		return addr;
+	}
+}
+
+typedef enum {
+	MEM_ALLOWED = 0,
+	MEM_PAGEFAULT,		// Page fault -- page not present
+	MEM_PAGE_NO_WE,		// Page not write enabled
+	MEM_KERNEL,			// User attempted to access kernel memory
+	MEM_UIE				// User Nonmemory Location Access
+} MEM_STATUS;
+
+// check memory access permissions
+MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
+{
+	// Are we in Supervisor mode?
+	if (m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)
+		// Yes. We can do anything we like.
+		return MEM_ALLOWED;
+
+	// If we're here, then we must be in User mode.
+	// Check that the user didn't access memory outside of the RAM area
+	if (addr >= 0x400000)
+		return MEM_UIE;
+
+	// This leaves us with Page Fault checking. Get the page bits for this page.
+	uint16_t page = (addr >> 12) & 0x3FF;
+	uint8_t pagebits = (MAPRAM(page) >> 13) & 0x07;
+
+	// Check page is present
+	if ((pagebits & 0x03) == 0)
+		return MEM_PAGEFAULT;
+
+	// User attempt to access the kernel
+	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
+	if (((addr >> 19) & 0x0F) == 0)
+		return MEM_KERNEL;
+
+	// Check page is write enabled
+	if ((pagebits & 0x04) == 0)
+		return MEM_PAGE_NO_WE;
+
+	// Page access allowed.
+	return MEM_ALLOWED;
+}
+
+#undef MAPRAM
 
 /********************************************************
  * m68k memory read/write support functions for Musashi
