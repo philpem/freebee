@@ -243,37 +243,55 @@ uint32_t m68k_read_memory_32(uint32_t address)
 				data = RD32(state.vram, address, 0x7FFF);
 				break;
 			case 0x030000:				// Bus Status Register 0
+				break;
 			case 0x040000:				// Bus Status Register 1
+				break;
 			case 0x050000:				// Phone status
+				break;
 			case 0x060000:				// DMA Count
+				break;
 			case 0x070000:				// Line Printer Status Register
+				break;
 			case 0x080000:				// Real Time Clock
+				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						break;
 					case 0x091000:		// Line select 2
 					case 0x099000:
+						break;
 					case 0x092000:		// Hook relay 1
 					case 0x09A000:
+						break;
 					case 0x093000:		// Hook relay 2
 					case 0x09B000:
+						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						break;
 					case 0x096000:		// Line 1 A-lead
 					case 0x09E000:
+						break;
 					case 0x097000:		// Line 2 A-lead
 					case 0x09F000:
 						break;
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				break;
 			case 0x0B0000:				// TM/DIALWR
+				break;
 			case 0x0C0000:				// CSR
+				break;
 			case 0x0D0000:				// DMA Address Register
+				break;
 			case 0x0E0000:				// Disk Control Register
+				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
@@ -307,6 +325,33 @@ uint32_t m68k_read_memory_32(uint32_t address)
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+						switch (address & 0x077000) {
+							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+								break;
+							case 0x042000:		// [ef][4c][2A]xxx ==> BP
+								break;
+							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
+								break;
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+								break;
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+								break;
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								break;
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+								break;
+						}
+					case 0x050000:		// [ef][5d]xxxx ==> 8274
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+						switch (address & 0x07F000) {
+							default:
+								break;
+						}
+						break;
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
 					default:
 						fprintf(stderr, "NOTE: RD32 from undefined E/F-block address 0x%08X", address);
 				}
@@ -351,37 +396,55 @@ uint32_t m68k_read_memory_16(uint32_t address)
 				data = RD16(state.vram, address, 0x7FFF);
 				break;
 			case 0x030000:				// Bus Status Register 0
+				break;
 			case 0x040000:				// Bus Status Register 1
+				break;
 			case 0x050000:				// Phone status
+				break;
 			case 0x060000:				// DMA Count
+				break;
 			case 0x070000:				// Line Printer Status Register
+				break;
 			case 0x080000:				// Real Time Clock
+				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						break;
 					case 0x091000:		// Line select 2
 					case 0x099000:
+						break;
 					case 0x092000:		// Hook relay 1
 					case 0x09A000:
+						break;
 					case 0x093000:		// Hook relay 2
 					case 0x09B000:
+						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						break;
 					case 0x096000:		// Line 1 A-lead
 					case 0x09E000:
+						break;
 					case 0x097000:		// Line 2 A-lead
 					case 0x09F000:
 						break;
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				break;
 			case 0x0B0000:				// TM/DIALWR
+				break;
 			case 0x0C0000:				// CSR
+				break;
 			case 0x0D0000:				// DMA Address Register
+				break;
 			case 0x0E0000:				// Disk Control Register
+				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
@@ -415,8 +478,35 @@ uint32_t m68k_read_memory_16(uint32_t address)
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+						switch (address & 0x077000) {
+							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+								break;
+							case 0x042000:		// [ef][4c][2A]xxx ==> BP
+								break;
+							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
+								break;
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+								break;
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+								break;
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								break;
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+								break;
+						}
+					case 0x050000:		// [ef][5d]xxxx ==> 8274
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+						switch (address & 0x07F000) {
+							default:
+								break;
+						}
+						break;
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
 					default:
-						fprintf(stderr, "NOTE: RD16 to undefined E/F-block address 0x%08X", address);
+						fprintf(stderr, "NOTE: RD16 from undefined E/F-block address 0x%08X", address);
 				}
 		}
 	}
@@ -462,43 +552,61 @@ uint32_t m68k_read_memory_8(uint32_t address)
 				data = RD8(state.vram, address, 0x7FFF);
 				break;
 			case 0x030000:				// Bus Status Register 0
+				break;
 			case 0x040000:				// Bus Status Register 1
+				break;
 			case 0x050000:				// Phone status
+				break;
 			case 0x060000:				// DMA Count
+				break;
 			case 0x070000:				// Line Printer Status Register
+				break;
 			case 0x080000:				// Real Time Clock
+				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						break;
 					case 0x091000:		// Line select 2
 					case 0x099000:
+						break;
 					case 0x092000:		// Hook relay 1
 					case 0x09A000:
+						break;
 					case 0x093000:		// Hook relay 2
 					case 0x09B000:
+						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						break;
 					case 0x096000:		// Line 1 A-lead
 					case 0x09E000:
+						break;
 					case 0x097000:		// Line 2 A-lead
 					case 0x09F000:
 						break;
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				break;
 			case 0x0B0000:				// TM/DIALWR
+				break;
 			case 0x0C0000:				// CSR
+				break;
 			case 0x0D0000:				// DMA Address Register
+				break;
 			case 0x0E0000:				// Disk Control Register
+				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -511,7 +619,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 					case 0xD40000:		// Expansion slot 5
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
-						fprintf(stderr, "NOTE: RD8 from expansion card address 0x%08X\n", address);
+						fprintf(stderr, "NOTE: RD8 from expansion card space, addr=0x%08X\n", address);
 						break;
 				}
 				break;
@@ -526,6 +634,33 @@ uint32_t m68k_read_memory_8(uint32_t address)
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+						switch (address & 0x077000) {
+							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+								break;
+							case 0x042000:		// [ef][4c][2A]xxx ==> BP
+								break;
+							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
+								break;
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+								break;
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+								break;
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								break;
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+								break;
+						}
+					case 0x050000:		// [ef][5d]xxxx ==> 8274
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+						switch (address & 0x07F000) {
+							default:
+								break;
+						}
+						break;
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
 					default:
 						fprintf(stderr, "NOTE: RD8 from undefined E/F-block address 0x%08X", address);
 				}
@@ -554,7 +689,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		WR32(state.ram, mapAddr(address, false), state.ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("WR32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR32 to MapRAM mirror, addr=0x%08X, data=0x%08X\n", address, value);
@@ -568,37 +703,55 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				WR32(state.vram, address, 0x7FFF, value);
 				break;
 			case 0x030000:				// Bus Status Register 0
+				break;
 			case 0x040000:				// Bus Status Register 1
+				break;
 			case 0x050000:				// Phone status
+				break;
 			case 0x060000:				// DMA Count
+				break;
 			case 0x070000:				// Line Printer Status Register
+				break;
 			case 0x080000:				// Real Time Clock
+				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						break;
 					case 0x091000:		// Line select 2
 					case 0x099000:
+						break;
 					case 0x092000:		// Hook relay 1
 					case 0x09A000:
+						break;
 					case 0x093000:		// Hook relay 2
 					case 0x09B000:
+						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						break;
 					case 0x096000:		// Line 1 A-lead
 					case 0x09E000:
+						break;
 					case 0x097000:		// Line 2 A-lead
 					case 0x09F000:
 						break;
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				break;
 			case 0x0B0000:				// TM/DIALWR
+				break;
 			case 0x0C0000:				// CSR
+				break;
 			case 0x0D0000:				// DMA Address Register
+				break;
 			case 0x0E0000:				// Disk Control Register
+				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
@@ -632,6 +785,36 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+						switch (address & 0x077000) {
+							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+								break;
+							case 0x042000:		// [ef][4c][2A]xxx ==> BP
+								break;
+							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
+								state.romlmap = ((value & 0x8000) == 0x8000);
+								break;
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+								break;
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+								break;
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								break;
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+								break;
+						}
+					case 0x050000:		// [ef][5d]xxxx ==> 8274
+						break;
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+						switch (address & 0x07F000) {
+							default:
+								break;
+						}
+						break;
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+						break;
 					default:
 						fprintf(stderr, "NOTE: WR32 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
 				}
@@ -659,7 +842,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		WR16(state.ram, mapAddr(address, false), state.ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("WR16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR16 to MapRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
@@ -673,37 +856,55 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				WR16(state.vram, address, 0x7FFF, value);
 				break;
 			case 0x030000:				// Bus Status Register 0
+				break;
 			case 0x040000:				// Bus Status Register 1
+				break;
 			case 0x050000:				// Phone status
+				break;
 			case 0x060000:				// DMA Count
+				break;
 			case 0x070000:				// Line Printer Status Register
+				break;
 			case 0x080000:				// Real Time Clock
+				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						break;
 					case 0x091000:		// Line select 2
 					case 0x099000:
+						break;
 					case 0x092000:		// Hook relay 1
 					case 0x09A000:
+						break;
 					case 0x093000:		// Hook relay 2
 					case 0x09B000:
+						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						break;
 					case 0x096000:		// Line 1 A-lead
 					case 0x09E000:
+						break;
 					case 0x097000:		// Line 2 A-lead
 					case 0x09F000:
 						break;
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				break;
 			case 0x0B0000:				// TM/DIALWR
+				break;
 			case 0x0C0000:				// CSR
+				break;
 			case 0x0D0000:				// DMA Address Register
+				break;
 			case 0x0E0000:				// Disk Control Register
+				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
@@ -737,8 +938,38 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+						switch (address & 0x077000) {
+							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+								break;
+							case 0x042000:		// [ef][4c][2A]xxx ==> BP
+								break;
+							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
+								state.romlmap = ((value & 0x8000) == 0x8000);
+								break;
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+								break;
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+								break;
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								break;
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+								break;
+						}
+					case 0x050000:		// [ef][5d]xxxx ==> 8274
+						break;
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+						switch (address & 0x07F000) {
+							default:
+								break;
+						}
+						break;
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+						break;
 					default:
-						fprintf(stderr, "NOTE: WR16 to undefined E/F-block space, addr=0x%08X, data=0x%04X\n", address, value);
+						fprintf(stderr, "NOTE: WR32 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
 				}
 		}
 	}
@@ -764,7 +995,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		WR8(state.ram, mapAddr(address, false), state.ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("WR8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		printf("WR8 0x%08X ==> %02X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR8 to MapRAM mirror, addr=%08X, data=%02X\n", address, value);
@@ -778,37 +1009,55 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				WR8(state.vram, address, 0x7FFF, value);
 				break;
 			case 0x030000:				// Bus Status Register 0
+				break;
 			case 0x040000:				// Bus Status Register 1
+				break;
 			case 0x050000:				// Phone status
+				break;
 			case 0x060000:				// DMA Count
+				break;
 			case 0x070000:				// Line Printer Status Register
+				break;
 			case 0x080000:				// Real Time Clock
+				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						break;
 					case 0x091000:		// Line select 2
 					case 0x099000:
+						break;
 					case 0x092000:		// Hook relay 1
 					case 0x09A000:
+						break;
 					case 0x093000:		// Hook relay 2
 					case 0x09B000:
+						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						break;
 					case 0x096000:		// Line 1 A-lead
 					case 0x09E000:
+						break;
 					case 0x097000:		// Line 2 A-lead
 					case 0x09F000:
 						break;
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				break;
 			case 0x0B0000:				// TM/DIALWR
+				break;
 			case 0x0C0000:				// CSR
+				break;
 			case 0x0D0000:				// DMA Address Register
+				break;
 			case 0x0E0000:				// Disk Control Register
+				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
@@ -842,8 +1091,40 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+						switch (address & 0x077000) {
+							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+								break;
+							case 0x042000:		// [ef][4c][2A]xxx ==> BP
+								break;
+							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
+								if ((address & 1) == 0)
+								state.romlmap = ((value & 0x8000) == 0x8000);
+								break;
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+								break;
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+								break;
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								break;
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+								break;
+						}
+					case 0x050000:		// [ef][5d]xxxx ==> 8274
+						break;
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+						switch (address & 0x07F000) {
+							default:
+								break;
+						}
+						break;
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+						break;
 					default:
 						fprintf(stderr, "NOTE: WR8 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
+						break;
 				}
 		}
 	}
