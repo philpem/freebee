@@ -27,8 +27,10 @@ typedef struct {
 	// Map RAM
 	uint8_t		map[0x800];			///< Map RAM
 
-	// General Status Register
-	uint16_t	genstat;
+	// Registers
+	uint16_t	genstat;			///< General Status Register
+	uint16_t	bsr0;				///< Bus Status Register 0
+	uint16_t	bsr1;				///< Bus Status Register 1
 
 	// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the

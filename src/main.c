@@ -148,29 +148,42 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
  * 			in a non-void function, even if it's impossible to ever reach the
  * 			return-with-no-value. UGH!
  */
-#define ACCESS_CHECK_WR() do {									\
-		/* MEM_STATUS st; */									\
-		switch (checkMemoryAccess(address, true)) {				\
-			case MEM_ALLOWED:									\
-				/* Access allowed */							\
-				break;											\
-			case MEM_PAGEFAULT:									\
-				/* Page fault */								\
-				state.genstat = 0x8FFF;							\
-				m68k_pulse_bus_error();							\
-				return;											\
-			case MEM_UIE:										\
-				/* User access to memory above 4MB */			\
-				state.genstat = 0x9EFF;							\
-				m68k_pulse_bus_error();							\
-				return;											\
-			case MEM_KERNEL:									\
-			case MEM_PAGE_NO_WE:								\
-				/* kernel access or page not write enabled */	\
-				/* TODO: which regs need setting? */			\
-				m68k_pulse_bus_error();							\
-				return;											\
-		}														\
+#define ACCESS_CHECK_WR(address, bits) do {							\
+		bool fault = false;											\
+		/* MEM_STATUS st; */										\
+		switch (checkMemoryAccess(address, true)) {					\
+			case MEM_ALLOWED:										\
+				/* Access allowed */								\
+				break;												\
+			case MEM_PAGEFAULT:										\
+				/* Page fault */									\
+				state.genstat = 0x8FFF;								\
+				fault = true;										\
+				break;												\
+			case MEM_UIE:											\
+				/* User access to memory above 4MB */				\
+				state.genstat = 0x9EFF;								\
+				fault = true;										\
+				break;												\
+			case MEM_KERNEL:										\
+			case MEM_PAGE_NO_WE:									\
+				/* kernel access or page not write enabled */		\
+				/* TODO: which regs need setting? */				\
+				fault = true;										\
+				break;												\
+		}															\
+																	\
+		if (fault) {												\
+			if (bits >= 16)											\
+				state.bsr0 = 0x7F00;								\
+			else													\
+				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
+			state.bsr0 |= (address >> 16);							\
+			state.bsr1 = address & 0xffff;							\
+			printf("ERR: BusError WR\n");							\
+			m68k_pulse_bus_error();									\
+			return;													\
+		}															\
 	} while (false)
 
 /**
@@ -182,30 +195,44 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
  * 			in a non-void function, even if it's impossible to ever reach the
  * 			return-with-no-value. UGH!
  */
-#define ACCESS_CHECK_RD() do {									\
-		/* MEM_STATUS st; */									\
-		switch (checkMemoryAccess(address, false)) {			\
-			case MEM_ALLOWED:									\
-				/* Access allowed */							\
-				break;											\
-			case MEM_PAGEFAULT:									\
-				/* Page fault */								\
-				state.genstat = 0xCFFF;							\
-				m68k_pulse_bus_error();							\
-				return 0xFFFFFFFF;								\
-			case MEM_UIE:										\
-				/* User access to memory above 4MB */			\
-				state.genstat = 0xDEFF;							\
-				m68k_pulse_bus_error();							\
-				return 0xFFFFFFFF;								\
-			case MEM_KERNEL:									\
-			case MEM_PAGE_NO_WE:								\
-				/* kernel access or page not write enabled */	\
-				/* TODO: which regs need setting? */			\
-				m68k_pulse_bus_error();							\
-				return 0xFFFFFFFF;								\
-		}														\
+#define ACCESS_CHECK_RD(address, bits) do {							\
+		bool fault = false;											\
+		/* MEM_STATUS st; */										\
+		switch (checkMemoryAccess(address, false)) {				\
+			case MEM_ALLOWED:										\
+				/* Access allowed */								\
+				break;												\
+			case MEM_PAGEFAULT:										\
+				/* Page fault */									\
+				state.genstat = 0x8FFF;								\
+				fault = true;										\
+				break;												\
+			case MEM_UIE:											\
+				/* User access to memory above 4MB */				\
+				state.genstat = 0x9EFF;								\
+				fault = true;										\
+				break;												\
+			case MEM_KERNEL:										\
+			case MEM_PAGE_NO_WE:									\
+				/* kernel access or page not write enabled */		\
+				/* TODO: which regs need setting? */				\
+				fault = true;										\
+				break;												\
+		}															\
+																	\
+		if (fault) {												\
+			if (bits >= 16)											\
+				state.bsr0 = 0x7F00;								\
+			else													\
+				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
+			state.bsr0 |= (address >> 16);							\
+			state.bsr1 = address & 0xffff;							\
+			printf("ERR: BusError RD\n");							\
+			m68k_pulse_bus_error();									\
+			return 0xFFFFFFFF;										\
+		}															\
 	} while (false)
+
 
 /**
  * @brief Read M68K memory, 32-bit
@@ -219,7 +246,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_RD();
+	ACCESS_CHECK_RD(address, 32);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -372,7 +399,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_RD();
+	ACCESS_CHECK_RD(address, 16);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -525,7 +552,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_RD();
+	ACCESS_CHECK_RD(address, 8);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -679,7 +706,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_WR();
+	ACCESS_CHECK_WR(address, 32);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -832,7 +859,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_WR();
+	ACCESS_CHECK_WR(address, 16);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -985,7 +1012,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_WR();
+	ACCESS_CHECK_WR(address, 8);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
