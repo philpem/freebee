@@ -233,6 +233,18 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
 		}															\
 	} while (false)
 
+// Logging macros
+#define LOG_NOT_HANDLED_R(bits)																	\
+	do {																						\
+		if (!handled)																			\
+			printf("unhandled read%02d, addr=0x%08X\n", bits, address);							\
+	} while (0);
+
+#define LOG_NOT_HANDLED_W(bits)																	\
+	do {																						\
+		if (!handled)																			\
+			printf("unhandled write%02d, addr=0x%08X, data=0x%08X\n", bits, address, value);	\
+	} while (0);
 
 /**
  * @brief Read M68K memory, 32-bit
@@ -240,6 +252,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
 uint32_t m68k_read_memory_32(uint32_t address)
 {
 	uint32_t data = 0xFFFFFFFF;
+	bool handled = false;
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -251,9 +264,11 @@ uint32_t m68k_read_memory_32(uint32_t address)
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD32(state.rom, address, ROM_SIZE - 1);
+		handled = true;
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		data = RD32(state.ram, mapAddr(address, false), state.ram_size - 1);
+		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 //		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
@@ -261,17 +276,24 @@ uint32_t m68k_read_memory_32(uint32_t address)
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD32 from MapRAM mirror, addr=0x%08X\n", address);
 				data = RD32(state.map, address, 0x7FF);
+				handled = true;
 				break;
 			case 0x010000:				// General Status Register
 				data = ((uint32_t)state.genstat << 16) + (uint32_t)state.genstat;
+				handled = true;
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD32 from VideoRAM mirror, addr=0x%08X\n", address);
 				data = RD32(state.vram, address, 0x7FFF);
+				handled = true;
 				break;
 			case 0x030000:				// Bus Status Register 0
+				data = ((uint32_t)state.bsr0 << 16) + (uint32_t)state.bsr0;
+				handled = true;
 				break;
 			case 0x040000:				// Bus Status Register 1
+				data = ((uint32_t)state.bsr1 << 16) + (uint32_t)state.bsr1;
+				handled = true;
 				break;
 			case 0x050000:				// Phone status
 				break;
@@ -324,7 +346,6 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-//		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -371,7 +392,9 @@ uint32_t m68k_read_memory_32(uint32_t address)
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
 								break;
 						}
+						break;
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
+						break;
 					case 0x060000:		// [ef][6e]xxxx ==> Control regs
 						switch (address & 0x07F000) {
 							default:
@@ -379,11 +402,12 @@ uint32_t m68k_read_memory_32(uint32_t address)
 						}
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
-					default:
-						fprintf(stderr, "NOTE: RD32 from undefined E/F-block address 0x%08X", address);
+						break;
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_R(32);
 	return data;
 }
 
@@ -393,6 +417,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 uint32_t m68k_read_memory_16(uint32_t address)
 {
 	uint16_t data = 0xFFFF;
+	bool handled = false;
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -404,27 +429,35 @@ uint32_t m68k_read_memory_16(uint32_t address)
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD16(state.rom, address, ROM_SIZE - 1);
+		handled = true;
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		data = RD16(state.ram, mapAddr(address, false), state.ram_size - 1);
+		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-//		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD16 from MapRAM mirror, addr=0x%08X\n", address);
 				data = RD16(state.map, address, 0x7FF);
+				handled = true;
 				break;
 			case 0x010000:				// General Status Register
 				data = state.genstat;
+				handled = true;
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD16 from VideoRAM mirror, addr=0x%08X\n", address);
 				data = RD16(state.vram, address, 0x7FFF);
+				handled = true;
 				break;
 			case 0x030000:				// Bus Status Register 0
+				data = state.bsr0;
+				handled = true;
 				break;
 			case 0x040000:				// Bus Status Register 1
+				data = state.bsr1;
+				handled = true;
 				break;
 			case 0x050000:				// Phone status
 				break;
@@ -477,7 +510,6 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-//		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -524,7 +556,9 @@ uint32_t m68k_read_memory_16(uint32_t address)
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
 								break;
 						}
+						break;
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
+						break;
 					case 0x060000:		// [ef][6e]xxxx ==> Control regs
 						switch (address & 0x07F000) {
 							default:
@@ -532,11 +566,12 @@ uint32_t m68k_read_memory_16(uint32_t address)
 						}
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
-					default:
-						fprintf(stderr, "NOTE: RD16 from undefined E/F-block address 0x%08X", address);
+						break;
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_R(32);
 	return data;
 }
 
@@ -546,6 +581,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 uint32_t m68k_read_memory_8(uint32_t address)
 {
 	uint8_t data = 0xFF;
+	bool handled = false;
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -557,30 +593,44 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD8(state.rom, address, ROM_SIZE - 1);
+		handled = true;
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		data = RD8(state.ram, mapAddr(address, false), state.ram_size - 1);
+		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-//		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD8 from MapRAM mirror, addr=0x%08X\n", address);
 				data = RD8(state.map, address, 0x7FF);
+				handled = true;
 				break;
 			case 0x010000:				// General Status Register
 				if ((address & 1) == 0)
 					data = (state.genstat >> 8) & 0xff;
 				else
 					data = (state.genstat)      & 0xff;
+				handled = true;
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD8 from VideoRAM mirror, addr=0x%08X\n", address);
 				data = RD8(state.vram, address, 0x7FFF);
+				handled = true;
 				break;
 			case 0x030000:				// Bus Status Register 0
+				if ((address & 1) == 0)
+					data = (state.bsr0 >> 8) & 0xff;
+				else
+					data = (state.bsr0)      & 0xff;
+				handled = true;
 				break;
 			case 0x040000:				// Bus Status Register 1
+				if ((address & 1) == 0)
+					data = (state.bsr1 >> 8) & 0xff;
+				else
+					data = (state.bsr1)      & 0xff;
+				handled = true;
 				break;
 			case 0x050000:				// Phone status
 				break;
@@ -633,7 +683,6 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-//		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -681,6 +730,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 								break;
 						}
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
+						break;
 					case 0x060000:		// [ef][6e]xxxx ==> Control regs
 						switch (address & 0x07F000) {
 							default:
@@ -688,11 +738,13 @@ uint32_t m68k_read_memory_8(uint32_t address)
 						}
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
-					default:
-						fprintf(stderr, "NOTE: RD8 from undefined E/F-block address 0x%08X", address);
+						break;
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_R(8);
+
 	return data;
 }
 
@@ -701,6 +753,8 @@ uint32_t m68k_read_memory_8(uint32_t address)
  */
 void m68k_write_memory_32(uint32_t address, uint32_t value)
 {
+	bool handled = false;
+
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
@@ -710,24 +764,27 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		WR32(state.rom, address, ROM_SIZE - 1, value);
+		handled = true;
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		WR32(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-//		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR32 to MapRAM mirror, addr=0x%08X, data=0x%08X\n", address, value);
 				WR32(state.map, address, 0x7FF, value);
+				handled = true;
 				break;
 			case 0x010000:				// General Status Register
 				state.genstat = (value & 0xffff);
+				handled = true;
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR32 to VideoRAM mirror, addr=0x%08X, data=0x%08X\n", address, value);
 				WR32(state.vram, address, 0x7FFF, value);
+				handled = true;
 				break;
 			case 0x030000:				// Bus Status Register 0
 				break;
@@ -784,7 +841,6 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-//		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -798,6 +854,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
 						fprintf(stderr, "NOTE: WR32 to expansion card space, addr=0x%08X, data=0x%08X\n", address, value);
+						handled = true;
 						break;
 				}
 				break;
@@ -842,11 +899,11 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
 						break;
-					default:
-						fprintf(stderr, "NOTE: WR32 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_W(32);
 }
 
 /**
@@ -854,6 +911,8 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
  */
 void m68k_write_memory_16(uint32_t address, uint32_t value)
 {
+	bool handled = false;
+
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
@@ -863,28 +922,32 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		WR16(state.rom, address, ROM_SIZE - 1, value);
+		handled = true;
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		WR16(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-//		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR16 to MapRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
 				WR16(state.map, address, 0x7FF, value);
+				handled = true;
 				break;
-			case 0x010000:				// General Status Register
-				state.genstat = (value & 0xffff);
+			case 0x010000:				// General Status Register (read only)
+				handled = true;
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR16 to VideoRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
 				WR16(state.vram, address, 0x7FFF, value);
+				handled = true;
 				break;
-			case 0x030000:				// Bus Status Register 0
+			case 0x030000:				// Bus Status Register 0 (read only)
+				handled = true;
 				break;
-			case 0x040000:				// Bus Status Register 1
+			case 0x040000:				// Bus Status Register 1 (read only)
+				handled = true;
 				break;
 			case 0x050000:				// Phone status
 				break;
@@ -937,7 +1000,6 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-//		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -975,6 +1037,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
 								state.romlmap = ((value & 0x8000) == 0x8000);
+								handled = true;
 								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
 								break;
@@ -995,11 +1058,11 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
 						break;
-					default:
-						fprintf(stderr, "NOTE: WR32 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_W(16);
 }
 
 /**
@@ -1007,6 +1070,8 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
  */
 void m68k_write_memory_8(uint32_t address, uint32_t value)
 {
+	bool handled = false;
+
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
@@ -1015,29 +1080,33 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 	ACCESS_CHECK_WR(address, 8);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
-		// ROM access
-		WR8(state.rom, address, ROM_SIZE - 1, value);
+		// ROM access (read only!)
+		handled = true;
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		WR8(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+		handled = true;
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-//		printf("WR8 0x%08X ==> %02X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR8 to MapRAM mirror, addr=%08X, data=%02X\n", address, value);
 				WR8(state.map, address, 0x7FF, value);
+				handled = true;
 				break;
 			case 0x010000:				// General Status Register
-				state.genstat = (value & 0xffff);
+				handled = true;
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR8 to VideoRAM mirror, addr=%08X\n, data=0x%02X", address, value);
 				WR8(state.vram, address, 0x7FFF, value);
+				handled = true;
 				break;
 			case 0x030000:				// Bus Status Register 0
+				handled = true;
 				break;
 			case 0x040000:				// Bus Status Register 1
+				handled = true;
 				break;
 			case 0x050000:				// Phone status
 				break;
@@ -1090,7 +1159,6 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-//		printf("WR8 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -1128,7 +1196,8 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
 								if ((address & 1) == 0)
-								state.romlmap = ((value & 0x8000) == 0x8000);
+									state.romlmap = ((value & 0x80) == 0x80);
+								handled = true;
 								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
 								break;
@@ -1155,6 +1224,8 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_W(8);
 }
 
 
