@@ -77,9 +77,9 @@ uint32_t mapAddr(uint32_t addr, bool writing)
 		uint8_t pagebits = (MAPRAM(page) >> 13) & 0x03;
 		if (pagebits != 0) {
 			if (writing)
-				state.map[addr*2] |= 0x60;		// Page written to (dirty)
+				state.map[page*2] |= 0x60;		// Page written to (dirty)
 			else
-				state.map[addr*2] |= 0x40;		// Page accessed but not written
+				state.map[page*2] |= 0x40;		// Page accessed but not written
 		}
 
 		// Return the address with the new physical page spliced in
@@ -139,7 +139,77 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
  * m68k memory read/write support functions for Musashi
  ********************************************************/
 
-// read m68k memory
+/**
+ * @brief	Check memory access permissions for a write operation.
+ * @note	This used to be a single macro (merged with ACCESS_CHECK_RD), but
+ * 			gcc throws warnings when you have a return-with-value in a void
+ * 			function, even if the return-with-value is completely unreachable.
+ * 			Similarly it doesn't like it if you have a return without a value
+ * 			in a non-void function, even if it's impossible to ever reach the
+ * 			return-with-no-value. UGH!
+ */
+#define ACCESS_CHECK_WR() do {									\
+		/* MEM_STATUS st; */									\
+		switch (checkMemoryAccess(address, true)) {				\
+			case MEM_ALLOWED:									\
+				/* Access allowed */							\
+				break;											\
+			case MEM_PAGEFAULT:									\
+				/* Page fault */								\
+				state.genstat = 0x8FFF;							\
+				m68k_pulse_bus_error();							\
+				return;											\
+			case MEM_UIE:										\
+				/* User access to memory above 4MB */			\
+				state.genstat = 0x9EFF;							\
+				m68k_pulse_bus_error();							\
+				return;											\
+			case MEM_KERNEL:									\
+			case MEM_PAGE_NO_WE:								\
+				/* kernel access or page not write enabled */	\
+				/* TODO: which regs need setting? */			\
+				m68k_pulse_bus_error();							\
+				return;											\
+		}														\
+	} while (false)
+
+/**
+ * @brief Check memory access permissions for a read operation.
+ * @note	This used to be a single macro (merged with ACCESS_CHECK_WR), but
+ * 			gcc throws warnings when you have a return-with-value in a void
+ * 			function, even if the return-with-value is completely unreachable.
+ * 			Similarly it doesn't like it if you have a return without a value
+ * 			in a non-void function, even if it's impossible to ever reach the
+ * 			return-with-no-value. UGH!
+ */
+#define ACCESS_CHECK_RD() do {									\
+		/* MEM_STATUS st; */									\
+		switch (checkMemoryAccess(address, false)) {			\
+			case MEM_ALLOWED:									\
+				/* Access allowed */							\
+				break;											\
+			case MEM_PAGEFAULT:									\
+				/* Page fault */								\
+				state.genstat = 0xCFFF;							\
+				m68k_pulse_bus_error();							\
+				return 0xFFFFFFFF;								\
+			case MEM_UIE:										\
+				/* User access to memory above 4MB */			\
+				state.genstat = 0xDEFF;							\
+				m68k_pulse_bus_error();							\
+				return 0xFFFFFFFF;								\
+			case MEM_KERNEL:									\
+			case MEM_PAGE_NO_WE:								\
+				/* kernel access or page not write enabled */	\
+				/* TODO: which regs need setting? */			\
+				m68k_pulse_bus_error();							\
+				return 0xFFFFFFFF;								\
+		}														\
+	} while (false)
+
+/**
+ * @brief Read M68K memory, 32-bit
+ */
 uint32_t m68k_read_memory_32(uint32_t address)
 {
 	uint32_t data = 0xFFFFFFFF;
@@ -148,12 +218,15 @@ uint32_t m68k_read_memory_32(uint32_t address)
 	if (!state.romlmap)
 		address |= 0x800000;
 
+	// Check access permissions
+	ACCESS_CHECK_RD();
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD32(state.rom, address, ROM_SIZE - 1);
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access -- TODO: mapping
-		data = RD32(state.ram, address, state.ram_size - 1);
+		// RAM access
+		data = RD32(state.ram, mapAddr(address, false), state.ram_size - 1);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		data = RD32(state.vram, address, 0x7FFF);
@@ -167,6 +240,9 @@ uint32_t m68k_read_memory_32(uint32_t address)
 	return data;
 }
 
+/**
+ * @brief Read M68K memory, 16-bit
+ */
 uint32_t m68k_read_memory_16(uint32_t address)
 {
 	uint16_t data = 0xFFFF;
@@ -175,12 +251,15 @@ uint32_t m68k_read_memory_16(uint32_t address)
 	if (!state.romlmap)
 		address |= 0x800000;
 
+	// Check access permissions
+	ACCESS_CHECK_RD();
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD16(state.rom, address, ROM_SIZE - 1);
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access -- TODO: mapping
-		data = RD16(state.ram, address, state.ram_size - 1);
+		// RAM access
+		data = RD16(state.ram, mapAddr(address, false), state.ram_size - 1);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		data = RD16(state.vram, address, 0x7FFF);
@@ -195,6 +274,9 @@ uint32_t m68k_read_memory_16(uint32_t address)
 	return data;
 }
 
+/**
+ * @brief Read M68K memory, 8-bit
+ */
 uint32_t m68k_read_memory_8(uint32_t address)
 {
 	uint8_t data = 0xFF;
@@ -203,12 +285,15 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	if (!state.romlmap)
 		address |= 0x800000;
 
+	// Check access permissions
+	ACCESS_CHECK_RD();
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD8(state.rom, address, ROM_SIZE - 1);
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access -- TODO: mapping
-		data = RD8(state.ram, address, state.ram_size - 1);
+		// RAM access
+		data = RD8(state.ram, mapAddr(address, false), state.ram_size - 1);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		data = RD8(state.vram, address, 0x7FFF);
@@ -223,19 +308,25 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	return data;
 }
 
-// write m68k memory
+/**
+ * @brief Write M68K memory, 32-bit
+ */
 void m68k_write_memory_32(uint32_t address, uint32_t value)
 {
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
 
+	// Check access permissions
+	ACCESS_CHECK_WR();
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		// TODO: bus error here? can't write to rom!
+		// According to HwNote15 (John B. Milton), there is no write protection
+		// here. You can write to ROM, but nothing happens.
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM -- TODO: mapping
-		WR32(state.ram, address, state.ram_size - 1, value);
+		// RAM access
+		WR32(state.ram, mapAddr(address, true), state.ram_size - 1, value);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		WR32(state.vram, address, 0x7fff, value);
@@ -250,18 +341,25 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 	}
 }
 
+/**
+ * @brief Write M68K memory, 16-bit
+ */
 void m68k_write_memory_16(uint32_t address, uint32_t value)
 {
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
 
+	// Check access permissions
+	ACCESS_CHECK_WR();
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		// TODO: bus error here? can't write to rom!
+		// According to HwNote15 (John B. Milton), there is no write protection
+		// here. You can write to ROM, but nothing happens.
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access -- TODO: mapping
-		WR16(state.ram, address, state.ram_size - 1, value);
+		// RAM access
+		WR16(state.ram, mapAddr(address, true), state.ram_size - 1, value);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		WR16(state.vram, address, 0x7fff, value);
@@ -284,18 +382,25 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 	}
 }
 
+/**
+ * @brief Write M68K memory, 8-bit
+ */
 void m68k_write_memory_8(uint32_t address, uint32_t value)
 {
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
 
+	// Check access permissions
+	ACCESS_CHECK_WR();
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		// TODO: bus error here? can't write to rom!
+		// According to HwNote15 (John B. Milton), there is no write protection
+		// here. You can write to ROM, but nothing happens.
 	} else if (address <= (state.ram_size - 1)) {
-		// RAM access -- TODO: mapping
-		WR8(state.ram, address, state.ram_size - 1, value);
+		// RAM access
+		WR8(state.ram, mapAddr(address, true), state.ram_size - 1, value);
 	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
 		// VRAM access
 		WR8(state.vram, address, 0x7fff, value);
@@ -354,7 +459,7 @@ int main(void)
 		printf("Could not find a suitable video mode: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-	printf("Set %dx%d at %d bits-per-pixel mode\n", screen->w, screen->h, screen->format->BitsPerPixel);
+	printf("Set %dx%d at %d bits-per-pixel mode\n\n", screen->w, screen->h, screen->format->BitsPerPixel);
 	SDL_WM_SetCaption("FreeBee 3B1 emulator", "FreeBee");
 
 	/***

@@ -27,6 +27,9 @@ typedef struct {
 	// Map RAM
 	uint8_t		map[0x800];			///< Map RAM
 
+	// General Status Register
+	uint16_t	genstat;
+
 	// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.
