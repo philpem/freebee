@@ -118,7 +118,7 @@ BUILD_TYPE	?=	debug
 TARGET		=	freebee
 
 # source files that produce object files
-SRC			=	main.c state.c
+SRC			=	main.c state.c memory.c
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/m68kopac.c musashi/m68kopdm.c musashi/m68kopnz.c
 
 # source type - either "c" or "cpp" (C or C++)
