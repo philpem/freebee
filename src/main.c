@@ -227,15 +227,90 @@ uint32_t m68k_read_memory_32(uint32_t address)
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		data = RD32(state.ram, mapAddr(address, false), state.ram_size - 1);
-	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM access
-		data = RD32(state.vram, address, 0x7FFF);
-	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
-		// Map RAM access
-		data = RD32(state.map, address, 0x7FF);
-	} else {
-		// I/O register -- TODO
+	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
+		// I/O register space, zone A
 		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0x0F0000) {
+			case 0x000000:				// Map RAM access
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD32 from MapRAM mirror, addr=0x%08X\n", address);
+				data = RD32(state.map, address, 0x7FF);
+				break;
+			case 0x010000:				// General Status Register
+				data = ((uint32_t)state.genstat << 16) + (uint32_t)state.genstat;
+				break;
+			case 0x020000:				// Video RAM
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD32 from VideoRAM mirror, addr=0x%08X\n", address);
+				data = RD32(state.vram, address, 0x7FFF);
+				break;
+			case 0x030000:				// Bus Status Register 0
+			case 0x040000:				// Bus Status Register 1
+			case 0x050000:				// Phone status
+			case 0x060000:				// DMA Count
+			case 0x070000:				// Line Printer Status Register
+			case 0x080000:				// Real Time Clock
+			case 0x090000:				// Phone registers
+				switch (address & 0x0FF000) {
+					case 0x090000:		// Handset relay
+					case 0x098000:
+					case 0x091000:		// Line select 2
+					case 0x099000:
+					case 0x092000:		// Hook relay 1
+					case 0x09A000:
+					case 0x093000:		// Hook relay 2
+					case 0x09B000:
+					case 0x094000:		// Line 1 hold
+					case 0x09C000:
+					case 0x095000:		// Line 2 hold
+					case 0x09D000:
+					case 0x096000:		// Line 1 A-lead
+					case 0x09E000:
+					case 0x097000:		// Line 2 A-lead
+					case 0x09F000:
+						break;
+				}
+				break;
+			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0B0000:				// TM/DIALWR
+			case 0x0C0000:				// CSR
+			case 0x0D0000:				// DMA Address Register
+			case 0x0E0000:				// Disk Control Register
+			case 0x0F0000:				// Line Printer Data Register
+				break;
+		}
+	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
+		// I/O register space, zone B
+		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0xF00000) {
+			case 0xC00000:				// Expansion slots
+			case 0xD00000:
+				switch (address & 0xFC0000) {
+					case 0xC00000:		// Expansion slot 0
+					case 0xC40000:		// Expansion slot 1
+					case 0xC80000:		// Expansion slot 2
+					case 0xCC0000:		// Expansion slot 3
+					case 0xD00000:		// Expansion slot 4
+					case 0xD40000:		// Expansion slot 5
+					case 0xD80000:		// Expansion slot 6
+					case 0xDC0000:		// Expansion slot 7
+						fprintf(stderr, "NOTE: RD32 from expansion card space, addr=0x%08X\n", address);
+						break;
+				}
+				break;
+			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
+			case 0xF00000:
+				switch (address & 0x070000) {
+					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						break;
+					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						break;
+					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						break;
+					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
+						break;
+					default:
+						fprintf(stderr, "NOTE: RD32 from undefined E/F-block address 0x%08X", address);
+				}
+		}
 	}
 	return data;
 }
@@ -260,17 +335,91 @@ uint32_t m68k_read_memory_16(uint32_t address)
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		data = RD16(state.ram, mapAddr(address, false), state.ram_size - 1);
-	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM access
-		data = RD16(state.vram, address, 0x7FFF);
-	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
-		// Map RAM access
-		data = RD16(state.map, address, 0x7FF);
-	} else {
-		// I/O register -- TODO
+	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
+		// I/O register space, zone A
 		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0x0F0000) {
+			case 0x000000:				// Map RAM access
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD16 from MapRAM mirror, addr=0x%08X\n", address);
+				data = RD16(state.map, address, 0x7FF);
+				break;
+			case 0x010000:				// General Status Register
+				data = state.genstat;
+				break;
+			case 0x020000:				// Video RAM
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD16 from VideoRAM mirror, addr=0x%08X\n", address);
+				data = RD16(state.vram, address, 0x7FFF);
+				break;
+			case 0x030000:				// Bus Status Register 0
+			case 0x040000:				// Bus Status Register 1
+			case 0x050000:				// Phone status
+			case 0x060000:				// DMA Count
+			case 0x070000:				// Line Printer Status Register
+			case 0x080000:				// Real Time Clock
+			case 0x090000:				// Phone registers
+				switch (address & 0x0FF000) {
+					case 0x090000:		// Handset relay
+					case 0x098000:
+					case 0x091000:		// Line select 2
+					case 0x099000:
+					case 0x092000:		// Hook relay 1
+					case 0x09A000:
+					case 0x093000:		// Hook relay 2
+					case 0x09B000:
+					case 0x094000:		// Line 1 hold
+					case 0x09C000:
+					case 0x095000:		// Line 2 hold
+					case 0x09D000:
+					case 0x096000:		// Line 1 A-lead
+					case 0x09E000:
+					case 0x097000:		// Line 2 A-lead
+					case 0x09F000:
+						break;
+				}
+				break;
+			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0B0000:				// TM/DIALWR
+			case 0x0C0000:				// CSR
+			case 0x0D0000:				// DMA Address Register
+			case 0x0E0000:				// Disk Control Register
+			case 0x0F0000:				// Line Printer Data Register
+				break;
+		}
+	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
+		// I/O register space, zone B
+		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0xF00000) {
+			case 0xC00000:				// Expansion slots
+			case 0xD00000:
+				switch (address & 0xFC0000) {
+					case 0xC00000:		// Expansion slot 0
+					case 0xC40000:		// Expansion slot 1
+					case 0xC80000:		// Expansion slot 2
+					case 0xCC0000:		// Expansion slot 3
+					case 0xD00000:		// Expansion slot 4
+					case 0xD40000:		// Expansion slot 5
+					case 0xD80000:		// Expansion slot 6
+					case 0xDC0000:		// Expansion slot 7
+						fprintf(stderr, "NOTE: RD16 from expansion card space, addr=0x%08X\n", address);
+						break;
+				}
+				break;
+			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
+			case 0xF00000:
+				switch (address & 0x070000) {
+					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						break;
+					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						break;
+					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						break;
+					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
+						break;
+					default:
+						fprintf(stderr, "NOTE: RD16 to undefined E/F-block address 0x%08X", address);
+				}
+		}
 	}
-
 	return data;
 }
 
@@ -294,17 +443,94 @@ uint32_t m68k_read_memory_8(uint32_t address)
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
 		data = RD8(state.ram, mapAddr(address, false), state.ram_size - 1);
-	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM access
-		data = RD8(state.vram, address, 0x7FFF);
-	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
-		// Map RAM access
-		data = RD8(state.map, address, 0x7FF);
-	} else {
-		// I/O register -- TODO
-		printf("RD08 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
+		// I/O register space, zone A
+		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0x0F0000) {
+			case 0x000000:				// Map RAM access
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD8 from MapRAM mirror, addr=0x%08X\n", address);
+				data = RD8(state.map, address, 0x7FF);
+				break;
+			case 0x010000:				// General Status Register
+				if ((address & 1) == 0)
+					data = (state.genstat >> 8) & 0xff;
+				else
+					data = (state.genstat)      & 0xff;
+				break;
+			case 0x020000:				// Video RAM
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD8 from VideoRAM mirror, addr=0x%08X\n", address);
+				data = RD8(state.vram, address, 0x7FFF);
+				break;
+			case 0x030000:				// Bus Status Register 0
+			case 0x040000:				// Bus Status Register 1
+			case 0x050000:				// Phone status
+			case 0x060000:				// DMA Count
+			case 0x070000:				// Line Printer Status Register
+			case 0x080000:				// Real Time Clock
+			case 0x090000:				// Phone registers
+				switch (address & 0x0FF000) {
+					case 0x090000:		// Handset relay
+					case 0x098000:
+					case 0x091000:		// Line select 2
+					case 0x099000:
+					case 0x092000:		// Hook relay 1
+					case 0x09A000:
+					case 0x093000:		// Hook relay 2
+					case 0x09B000:
+					case 0x094000:		// Line 1 hold
+					case 0x09C000:
+					case 0x095000:		// Line 2 hold
+					case 0x09D000:
+					case 0x096000:		// Line 1 A-lead
+					case 0x09E000:
+					case 0x097000:		// Line 2 A-lead
+					case 0x09F000:
+						break;
+				}
+				break;
+			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0B0000:				// TM/DIALWR
+			case 0x0C0000:				// CSR
+			case 0x0D0000:				// DMA Address Register
+			case 0x0E0000:				// Disk Control Register
+			case 0x0F0000:				// Line Printer Data Register
+				break;
+		}
+	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
+		// I/O register space, zone B
+		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0xF00000) {
+			case 0xC00000:				// Expansion slots
+			case 0xD00000:
+				switch (address & 0xFC0000) {
+					case 0xC00000:		// Expansion slot 0
+					case 0xC40000:		// Expansion slot 1
+					case 0xC80000:		// Expansion slot 2
+					case 0xCC0000:		// Expansion slot 3
+					case 0xD00000:		// Expansion slot 4
+					case 0xD40000:		// Expansion slot 5
+					case 0xD80000:		// Expansion slot 6
+					case 0xDC0000:		// Expansion slot 7
+						fprintf(stderr, "NOTE: RD8 from expansion card address 0x%08X\n", address);
+						break;
+				}
+				break;
+			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
+			case 0xF00000:
+				switch (address & 0x070000) {
+					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						break;
+					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						break;
+					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						break;
+					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
+						break;
+					default:
+						fprintf(stderr, "NOTE: RD8 from undefined E/F-block address 0x%08X", address);
+				}
+		}
 	}
-
 	return data;
 }
 
@@ -322,21 +548,93 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		// According to HwNote15 (John B. Milton), there is no write protection
-		// here. You can write to ROM, but nothing happens.
+		WR32(state.rom, address, ROM_SIZE - 1, value);
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
-		WR32(state.ram, mapAddr(address, true), state.ram_size - 1, value);
-	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM access
-		WR32(state.vram, address, 0x7fff, value);
-	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
-		// Map RAM access
-		WR32(state.map, address, 0x7FF, value);
-	} else {
-		switch (address) {
-			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
-			default:		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : ""); break;
+		WR32(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
+		// I/O register space, zone A
+		printf("WR32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0x0F0000) {
+			case 0x000000:				// Map RAM access
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR32 to MapRAM mirror, addr=0x%08X, data=0x%08X\n", address, value);
+				WR32(state.map, address, 0x7FF, value);
+				break;
+			case 0x010000:				// General Status Register
+				state.genstat = (value & 0xffff);
+				break;
+			case 0x020000:				// Video RAM
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR32 to VideoRAM mirror, addr=0x%08X, data=0x%08X\n", address, value);
+				WR32(state.vram, address, 0x7FFF, value);
+				break;
+			case 0x030000:				// Bus Status Register 0
+			case 0x040000:				// Bus Status Register 1
+			case 0x050000:				// Phone status
+			case 0x060000:				// DMA Count
+			case 0x070000:				// Line Printer Status Register
+			case 0x080000:				// Real Time Clock
+			case 0x090000:				// Phone registers
+				switch (address & 0x0FF000) {
+					case 0x090000:		// Handset relay
+					case 0x098000:
+					case 0x091000:		// Line select 2
+					case 0x099000:
+					case 0x092000:		// Hook relay 1
+					case 0x09A000:
+					case 0x093000:		// Hook relay 2
+					case 0x09B000:
+					case 0x094000:		// Line 1 hold
+					case 0x09C000:
+					case 0x095000:		// Line 2 hold
+					case 0x09D000:
+					case 0x096000:		// Line 1 A-lead
+					case 0x09E000:
+					case 0x097000:		// Line 2 A-lead
+					case 0x09F000:
+						break;
+				}
+				break;
+			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0B0000:				// TM/DIALWR
+			case 0x0C0000:				// CSR
+			case 0x0D0000:				// DMA Address Register
+			case 0x0E0000:				// Disk Control Register
+			case 0x0F0000:				// Line Printer Data Register
+				break;
+		}
+	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
+		// I/O register space, zone B
+		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0xF00000) {
+			case 0xC00000:				// Expansion slots
+			case 0xD00000:
+				switch (address & 0xFC0000) {
+					case 0xC00000:		// Expansion slot 0
+					case 0xC40000:		// Expansion slot 1
+					case 0xC80000:		// Expansion slot 2
+					case 0xCC0000:		// Expansion slot 3
+					case 0xD00000:		// Expansion slot 4
+					case 0xD40000:		// Expansion slot 5
+					case 0xD80000:		// Expansion slot 6
+					case 0xDC0000:		// Expansion slot 7
+						fprintf(stderr, "NOTE: WR32 to expansion card space, addr=0x%08X, data=0x%08X\n", address, value);
+						break;
+				}
+				break;
+			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
+			case 0xF00000:
+				switch (address & 0x070000) {
+					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						break;
+					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						break;
+					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						break;
+					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
+						break;
+					default:
+						fprintf(stderr, "NOTE: WR32 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
+				}
 		}
 	}
 }
@@ -355,29 +653,93 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		// According to HwNote15 (John B. Milton), there is no write protection
-		// here. You can write to ROM, but nothing happens.
+		WR16(state.rom, address, ROM_SIZE - 1, value);
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
-		WR16(state.ram, mapAddr(address, true), state.ram_size - 1, value);
-	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM access
-		WR16(state.vram, address, 0x7fff, value);
-	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
-		// Map RAM access
-		WR16(state.map, address, 0x7FF, value);
-	} else {
-		switch (address) {
-			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
-			default:		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : ""); break;
+		WR16(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
+		// I/O register space, zone A
+		printf("WR16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0x0F0000) {
+			case 0x000000:				// Map RAM access
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR16 to MapRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
+				WR16(state.map, address, 0x7FF, value);
+				break;
+			case 0x010000:				// General Status Register
+				state.genstat = (value & 0xffff);
+				break;
+			case 0x020000:				// Video RAM
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR16 to VideoRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
+				WR16(state.vram, address, 0x7FFF, value);
+				break;
+			case 0x030000:				// Bus Status Register 0
+			case 0x040000:				// Bus Status Register 1
+			case 0x050000:				// Phone status
+			case 0x060000:				// DMA Count
+			case 0x070000:				// Line Printer Status Register
+			case 0x080000:				// Real Time Clock
+			case 0x090000:				// Phone registers
+				switch (address & 0x0FF000) {
+					case 0x090000:		// Handset relay
+					case 0x098000:
+					case 0x091000:		// Line select 2
+					case 0x099000:
+					case 0x092000:		// Hook relay 1
+					case 0x09A000:
+					case 0x093000:		// Hook relay 2
+					case 0x09B000:
+					case 0x094000:		// Line 1 hold
+					case 0x09C000:
+					case 0x095000:		// Line 2 hold
+					case 0x09D000:
+					case 0x096000:		// Line 1 A-lead
+					case 0x09E000:
+					case 0x097000:		// Line 2 A-lead
+					case 0x09F000:
+						break;
+				}
+				break;
+			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0B0000:				// TM/DIALWR
+			case 0x0C0000:				// CSR
+			case 0x0D0000:				// DMA Address Register
+			case 0x0E0000:				// Disk Control Register
+			case 0x0F0000:				// Line Printer Data Register
+				break;
 		}
-		if (address == 0x4A0000) {
-			printf("\tLED WRITE: %s %s %s %s\n",
-					value & 0x800 ? "-" : "R",
-					value & 0x400 ? "-" : "G",
-					value & 0x200 ? "-" : "Y",
-					value & 0x100 ? "-" : "R"
-					);
+	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
+		// I/O register space, zone B
+		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0xF00000) {
+			case 0xC00000:				// Expansion slots
+			case 0xD00000:
+				switch (address & 0xFC0000) {
+					case 0xC00000:		// Expansion slot 0
+					case 0xC40000:		// Expansion slot 1
+					case 0xC80000:		// Expansion slot 2
+					case 0xCC0000:		// Expansion slot 3
+					case 0xD00000:		// Expansion slot 4
+					case 0xD40000:		// Expansion slot 5
+					case 0xD80000:		// Expansion slot 6
+					case 0xDC0000:		// Expansion slot 7
+						fprintf(stderr, "NOTE: WR16 to expansion card space, addr=0x%08X, data=0x%04X\n", address, value);
+						break;
+				}
+				break;
+			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
+			case 0xF00000:
+				switch (address & 0x070000) {
+					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						break;
+					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						break;
+					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						break;
+					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
+						break;
+					default:
+						fprintf(stderr, "NOTE: WR16 to undefined E/F-block space, addr=0x%08X, data=0x%04X\n", address, value);
+				}
 		}
 	}
 }
@@ -396,24 +758,97 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		// According to HwNote15 (John B. Milton), there is no write protection
-		// here. You can write to ROM, but nothing happens.
+		WR8(state.rom, address, ROM_SIZE - 1, value);
 	} else if (address <= (state.ram_size - 1)) {
 		// RAM access
-		WR8(state.ram, mapAddr(address, true), state.ram_size - 1, value);
-	} else if ((address >= 0x420000) && (address <= 0x427FFF)) {
-		// VRAM access
-		WR8(state.vram, address, 0x7fff, value);
-	} else if ((address >= 0x400000) && (address <= 0x4007FF)) {
-		// Map RAM access
-		WR8(state.map, address, 0x7FF, value);
-	} else {
-		switch (address) {
-			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80); break;	// GCR3: ROMLMAP
-			default:		printf("WR08 0x%08X ==> 0x%02X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : ""); break;
+		WR8(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
+		// I/O register space, zone A
+		printf("WR8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0x0F0000) {
+			case 0x000000:				// Map RAM access
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR8 to MapRAM mirror, addr=%08X, data=%02X\n", address, value);
+				WR8(state.map, address, 0x7FF, value);
+				break;
+			case 0x010000:				// General Status Register
+				state.genstat = (value & 0xffff);
+				break;
+			case 0x020000:				// Video RAM
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR8 to VideoRAM mirror, addr=%08X\n, data=0x%02X", address, value);
+				WR8(state.vram, address, 0x7FFF, value);
+				break;
+			case 0x030000:				// Bus Status Register 0
+			case 0x040000:				// Bus Status Register 1
+			case 0x050000:				// Phone status
+			case 0x060000:				// DMA Count
+			case 0x070000:				// Line Printer Status Register
+			case 0x080000:				// Real Time Clock
+			case 0x090000:				// Phone registers
+				switch (address & 0x0FF000) {
+					case 0x090000:		// Handset relay
+					case 0x098000:
+					case 0x091000:		// Line select 2
+					case 0x099000:
+					case 0x092000:		// Hook relay 1
+					case 0x09A000:
+					case 0x093000:		// Hook relay 2
+					case 0x09B000:
+					case 0x094000:		// Line 1 hold
+					case 0x09C000:
+					case 0x095000:		// Line 2 hold
+					case 0x09D000:
+					case 0x096000:		// Line 1 A-lead
+					case 0x09E000:
+					case 0x097000:		// Line 2 A-lead
+					case 0x09F000:
+						break;
+				}
+				break;
+			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0B0000:				// TM/DIALWR
+			case 0x0C0000:				// CSR
+			case 0x0D0000:				// DMA Address Register
+			case 0x0E0000:				// Disk Control Register
+			case 0x0F0000:				// Line Printer Data Register
+				break;
+		}
+	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
+		// I/O register space, zone B
+		printf("WR8 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+		switch (address & 0xF00000) {
+			case 0xC00000:				// Expansion slots
+			case 0xD00000:
+				switch (address & 0xFC0000) {
+					case 0xC00000:		// Expansion slot 0
+					case 0xC40000:		// Expansion slot 1
+					case 0xC80000:		// Expansion slot 2
+					case 0xCC0000:		// Expansion slot 3
+					case 0xD00000:		// Expansion slot 4
+					case 0xD40000:		// Expansion slot 5
+					case 0xD80000:		// Expansion slot 6
+					case 0xDC0000:		// Expansion slot 7
+						fprintf(stderr, "NOTE: WR8 to expansion card space, addr=0x%08X, data=0x%08X\n", address, value);
+						break;
+				}
+				break;
+			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
+			case 0xF00000:
+				switch (address & 0x070000) {
+					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						break;
+					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						break;
+					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						break;
+					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
+						break;
+					default:
+						fprintf(stderr, "NOTE: WR8 to undefined E/F-block space, addr=0x%08X, data=0x%08X\n", address, value);
+				}
 		}
 	}
 }
+
 
 // for the disassembler
 uint32_t m68k_read_disassembler_32(uint32_t addr) { return m68k_read_memory_32(addr); }
