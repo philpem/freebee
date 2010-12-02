@@ -229,7 +229,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		data = RD32(state.ram, mapAddr(address, false), state.ram_size - 1);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD32 from MapRAM mirror, addr=0x%08X\n", address);
@@ -297,7 +297,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -382,7 +382,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		data = RD16(state.ram, mapAddr(address, false), state.ram_size - 1);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD16 from MapRAM mirror, addr=0x%08X\n", address);
@@ -450,7 +450,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -535,7 +535,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		data = RD8(state.ram, mapAddr(address, false), state.ram_size - 1);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD8 from MapRAM mirror, addr=0x%08X\n", address);
@@ -606,7 +606,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("RD8 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -689,7 +689,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		WR32(state.ram, mapAddr(address, false), state.ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR32 to MapRAM mirror, addr=0x%08X, data=0x%08X\n", address, value);
@@ -757,7 +757,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -842,7 +842,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		WR16(state.ram, mapAddr(address, false), state.ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR16 to MapRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
@@ -910,7 +910,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
@@ -995,7 +995,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		WR8(state.ram, mapAddr(address, false), state.ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
-		printf("WR8 0x%08X ==> %02X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("WR8 0x%08X ==> %02X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR8 to MapRAM mirror, addr=%08X, data=%02X\n", address, value);
@@ -1063,7 +1063,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 		}
 	} else if ((address >= 0xC00000) && (address <= 0xFFFFFF)) {
 		// I/O register space, zone B
-		printf("WR8 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
+//		printf("WR8 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 		switch (address & 0xF00000) {
 			case 0xC00000:				// Expansion slots
 			case 0xD00000:
