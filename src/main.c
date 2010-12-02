@@ -261,22 +261,24 @@ int main(void)
 	// set up musashi and reset the CPU
 	m68k_set_cpu_type(M68K_CPU_TYPE_68010);
 	m68k_pulse_reset();
-/*
-	size_t i = 0x80001a;
-	size_t len;
-	do {
-		char dasm[512];
-		len = m68k_disassemble(dasm, i, M68K_CPU_TYPE_68010);
-		printf("%06X: %s\n", i, dasm);
-		i += len;
-	} while (i < 0x8000ff);
-*/
 
-	// set up SDL
+	// Set up SDL
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == -1) {
 		printf("Could not initialise SDL: %s.\n", SDL_GetError());
-		return -1;
+		exit(EXIT_FAILURE);
 	}
+
+	// Make sure SDL cleans up after itself
+	atexit(SDL_Quit);
+
+	// Set up the video display
+	SDL_Surface *screen = NULL;
+	if ((screen = SDL_SetVideoMode(720, 384, 8, SDL_SWSURFACE | SDL_ANYFORMAT)) == NULL) {
+		printf("Could not find a suitable video mode: %s.\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+	printf("Set %dx%d at %d bits-per-pixel mode\n", screen->w, screen->h, screen->format->BitsPerPixel);
+	SDL_WM_SetCaption("FreeBee 3B1 emulator", "FreeBee");
 
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
