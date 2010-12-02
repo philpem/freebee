@@ -17,7 +17,7 @@ int state_init(size_t ramsize)
 	// Basically: 512KiB minimum, 4MiB maximum, in increments of 512KiB.
 	if ((ramsize < 512*1024) || ((ramsize % (512*1024)) != 0))
 		return -1;
-	state.ram = malloc(state.ram_size);
+	state.ram = malloc(ramsize);
 	if (state.ram == NULL)
 		return -2;
 	state.ram_size = ramsize;
