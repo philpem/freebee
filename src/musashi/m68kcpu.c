@@ -725,7 +725,7 @@ void m68k_set_irq(unsigned int int_level)
 
 
 /* Trigger a Bus Error exception */
-void m68k_pulse_buserr(void)
+void m68k_pulse_bus_error(void)
 {
 	m68ki_exception_bus_error();
 }
