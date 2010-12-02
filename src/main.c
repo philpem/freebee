@@ -85,7 +85,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 		data = RD32(state.map, address, 0x7FF);
 	} else {
 		// I/O register -- TODO
-		printf("RD32 0x%08X [unknown I/O register]\n", address);
+		printf("RD32 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 	}
 	return data;
 }
@@ -112,7 +112,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		data = RD16(state.map, address, 0x7FF);
 	} else {
 		// I/O register -- TODO
-		printf("RD16 0x%08X [unknown I/O register]\n", address);
+		printf("RD16 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 	}
 
 	return data;
@@ -140,7 +140,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 		data = RD8(state.map, address, 0x7FF);
 	} else {
 		// I/O register -- TODO
-		printf("RD08 0x%08X [unknown I/O register]\n", address);
+		printf("RD08 0x%08X ==> ??? %s\n", address, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : "");
 	}
 
 	return data;
@@ -168,7 +168,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
-			default:		printf("WR32 0x%08X ==> 0x%08X\n", address, value); break;
+			default:		printf("WR32 0x%08X ==> 0x%08X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : ""); break;
 		}
 	}
 }
@@ -194,7 +194,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x8000) == 0x8000); break;	// GCR3: ROMLMAP
-			default:		printf("WR16 0x%08X ==> 0x%04X\n", address, value); break;
+			default:		printf("WR16 0x%08X ==> 0x%04X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : ""); break;
 		}
 		if (address == 0x4A0000) {
 			printf("\tLED WRITE: %s %s %s %s\n",
@@ -228,7 +228,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 	} else {
 		switch (address) {
 			case 0xE43000:	state.romlmap = ((value & 0x80) == 0x80); break;	// GCR3: ROMLMAP
-			default:		printf("WR08 0x%08X ==> 0x%02X\n", address, value); break;
+			default:		printf("WR08 0x%08X ==> 0x%02X %s\n", address, value, m68k_get_reg(NULL, M68K_REG_SR) & 0x2000 ? "[SV]" : ""); break;
 		}
 	}
 }
