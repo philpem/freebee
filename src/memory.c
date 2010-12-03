@@ -98,12 +98,12 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0x8FFF;								\
+				state.genstat = 0x8BFF | (status.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0x9EFF;								\
+				state.genstat = 0x9AFF | (status.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
@@ -145,12 +145,12 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0x8FFF;								\
+				state.genstat = 0xCBFF | (status.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0x9EFF;								\
+				state.genstat = 0xDAFF | (status.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
@@ -275,7 +275,8 @@ uint32_t m68k_read_memory_32(uint32_t address)
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// CSR
+			case 0x0C0000:				// Clear Status Register
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
@@ -439,7 +440,8 @@ uint32_t m68k_read_memory_16(uint32_t address)
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// CSR
+			case 0x0C0000:				// Clear Status Register
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
@@ -612,7 +614,8 @@ uint32_t m68k_read_memory_8(uint32_t address)
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// CSR
+			case 0x0C0000:				// Clear Status Register
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
@@ -770,7 +773,11 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// CSR
+			case 0x0C0000:				// Clear Status Register
+				state.genstat = 0xFFFF;
+				state.bsr0 = 0xFFFF;
+				state.bsr1 = 0xFFFF;
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
@@ -929,7 +936,11 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// CSR
+			case 0x0C0000:				// Clear Status Register
+				state.genstat = 0xFFFF;
+				state.bsr0 = 0xFFFF;
+				state.bsr1 = 0xFFFF;
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
@@ -1088,7 +1099,11 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// CSR
+			case 0x0C0000:				// Clear Status Register
+				state.genstat = 0xFFFF;
+				state.bsr0 = 0xFFFF;
+				state.bsr1 = 0xFFFF;
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
