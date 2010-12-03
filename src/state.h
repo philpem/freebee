@@ -32,6 +32,9 @@ typedef struct {
 	uint16_t	bsr0;				///< Bus Status Register 0
 	uint16_t	bsr1;				///< Bus Status Register 1
 
+	// MISCELLANEOUS CONTROL REGISTER
+	uint8_t		leds;				///< LED status, 1=on, in order red3/green2/yellow1/red0 from bit3 to bit0
+
 	// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.

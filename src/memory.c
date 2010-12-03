@@ -271,11 +271,12 @@ uint32_t m68k_read_memory_32(uint32_t address)
 						break;
 				}
 				break;
-			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0A0000:				// Miscellaneous Control Register -- write only!
+				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// Clear Status Register
+			case 0x0C0000:				// Clear Status Register -- write only!
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -432,11 +433,12 @@ uint32_t m68k_read_memory_16(uint32_t address)
 						break;
 				}
 				break;
-			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0A0000:				// Miscellaneous Control Register -- write only!
+				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// Clear Status Register
+			case 0x0C0000:				// Clear Status Register -- write only!
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -505,7 +507,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 		}
 	}
 
-	LOG_NOT_HANDLED_R(32);
+	LOG_NOT_HANDLED_R(16);
 	return data;
 }
 
@@ -602,11 +604,12 @@ uint32_t m68k_read_memory_8(uint32_t address)
 						break;
 				}
 				break;
-			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0A0000:				// Miscellaneous Control Register -- write only!
+				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
-			case 0x0C0000:				// Clear Status Register
+			case 0x0C0000:				// Clear Status Register -- write only!
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -758,6 +761,14 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				// TODO: handle the ctrl bits properly
+				state.leds = (~value & 0xF00) >> 8;
+				printf("LEDs: %s %s %s %s\n",
+						(state.leds & 8) ? "R" : "-",
+						(state.leds & 4) ? "G" : "-",
+						(state.leds & 2) ? "Y" : "-",
+						(state.leds & 1) ? "R" : "-");
+				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
@@ -924,6 +935,14 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				// TODO: handle the ctrl bits properly
+				state.leds = (~value & 0xF00) >> 8;
+				printf("LEDs: %s %s %s %s\n",
+						(state.leds & 8) ? "R" : "-",
+						(state.leds & 4) ? "G" : "-",
+						(state.leds & 2) ? "Y" : "-",
+						(state.leds & 1) ? "R" : "-");
+				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
@@ -1042,7 +1061,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				handled = true;
 				break;
 			case 0x020000:				// Video RAM
-				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR8 to VideoRAM mirror, addr=%08X\n, data=0x%02X", address, value);
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR8 to VideoRAM mirror, addr=%08X, data=0x%02X\n", address, value);
 				WR8(state.vram, address, 0x7FFF, value);
 				handled = true;
 				break;
@@ -1089,6 +1108,17 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				// TODO: handle the ctrl bits properly
+				if ((address & 1) == 0)
+					;// CTL bits
+				else
+					state.leds = (~value & 0xF);
+				printf("LEDs: %s %s %s %s\n",
+						(state.leds & 8) ? "R" : "-",
+						(state.leds & 4) ? "G" : "-",
+						(state.leds & 2) ? "Y" : "-",
+						(state.leds & 1) ? "R" : "-");
+				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
