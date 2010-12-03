@@ -115,6 +115,38 @@ void refreshScreen(SDL_Surface *s)
 	SDL_Flip(s);
 }
 
+/**
+ * @brief	Handle events posted by SDL.
+ */
+bool HandleSDLEvents(SDL_Surface *screen)
+{
+	SDL_Event event;
+	while (SDL_PollEvent(&event))
+	{
+		switch (event.type) {
+			case SDL_QUIT:
+				// Quit button tagged. Exit.
+				return true;
+			case SDL_KEYDOWN:
+				switch (event.key.keysym.sym) {
+					case SDLK_ESCAPE:
+						if (event.key.keysym.mod & (KMOD_LALT | KMOD_RALT))
+							// ALT-ESC pressed; exit emulator
+							return true;
+						break;
+					default:
+						break;
+				}
+				break;
+			default:
+				break;
+		}
+	}
+
+	return false;
+}
+
+
 /****************************
  * blessed be thy main()...
  ****************************/
@@ -182,6 +214,10 @@ int main(void)
 			// decrement clock cycle counter, we've handled the intr.
 			clock_cycles -= CLOCKS_PER_60HZ;
 		}
+
+		// handle SDL events -- returns true if we need to exit
+		if (HandleSDLEvents(screen))
+			exitEmu = true;
 
 		// make sure frame rate is equal to real time
 		uint32_t now = SDL_GetTicks();
