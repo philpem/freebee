@@ -98,6 +98,7 @@ void refreshScreen(SDL_Surface *s)
 					putpixel(s, x+px, y, fg);
 				else
 					putpixel(s, x+px, y, bg);
+				val >>= 1;
 			}
 		}
 	}
