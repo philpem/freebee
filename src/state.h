@@ -36,6 +36,8 @@ typedef struct {
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.
 	bool		romlmap;
+	/// GENCON.PIE -- Parity Error Check Enable
+	bool		pie;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't

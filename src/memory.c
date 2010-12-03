@@ -98,12 +98,12 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0x8BFF | (status.pie ? 0x0400 : 0);	\
+				state.genstat = 0x8BFF | (state.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0x9AFF | (status.pie ? 0x0400 : 0);	\
+				state.genstat = 0x9AFF | (state.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
@@ -145,12 +145,12 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0xCBFF | (status.pie ? 0x0400 : 0);	\
+				state.genstat = 0xCBFF | (state.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0xDAFF | (status.pie ? 0x0400 : 0);	\
+				state.genstat = 0xDAFF | (state.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
@@ -317,20 +317,16 @@ uint32_t m68k_read_memory_32(uint32_t address)
 					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
-								break;
-							case 0x041000:		// [ef][4c][19]xxx ==> P1E
-								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> PIE
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
-								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
-								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
-								break;
 							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
-								break;
 							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								// All write-only registers... TODO: bus error?
+								handled = true;
 								break;
-							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
+							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video [FIXME: not in TRM]
 								break;
 						}
 						break;
@@ -482,18 +478,14 @@ uint32_t m68k_read_memory_16(uint32_t address)
 					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
-								break;
-							case 0x041000:		// [ef][4c][19]xxx ==> P1E
-								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> PIE
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
-								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
-								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
-								break;
 							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
-								break;
 							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								// All write-only registers... TODO: bus error?
+								handled = true;
 								break;
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
 								break;
@@ -656,18 +648,14 @@ uint32_t m68k_read_memory_8(uint32_t address)
 					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
-								break;
-							case 0x041000:		// [ef][4c][19]xxx ==> P1E
-								break;
+							case 0x041000:		// [ef][4c][19]xxx ==> PIE
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
-								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
-								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
-								break;
 							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
-								break;
 							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+								// All write-only registers... TODO: bus error?
+								handled = true;
 								break;
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
 								break;
@@ -820,12 +808,15 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
 								break;
-							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+							case 0x041000:		// [ef][4c][19]xxx ==> PIE
+								state.pie = ((value & 0x8000) == 0x8000);
+								handled = true;
 								break;
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
 								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
 								state.romlmap = ((value & 0x8000) == 0x8000);
+								handled = true;
 								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
 								break;
@@ -982,7 +973,9 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
 								break;
-							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+							case 0x041000:		// [ef][4c][19]xxx ==> PIE
+								state.pie = ((value & 0x8000) == 0x8000);
+								handled = true;
 								break;
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
 								break;
@@ -1145,7 +1138,10 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
 								break;
-							case 0x041000:		// [ef][4c][19]xxx ==> P1E
+							case 0x041000:		// [ef][4c][19]xxx ==> PIE
+								if ((address & 1) == 0)
+									state.pie = ((value & 0x80) == 0x80);
+								handled = true;
 								break;
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
 								break;
