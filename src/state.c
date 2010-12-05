@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <malloc.h>
 #include <stdio.h>
+#include "wd279x.h"
 #include "state.h"
 
 int state_init(size_t ramsize)
@@ -60,6 +61,9 @@ int state_init(size_t ramsize)
 	fclose(r14c);
 	fclose(r15c);
 
+	// Initialise the disc controller
+	wd2797_init(&state.fdc_ctx);
+
 	return 0;
 }
 
@@ -69,6 +73,9 @@ void state_done()
 		free(state.ram);
 		state.ram = NULL;
 	}
+	
+	// Deinitialise the disc controller
+	wd2797_done(&state.fdc_ctx);
 }
 
 

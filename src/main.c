@@ -188,6 +188,10 @@ int main(void)
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", screen->w, screen->h, screen->format->BitsPerPixel);
 	SDL_WM_SetCaption("FreeBee 3B1 emulator", "FreeBee");
 
+	// Load a disc image
+	FILE *disc = fopen("discim", "rb");
+	wd2797_load(&state.fdc_ctx, disc, 512, 10, 2);
+
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * around 60Hz (???), with a 60Hz periodic interrupt.
@@ -236,6 +240,10 @@ int main(void)
 		// if we've been asked to exit the emulator, then do so.
 		if (exitEmu) break;
 	}
+
+	// Release the disc image
+	wd2797_unload(&state.fdc_ctx);
+	fclose(disc);
 
 	return 0;
 }

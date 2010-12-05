@@ -310,6 +310,9 @@ uint32_t m68k_read_memory_32(uint32_t address)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						data = wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
+						printf("WD279X: rd %02X ==> %02X\n", (address >> 1) & 3, data);
+						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -472,6 +475,9 @@ uint32_t m68k_read_memory_16(uint32_t address)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						data = wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
+						printf("WD279X: rd %02X ==> %02X\n", (address >> 1) & 3, data);
+						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -643,6 +649,9 @@ uint32_t m68k_read_memory_8(uint32_t address)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						data = wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
+						printf("WD279X: rd %02X ==> %02X\n", (address >> 1) & 3, data);
+						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -762,6 +771,8 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
 				// TODO: handle the ctrl bits properly
+				// TODO: &0x8000 --> dismiss 60hz intr
+				state.dma_reading = (value & 0x4000);
 				state.leds = (~value & 0xF00) >> 8;
 				printf("LEDs: %s %s %s %s\n",
 						(state.leds & 8) ? "R" : "-",
@@ -779,8 +790,22 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
+				if (address & 0x004000) {
+					// A14 high -- set most significant bits
+					state.dma_address = (state.dma_address & 0xff) | ((address & 0x3fff) << 7);
+				} else {
+					// A14 low -- set least significant bits
+					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
+				}
 				break;
 			case 0x0E0000:				// Disk Control Register
+				// B7 = FDD controller reset
+				if ((value & 0x80) == 0) wd2797_reset(&state.fdc_ctx);
+				// B6 = drive 0 select -- TODO
+				// B5 = motor enable -- TODO
+				// B4 = HDD controller reset -- TODO
+				// B3 = HDD0 select -- TODO
+				// B2,1,0 = HDD0 head select
 				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
@@ -810,6 +835,9 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, value);
+						printf("WD279X: wr %02X ==> %02X\n\t", (address >> 1) & 3, value);
+						//handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -936,6 +964,8 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
 				// TODO: handle the ctrl bits properly
+				// TODO: &0x8000 --> dismiss 60hz intr
+				state.dma_reading = (value & 0x4000);
 				state.leds = (~value & 0xF00) >> 8;
 				printf("LEDs: %s %s %s %s\n",
 						(state.leds & 8) ? "R" : "-",
@@ -953,8 +983,22 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
+				if (address & 0x004000) {
+					// A14 high -- set most significant bits
+					state.dma_address = (state.dma_address & 0xff) | ((address & 0x3fff) << 7);
+				} else {
+					// A14 low -- set least significant bits
+					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
+				}
 				break;
 			case 0x0E0000:				// Disk Control Register
+				// B7 = FDD controller reset
+				if ((value & 0x80) == 0) wd2797_reset(&state.fdc_ctx);
+				// B6 = drive 0 select -- TODO
+				// B5 = motor enable -- TODO
+				// B4 = HDD controller reset -- TODO
+				// B3 = HDD0 select -- TODO
+				// B2,1,0 = HDD0 head select
 				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
@@ -983,6 +1027,9 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, value);
+						printf("WD279X: wr %02X ==> %02X\n\t", (address >> 1) & 3, value);
+						//handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -1109,10 +1156,14 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
 				// TODO: handle the ctrl bits properly
-				if ((address & 1) == 0)
-					;// CTL bits
-				else
+				if ((address & 1) == 0) {
+					// low byte
+				} else {
+					// hight byte
+					// TODO: &0x8000 --> dismiss 60hz intr
+					state.dma_reading = (value & 0x40);
 					state.leds = (~value & 0xF);
+				}
 				printf("LEDs: %s %s %s %s\n",
 						(state.leds & 8) ? "R" : "-",
 						(state.leds & 4) ? "G" : "-",
@@ -1129,8 +1180,22 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
+				if (address & 0x004000) {
+					// A14 high -- set most significant bits
+					state.dma_address = (state.dma_address & 0xff) | ((address & 0x3fff) << 7);
+				} else {
+					// A14 low -- set least significant bits
+					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
+				}
 				break;
 			case 0x0E0000:				// Disk Control Register
+				// B7 = FDD controller reset
+				if ((value & 0x80) == 0) wd2797_reset(&state.fdc_ctx);
+				// B6 = drive 0 select -- TODO
+				// B5 = motor enable -- TODO
+				// B4 = HDD controller reset -- TODO
+				// B3 = HDD0 select -- TODO
+				// B2,1,0 = HDD0 head select
 				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
@@ -1159,6 +1224,9 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, value);
+						printf("WD279X: wr %02X ==> %02X\n\t", (address >> 1) & 3, value);
+						//handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
