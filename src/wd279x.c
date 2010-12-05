@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include <malloc.h>
 #include "wd279x.h"
-
 
 /// WD2797 command constants
 enum {
@@ -25,34 +25,69 @@ enum {
 };
 
 
-/**
- * @brief	Initialise a WD2797 context.
- */
-void wd2797_init(WD279X_CTX *ctx)
+void wd2797_init(WD2797_CTX *ctx)
 {
 	// track, head and sector unknown
-	ctx->track = 0;
-	ctx->head = 0;
-	ctx->sector = 0;
+	ctx->track = ctx->head = ctx->sector = 0;
 
-	// no IRQ or DRQ, no IRQ callback
-	ctx->irql = false;
-	ctx->irqe = false;
+	// no IRQ pending
+	ctx->irql = ctx->irqe = false;
 
 	// no data available
-	ctx->data_pos = 0;
-	ctx->data_len = 0;
+	ctx->data_pos = ctx->data_len = 0;
+	ctx->data = NULL;
+
+	// Status register clear, not busy
+	ctx->status = 0;
+
+	// Clear data register
+	ctx->data_reg = 0;
+
+	// Last step direction
+	ctx->last_step_dir = -1;
 
 	// No disc image loaded
 	ctx->disc_image = NULL;
+	ctx->geom_secsz = ctx->geom_spt = ctx->geom_heads = ctx->geom_tracks = 0;
 }
 
 
-/**
- * @brief	Read IRQ Rising Edge status. Clears Rising Edge status if it is set.
- * @note	No more IRQs will be sent until the Status Register is read, or a new command is written to the CR.
- */
-bool wd279x_get_irq(WD279X_CTX *ctx)
+void wd2797_reset(WD2797_CTX *ctx)
+{
+	// track, head and sector unknown
+	ctx->track = ctx->head = ctx->sector = 0;
+
+	// no IRQ pending
+	ctx->irql = ctx->irqe = false;
+
+	// no data available
+	ctx->data_pos = ctx->data_len = 0;
+
+	// Status register clear, not busy
+	ctx->status = 0;
+
+	// Clear data register
+	ctx->data_reg = 0;
+
+	// Last step direction
+	ctx->last_step_dir = -1;
+}
+
+
+void wd2797_done(WD2797_CTX *ctx)
+{
+	// Reset the WD2797
+	wd2797_reset(ctx);
+
+	// Free any allocated memory
+	if (ctx->data) {
+		free(ctx->data);
+		ctx->data = NULL;
+	}
+}
+
+
+bool wd2797_get_irq(WD2797_CTX *ctx)
 {
 	// If an IRQ is pending, clear it and return true, otherwise return false
 	if (ctx->irqe) {
@@ -64,24 +99,69 @@ bool wd279x_get_irq(WD279X_CTX *ctx)
 }
 
 
-/**
- * @brief	Read DRQ status.
- */
-bool wd279x_get_drq(WD279X_CTX *ctx)
+bool wd2797_get_drq(WD2797_CTX *ctx)
 {
 	return (ctx->data_pos < ctx->data_len);
 }
 
 
-/**
- * @brief	Read WD279x register.
- */
-uint8_t wd279x_read_reg(WD279X_CTX *ctx, uint8_t addr)
+WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
+{
+	size_t filesize;
+
+	// Start by finding out how big the image file is
+	fseek(fp, 0, SEEK_END);
+	filesize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
+	// Now figure out how many tracks it contains
+	int tracks = filesize / secsz / spt / heads;
+	// Confirm...
+	if (tracks < 1) {
+		return WD2797_ERR_BAD_GEOM;
+	}
+
+	// Allocate enough memory to store one disc track
+	if (ctx->data) {
+		free(ctx->data);
+	}
+	ctx->data = malloc(secsz * spt);
+	if (!ctx->data)
+		return WD2797_ERR_NO_MEMORY;
+
+	// Load the image and the geometry data
+	ctx->disc_image = fp;
+	ctx->geom_tracks = tracks;
+	ctx->geom_secsz = secsz;
+	ctx->geom_heads = heads;
+	ctx->geom_spt = spt;
+
+	return WD2797_ERR_OK;
+}
+
+
+void wd2797_unload(WD2797_CTX *ctx)
+{
+	// Free memory buffer
+	if (ctx->data) {
+		free(ctx->data);
+		ctx->data = NULL;
+	}
+
+	// Clear file pointer
+	ctx->disc_image = NULL;
+
+	// Clear the disc geometry
+	ctx->geom_tracks = ctx->geom_secsz = ctx->geom_spt = ctx->geom_heads = 0;
+}
+
+
+uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 {
 	uint8_t temp = 0;
 
 	switch (addr & 0x03) {
-		case WD279X_REG_STATUS:		// Status register
+		case WD2797_REG_STATUS:		// Status register
 			// Read from status register clears IRQ
 			ctx->irql = false;
 
@@ -92,16 +172,16 @@ uint8_t wd279x_read_reg(WD279X_CTX *ctx, uint8_t addr)
 				temp |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
 			// FDC is busy if there is still data in the buffer
 			temp |= (ctx->data_pos < ctx->data_len) ? 0x01 : 0x00;	// if data in buffer, then DMA hasn't copied it yet, and we're still busy!
-																		// TODO: also if seek delay / read delay hasn't passed (but that's for later)
+																	// TODO: also if seek delay / read delay hasn't passed (but that's for later)
 			return temp;
 
-		case WD279X_REG_TRACK:		// Track register
+		case WD2797_REG_TRACK:		// Track register
 			return ctx->track;
 
-		case WD279X_REG_SECTOR:		// Sector register
+		case WD2797_REG_SECTOR:		// Sector register
 			return ctx->sector;
 
-		case WD279X_REG_DATA:		// Data register
+		case WD2797_REG_DATA:		// Data register
 			// If there's data in the buffer, return it. Otherwise return 0xFF.
 			if (ctx->data_pos < ctx->data_len) {
 				// return data byte and increment pointer
@@ -118,17 +198,15 @@ uint8_t wd279x_read_reg(WD279X_CTX *ctx, uint8_t addr)
 }
 
 
-/**
- * Write WD279X register
- */
-void wd279x_write_reg(WD279X_CTX *ctx, uint8_t addr, uint8_t val)
+void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 {
 	uint8_t cmd = val & CMD_MASK;
 	size_t lba;
 	bool is_type1 = false;
+	int temp;
 
 	switch (addr) {
-		case WD279X_REG_COMMAND:	// Command register
+		case WD2797_REG_COMMAND:	// Command register
 			// write to command register clears interrupt request
 			ctx->irql = false;
 
@@ -284,20 +362,24 @@ void wd279x_write_reg(WD279X_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_READ_SECTOR:
 				case CMD_READ_SECTOR_MULTI:
 					// Read Sector or Read Sector Multiple
-					// TODO: multiple is not implemented!
-					if (cmd == CMD_READ_SECTOR_MULTI) printf("WD279X: NOTIMP: read-multi\n");
-
 					// reset data pointers
 					ctx->data_pos = ctx->data_len = 0;
 
-					// Calculate the LBA address of the required sector
-					lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ctx->sector - 1) * ctx->geom_secsz;
+					// Calculate number of sectors to read from disc
+					if (cmd == CMD_READ_SECTOR_MULTI)
+						temp = ctx->geom_spt;
+					else
+						temp = 1;
 
-					// Read the sector from the file
-					fseek(ctx->disc_image, lba, SEEK_SET);
-					ctx->data_len = fread(ctx->data, 1, ctx->geom_secsz, ctx->disc_image);
-					// TODO: if datalen < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
-					// TODO: if we're asked to do a Read Multi, malloc for an entire track, then just read a full track...
+					for (int i=0; i<temp; i++) {
+						// Calculate the LBA address of the required sector
+						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ctx->sector - 1) * ctx->geom_secsz;
+
+						// Read the sector from the file
+						fseek(ctx->disc_image, lba, SEEK_SET);
+						ctx->data_len += fread(&ctx->data[ctx->data_len], 1, ctx->geom_secsz, ctx->disc_image);
+						// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
+					}
 
 					// B6 = 0
 					// B5 = Record Type -- 1 = deleted, 0 = normal. We can't emulate anything but normal data blocks.
@@ -310,6 +392,7 @@ void wd279x_write_reg(WD279X_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_READ_TRACK:
 					// Read Track
+					// TODO! implement this
 					// B6, B5, B4, B3 = 0
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
 					// B1 = DRQ. Data request.
@@ -345,21 +428,25 @@ void wd279x_write_reg(WD279X_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_FORCE_INTERRUPT:
 					// Force Interrupt...
-					// TODO: terminate current R/W op
-					// TODO: variants for this command
+					// Terminates current operation and sends an interrupt
+					// TODO!
+					ctx->data_pos = ctx->data_len = 0;
+					// Set IRQ only if IRQL has been cleared (no pending IRQs)
+					ctx->irqe = !ctx->irql;
+					ctx->irql = true;
 					break;
 			}
 			break;
 
-		case WD279X_REG_TRACK:		// Track register
+		case WD2797_REG_TRACK:		// Track register
 			ctx->track = val;
 			break;
 
-		case WD279X_REG_SECTOR:		// Sector register
+		case WD2797_REG_SECTOR:		// Sector register
 			ctx->sector = val;
 			break;
 
-		case WD279X_REG_DATA:		// Data register
+		case WD2797_REG_DATA:		// Data register
 			// Save the value written into the data register
 			ctx->data_reg = val;
 
