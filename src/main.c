@@ -129,9 +129,9 @@ bool HandleSDLEvents(SDL_Surface *screen)
 				return true;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
-					case SDLK_ESCAPE:
+					case SDLK_F12:
 						if (event.key.keysym.mod & (KMOD_LALT | KMOD_RALT))
-							// ALT-ESC pressed; exit emulator
+							// ALT-F12 pressed; exit emulator
 							return true;
 						break;
 					default:
