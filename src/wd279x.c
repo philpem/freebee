@@ -373,7 +373,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 					for (int i=0; i<temp; i++) {
 						// Calculate the LBA address of the required sector
-						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ctx->sector - 1) * ctx->geom_secsz;
+						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ((ctx->sector + i - 1) % ctx->geom_spt)) * ctx->geom_secsz;
 
 						// Read the sector from the file
 						fseek(ctx->disc_image, lba, SEEK_SET);
