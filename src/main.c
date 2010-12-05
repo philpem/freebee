@@ -237,8 +237,5 @@ int main(void)
 		if (exitEmu) break;
 	}
 
-	// shut down and exit
-	SDL_Quit();
-
 	return 0;
 }
