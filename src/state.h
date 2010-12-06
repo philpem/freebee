@@ -47,6 +47,15 @@ typedef struct {
 	/// DMA Address Register
 	uint32_t	dma_address;
 
+	/// DMA count
+	uint32_t	dma_count;
+
+	/// DMA direction
+	bool		idmarw;
+	/// DMA enable
+	bool		dmaen;
+	bool		dmaenb;
+
 	/// Floppy disc controller context
 	WD2797_CTX	fdc_ctx;
 } S_state;

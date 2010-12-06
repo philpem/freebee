@@ -208,7 +208,68 @@ int main(void)
 		// 41667 cycles per timeslot.
 		clock_cycles += m68k_execute(10e6/TIMESLOT_FREQUENCY);
 
-		// TODO: run DMA here
+		// Run the DMA engine
+		//
+		if (state.dmaen) { //((state.dma_count < 0x3fff) && state.dmaen) {
+			printf("DMA: copy addr=%08X count=%08X idmarw=%d dmarw=%d\n", state.dma_address, state.dma_count, state.idmarw, state.dma_reading);
+			if (state.dmaenb) {
+				state.dmaenb = false;
+//				state.dma_address++;
+				state.dma_count++;
+			}
+			// DMA ready to go -- so do it.
+			size_t num = 0;
+			while (state.dma_count < 0x4000) {
+				uint16_t d = 0;
+
+				// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
+				if (num > (1e6/TIMESLOT_FREQUENCY)) break;
+
+				// Evidently we have more words to copy. Copy them.
+				if (!wd2797_get_drq(&state.fdc_ctx)) {
+					printf("\tDMABAIL: no data! dmac=%04X dmaa=%04X\n", state.dma_count, state.dma_address);
+					// Bail out, no data available. Try again later.
+					// TODO: handle HDD controller too
+					break;
+				}
+
+				if (!state.dma_reading) {
+					// Data available. Get it from the FDC.
+					d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
+					d <<= 8;
+					d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
+
+					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
+					m68k_write_memory_16(state.dma_address << 1, d);
+				} else {
+					// Data write to FDC
+					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
+					d = m68k_read_memory_16(state.dma_address << 1);
+
+					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
+					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
+				}
+
+				// Increment DMA address
+				state.dma_address++;
+				// Increment number of words transferred
+				num++; state.dma_count++;
+			}
+
+			// Turn off DMA engine if we finished this cycle
+			if (state.dma_count >= 0x4000) {
+				printf("\tDMATRAN: transfer complete! dmaa=%06X, dmac=%04X\n", state.dma_address, state.dma_count);
+				state.dma_count = 0;
+				state.dmaen = false;
+			}
+		}
+
+		// Any interrupts?
+		if (wd2797_get_irq(&state.fdc_ctx)) {
+			m68k_set_irq(2);
+		} else {
+			m68k_set_irq(0);
+		}
 
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {

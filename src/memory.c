@@ -238,8 +238,13 @@ uint32_t m68k_read_memory_32(uint32_t address)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
+				// U/OERR- is always inactive (bit set)
+				data = (state.dma_count & 0x3fff) | 0x8000;
+				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
+				data = 0x00120012;	// no parity error, no line printer error, no irqs from FDD or HDD
+				data |= (state.fdc_ctx.irql) ? 0x00080008 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
 				break;
 			case 0x080000:				// Real Time Clock
 				break;
@@ -311,7 +316,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
 						data = wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
-						printf("WD279X: rd %02X ==> %02X\n", (address >> 1) & 3, data);
+						printf("WD279X: rd32 %02X ==> %02X\n", (address >> 1) & 3, data);
 						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
@@ -403,8 +408,13 @@ uint32_t m68k_read_memory_16(uint32_t address)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
+				// U/OERR- is always inactive (bit set)
+				data = (state.dma_count & 0x3fff) | 0x8000;
+				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
+				data = 0x0012;	// no parity error, no line printer error, no irqs from FDD or HDD
+				data |= (state.fdc_ctx.irql) ? 0x0008 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
 				break;
 			case 0x080000:				// Real Time Clock
 				break;
@@ -476,7 +486,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
 						data = wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
-						printf("WD279X: rd %02X ==> %02X\n", (address >> 1) & 3, data);
+						printf("WD279X: rd16 %02X ==> %02X\n", (address >> 1) & 3, data);
 						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
@@ -577,8 +587,16 @@ uint32_t m68k_read_memory_8(uint32_t address)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
+				// TODO: how to handle this in 8bit mode?
 				break;
 			case 0x070000:				// Line Printer Status Register
+				printf("\tLPSR RD8 fdc irql=%d, irqe=%d\n", state.fdc_ctx.irql, state.fdc_ctx.irqe);
+				if (address & 1) {
+					data = 0x12;	// no parity error, no line printer error, no irqs from FDD or HDD
+					data |= (state.fdc_ctx.irql) ? 0x08 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
+				} else {
+					data = 0;
+				}
 				break;
 			case 0x080000:				// Real Time Clock
 				break;
@@ -650,7 +668,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
 						data = wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
-						printf("WD279X: rd %02X ==> %02X\n", (address >> 1) & 3, data);
+						printf("WD279X: rd8 %02X ==> %02X\n", (address >> 1) & 3, data);
 						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
@@ -736,6 +754,13 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
+				printf("WR32 dmacount %08X\n", value);
+				state.dma_count = (value & 0x3FFF);
+				state.idmarw = ((value & 0x4000) == 0x4000);
+				state.dmaen = ((value & 0x8000) == 0x8000);
+				state.dmaenb = state.dmaen;
+				printf("\tcount %04X, idmarw %d, dmaen %d\n", state.dma_count, state.idmarw, state.dmaen);
+				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
 				break;
@@ -797,6 +822,8 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 					// A14 low -- set least significant bits
 					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
 				}
+				printf("WR DMA_ADDR, now %08X\n", state.dma_address);
+				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
 				// B7 = FDD controller reset
@@ -806,6 +833,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				// B4 = HDD controller reset -- TODO
 				// B3 = HDD0 select -- TODO
 				// B2,1,0 = HDD0 head select
+				handled = true;
 				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
@@ -835,9 +863,9 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						printf("WD279X: wr32 %02X ==> %02X\n", (address >> 1) & 3, value);
 						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, value);
-						printf("WD279X: wr %02X ==> %02X\n\t", (address >> 1) & 3, value);
-						//handled = true;
+						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -929,6 +957,13 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
+				printf("WR16 dmacount %08X\n", value);
+				state.dma_count = (value & 0x3FFF);
+				state.idmarw = ((value & 0x4000) == 0x4000);
+				state.dmaen = ((value & 0x8000) == 0x8000);
+				state.dmaenb = state.dmaen;
+				printf("\tcount %04X, idmarw %d, dmaen %d\n", state.dma_count, state.idmarw, state.dmaen);
+				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
 				break;
@@ -990,6 +1025,8 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 					// A14 low -- set least significant bits
 					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
 				}
+				printf("WR DMA_ADDR, now %08X\n", state.dma_address);
+				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
 				// B7 = FDD controller reset
@@ -999,6 +1036,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				// B4 = HDD controller reset -- TODO
 				// B3 = HDD0 select -- TODO
 				// B2,1,0 = HDD0 head select
+				handled = true;
 				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
@@ -1027,9 +1065,9 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						printf("WD279X: wr16 %02X ==> %02X\n", (address >> 1) & 3, value);
 						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, value);
-						printf("WD279X: wr %02X ==> %02X\n\t", (address >> 1) & 3, value);
-						//handled = true;
+						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
@@ -1121,6 +1159,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
+				// TODO: how to handle this in 8bit mode?
 				break;
 			case 0x070000:				// Line Printer Status Register
 				break;
@@ -1155,6 +1194,8 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
+				// TODO: how to handle this in 8bit mode?
+/*
 				// TODO: handle the ctrl bits properly
 				if ((address & 1) == 0) {
 					// low byte
@@ -1170,6 +1211,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 						(state.leds & 2) ? "Y" : "-",
 						(state.leds & 1) ? "R" : "-");
 				handled = true;
+*/
 				break;
 			case 0x0B0000:				// TM/DIALWR
 				break;
@@ -1187,6 +1229,8 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 					// A14 low -- set least significant bits
 					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
 				}
+				printf("WR DMA_ADDR, now %08X\n", state.dma_address);
+				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
 				// B7 = FDD controller reset
@@ -1196,6 +1240,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 				// B4 = HDD controller reset -- TODO
 				// B3 = HDD0 select -- TODO
 				// B2,1,0 = HDD0 head select
+				handled = true;
 				break;
 			case 0x0F0000:				// Line Printer Data Register
 				break;
@@ -1224,9 +1269,9 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
+						printf("WD279X: wr8 %02X ==> %02X\n", (address >> 1) & 3, value);
 						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, value);
-						printf("WD279X: wr %02X ==> %02X\n\t", (address >> 1) & 3, value);
-						//handled = true;
+						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <malloc.h>
+#include "musashi/m68k.h"
 #include "wd279x.h"
 
 /// WD2797 command constants
@@ -164,12 +165,17 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 		case WD2797_REG_STATUS:		// Status register
 			// Read from status register clears IRQ
 			ctx->irql = false;
+			ctx->irqe = false;
 
 			// Get current status flags (set by last command)
-			temp = ctx->status;
 			// DRQ bit
-			if (ctx->cmd_has_drq)
+			if (ctx->cmd_has_drq) {
+				printf("\tWDFDC rd sr, has drq, pos=%lu len=%lu\n", ctx->data_pos, ctx->data_len);
+				temp = ctx->status & ~0x03;
 				temp |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
+			} else {
+				temp = ctx->status & ~0x01;
+			}
 			// FDC is busy if there is still data in the buffer
 			temp |= (ctx->data_pos < ctx->data_len) ? 0x01 : 0x00;	// if data in buffer, then DMA hasn't copied it yet, and we're still busy!
 																	// TODO: also if seek delay / read delay hasn't passed (but that's for later)
@@ -184,9 +190,16 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 		case WD2797_REG_DATA:		// Data register
 			// If there's data in the buffer, return it. Otherwise return 0xFF.
 			if (ctx->data_pos < ctx->data_len) {
+				// set IRQ if this is the last data byte
+				if (ctx->data_pos == (ctx->data_len-1)) {
+					// Set IRQ only if IRQL has been cleared (no pending IRQs)
+					ctx->irqe = ctx->irql ? ctx->irqe : true;
+					ctx->irql = true;
+				}
 				// return data byte and increment pointer
 				return ctx->data[ctx->data_pos++];
 			} else {
+				// command finished
 				return 0xff;
 			}
 
@@ -204,6 +217,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 	size_t lba;
 	bool is_type1 = false;
 	int temp;
+
+	m68k_end_timeslice();
 
 	switch (addr) {
 		case WD2797_REG_COMMAND:	// Command register
@@ -300,12 +315,15 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				// 		TODO: Set a timer for seeks, and ONLY clear BUSY when that timer expires. Need periodics for that.
 				
 				// Set IRQ only if IRQL has been cleared (no pending IRQs)
-				ctx->irqe = !ctx->irql;
+				ctx->irqe = ctx->irql ? ctx->irqe : true;
 				ctx->irql = true;
 				return;
 			}
 
 			// That's the Type 1 (seek) commands sorted. Now for the others.
+
+			// All these commands return the DRQ bit...
+			ctx->cmd_has_drq = true;
 
 			// If drive isn't ready, then set status B7 and exit
 			if (ctx->disc_image == NULL) {
@@ -322,7 +340,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					ctx->status = 0x40;
 
 					// Set IRQ only if IRQL has been cleared (no pending IRQs)
-					ctx->irqe = !ctx->irql;
+					ctx->irqe = ctx->irql ? ctx->irqe : true;
 					ctx->irql = true;
 
 					return;
@@ -351,6 +369,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					ctx->data[ctx->data_len++] = 0;	// TODO: IDAM CRC!
 					ctx->data[ctx->data_len++] = 0;
 
+					ctx->status = 0;
 					// B6, B5 = 0
 					// B4 = Record Not Found. We're not going to see this... FIXME-not emulated
 					// B3 = CRC Error. Not possible.
@@ -361,6 +380,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_READ_SECTOR:
 				case CMD_READ_SECTOR_MULTI:
+					printf("WD279X: READ SECTOR chs=%d:%d:%d\n", ctx->track, ctx->head, ctx->sector);
 					// Read Sector or Read Sector Multiple
 					// reset data pointers
 					ctx->data_pos = ctx->data_len = 0;
@@ -374,13 +394,16 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					for (int i=0; i<temp; i++) {
 						// Calculate the LBA address of the required sector
 						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ((ctx->sector + i - 1) % ctx->geom_spt)) * ctx->geom_secsz;
+						printf("\tREAD lba = %lu\n", lba);
 
 						// Read the sector from the file
 						fseek(ctx->disc_image, lba, SEEK_SET);
 						ctx->data_len += fread(&ctx->data[ctx->data_len], 1, ctx->geom_secsz, ctx->disc_image);
+						printf("\tREAD len=%lu, pos=%lu, ssz=%d\n", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 						// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
 					}
 
+					ctx->status = 0;
 					// B6 = 0
 					// B5 = Record Type -- 1 = deleted, 0 = normal. We can't emulate anything but normal data blocks.
 					// B4 = Record Not Found. We're not going to see this... FIXME-not emulated
@@ -393,6 +416,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_READ_TRACK:
 					// Read Track
 					// TODO! implement this
+					ctx->status = 0;
 					// B6, B5, B4, B3 = 0
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
 					// B1 = DRQ. Data request.
@@ -408,6 +432,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 					// TODO: set "write pending" flag, and write LBA, and go from there.
 
+					ctx->status = 0;
 					// B6 = Write Protect. FIXME -- emulate this!
 					// B5 = 0
 					// B4 = Record Not Found. We're not going to see this... FIXME-not emulated
@@ -419,6 +444,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_FORMAT_TRACK:
 					// Write Track (aka Format Track)
+					ctx->status = 0;
 					// B6 = Write Protect. FIXME -- emulate this!
 					// B5, B4, B3 = 0
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
@@ -430,9 +456,10 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					// Force Interrupt...
 					// Terminates current operation and sends an interrupt
 					// TODO!
+					ctx->status = 0;
 					ctx->data_pos = ctx->data_len = 0;
 					// Set IRQ only if IRQL has been cleared (no pending IRQs)
-					ctx->irqe = !ctx->irql;
+					ctx->irqe = ctx->irql ? ctx->irqe : true;
 					ctx->irql = true;
 					break;
 			}
@@ -453,6 +480,13 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 			// If we're processing a write command, and there's space in the
 			// buffer, allow the write.
 			if (ctx->data_pos < ctx->data_len) {
+				// set IRQ if this is the last data byte
+				if (ctx->data_pos == (ctx->data_len-1)) {
+					// Set IRQ only if IRQL has been cleared (no pending IRQs)
+					ctx->irqe = ctx->irql ? ctx->irqe : true;
+					ctx->irql = true;
+				}
+
 				// store data byte and increment pointer
 				ctx->data[ctx->data_pos++] = val;
 			}
