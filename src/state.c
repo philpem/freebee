@@ -13,6 +13,12 @@ int state_init(size_t ramsize)
 
 	// Initialise hardware registers
 	state.romlmap = false;
+	state.idmarw = state.dmaen = state.dmaenb = false;
+	state.dma_count = state.dma_address = 0;
+	state.pie = 0;
+	state.leds = 0;
+	state.genstat = 0;				// FIXME: check this
+	state.bsr0 = state.bsr1 = 0;	// FIXME: check this
 
 	// Allocate RAM, making sure the user has specified a valid RAM amount first
 	// Basically: 512KiB minimum, 4MiB maximum, in increments of 512KiB.
