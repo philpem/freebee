@@ -351,6 +351,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 			switch (cmd) {
 				case CMD_READ_ADDRESS:
 					// Read Address
+					ctx->head = (val & 0x02) ? 1 : 0;
 
 					// reset data pointers
 					ctx->data_pos = ctx->data_len = 0;
@@ -380,7 +381,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_READ_SECTOR:
 				case CMD_READ_SECTOR_MULTI:
-					printf("WD279X: READ SECTOR chs=%d:%d:%d\n", ctx->track, ctx->head, ctx->sector);
+					ctx->head = (val & 0x02) ? 1 : 0;
+					printf("WD279X: READ SECTOR cmd=%02X chs=%d:%d:%d\n", cmd, ctx->track, ctx->head, ctx->sector);
 					// Read Sector or Read Sector Multiple
 					// reset data pointers
 					ctx->data_pos = ctx->data_len = 0;
@@ -416,6 +418,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_READ_TRACK:
 					// Read Track
 					// TODO! implement this
+					ctx->head = (val & 0x02) ? 1 : 0;
 					ctx->status = 0;
 					// B6, B5, B4, B3 = 0
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
@@ -427,6 +430,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_WRITE_SECTOR_MULTI:
 					// Write Sector or Write Sector Multiple
 
+					ctx->head = (val & 0x02) ? 1 : 0;
 					// reset data pointers
 					ctx->data_pos = ctx->data_len = 0;
 
@@ -444,6 +448,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_FORMAT_TRACK:
 					// Write Track (aka Format Track)
+					ctx->head = (val & 0x02) ? 1 : 0;
 					ctx->status = 0;
 					// B6 = Write Protect. FIXME -- emulate this!
 					// B5, B4, B3 = 0
