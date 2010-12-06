@@ -244,7 +244,7 @@ uint32_t m68k_read_memory_32(uint32_t address)
 				break;
 			case 0x070000:				// Line Printer Status Register
 				data = 0x00120012;	// no parity error, no line printer error, no irqs from FDD or HDD
-				data |= (state.fdc_ctx.irql) ? 0x00080008 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
+				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
 				break;
 			case 0x080000:				// Real Time Clock
 				break;
@@ -414,7 +414,7 @@ uint32_t m68k_read_memory_16(uint32_t address)
 				break;
 			case 0x070000:				// Line Printer Status Register
 				data = 0x0012;	// no parity error, no line printer error, no irqs from FDD or HDD
-				data |= (state.fdc_ctx.irql) ? 0x0008 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
+				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x0008 : 0;
 				break;
 			case 0x080000:				// Real Time Clock
 				break;
@@ -590,13 +590,13 @@ uint32_t m68k_read_memory_8(uint32_t address)
 				// TODO: how to handle this in 8bit mode?
 				break;
 			case 0x070000:				// Line Printer Status Register
-				printf("\tLPSR RD8 fdc irql=%d, irqe=%d\n", state.fdc_ctx.irql, state.fdc_ctx.irqe);
 				if (address & 1) {
 					data = 0x12;	// no parity error, no line printer error, no irqs from FDD or HDD
-					data |= (state.fdc_ctx.irql) ? 0x08 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
+					data |= wd2797_get_irq(&state.fdc_ctx) ? 0x08 : 0;
 				} else {
 					data = 0;
 				}
+				handled = true;
 				break;
 			case 0x080000:				// Real Time Clock
 				break;

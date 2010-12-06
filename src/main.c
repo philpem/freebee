@@ -196,12 +196,13 @@ int main(void)
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * around 60Hz (???), with a 60Hz periodic interrupt.
 	 */
-	const uint32_t TIMESLOT_FREQUENCY = 240;	// Hz
+	const uint32_t TIMESLOT_FREQUENCY = 1000;//240;	// Hz
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
 	const uint32_t CLOCKS_PER_60HZ = (10e6 / 60);
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0;
 	bool exitEmu = false;
+	bool lastirq_fdc = false;
 	for (;;) {
 		// Run the CPU for however many cycles we need to. CPU core clock is
 		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
@@ -209,12 +210,10 @@ int main(void)
 		clock_cycles += m68k_execute(10e6/TIMESLOT_FREQUENCY);
 
 		// Run the DMA engine
-		//
-		if (state.dmaen) { //((state.dma_count < 0x3fff) && state.dmaen) {
+		if (state.dmaen) {
 			printf("DMA: copy addr=%08X count=%08X idmarw=%d dmarw=%d\n", state.dma_address, state.dma_count, state.idmarw, state.dma_reading);
 			if (state.dmaenb) {
 				state.dmaenb = false;
-//				state.dma_address++;
 				state.dma_count++;
 			}
 			// DMA ready to go -- so do it.
@@ -227,7 +226,7 @@ int main(void)
 
 				// Evidently we have more words to copy. Copy them.
 				if (!wd2797_get_drq(&state.fdc_ctx)) {
-					printf("\tDMABAIL: no data! dmac=%04X dmaa=%04X\n", state.dma_count, state.dma_address);
+//					printf("\tDMABAIL: no data! dmac=%04X dmaa=%04X\n", state.dma_count, state.dma_address);
 					// Bail out, no data available. Try again later.
 					// TODO: handle HDD controller too
 					break;
@@ -258,15 +257,20 @@ int main(void)
 
 			// Turn off DMA engine if we finished this cycle
 			if (state.dma_count >= 0x4000) {
-				printf("\tDMATRAN: transfer complete! dmaa=%06X, dmac=%04X\n", state.dma_address, state.dma_count);
+//				printf("\tDMATRAN: transfer complete! dmaa=%06X, dmac=%04X\n", state.dma_address, state.dma_count);
 				state.dma_count = 0;
 				state.dmaen = false;
 			}
 		}
 
 		// Any interrupts?
-		if (wd2797_get_irq(&state.fdc_ctx)) {
-			m68k_set_irq(2);
+		if (!lastirq_fdc) {
+			if (wd2797_get_irq(&state.fdc_ctx)) {
+				lastirq_fdc = true;
+				m68k_set_irq(2);
+			} else {
+				lastirq_fdc = false;
+			}
 		} else {
 			m68k_set_irq(0);
 		}
