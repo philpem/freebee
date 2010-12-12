@@ -26,9 +26,15 @@ int state_init(size_t ramsize)
 	// Load ROMs
 	FILE *r14c, *r15c;
 	r14c = fopen("roms/14c.bin", "rb");
-//	if (r14c == NULL) FAIL("unable to open roms/14c.bin");
+	if (r14c == NULL) {
+		fprintf(stderr, "[state] Error loading roms/14c.bin.\n");
+		return -3;
+	}
 	r15c = fopen("roms/15c.bin", "rb");
-//	if (r15c == NULL) FAIL("unable to open roms/15c.bin");
+	if (r15c == NULL) {
+		fprintf(stderr, "[state] Error loading roms/15c.bin.\n");
+		return -3;
+	}
 
 	// get ROM file size
 	fseek(r14c, 0, SEEK_END);
@@ -37,8 +43,14 @@ int state_init(size_t ramsize)
 	fseek(r15c, 0, SEEK_END);
 	size_t romlen2 = ftell(r15c);
 	fseek(r15c, 0, SEEK_SET);
-//	if (romlen2 != romlen) FAIL("ROMs are not the same size!");
-//	if ((romlen + romlen2) > ROM_SIZE) FAIL("ROMs are too large to fit in memory!");
+	if (romlen2 != romlen) {
+		fprintf(stderr, "[state] ROMs are not the same size!\n");
+		return -3;
+	}
+	if ((romlen + romlen2) > ROM_SIZE) {
+		fprintf(stderr, "[state] ROM files are too large!\n");
+		return -3;
+	}
 
 	// sanity checks completed; load the ROMs!
 	uint8_t *romdat1, *romdat2;

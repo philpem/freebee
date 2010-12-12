@@ -164,7 +164,11 @@ int main(void)
 
 	// set up system state
 	// 512K of RAM
-	state_init(512*1024);
+	int i;
+	if ((i = state_init(512*1024)) != STATE_E_OK) {
+		fprintf(stderr, "ERROR: Emulator initialisation failed. Error code %d.\n", i);
+		return i;
+	}
 
 	// set up musashi and reset the CPU
 	m68k_set_cpu_type(M68K_CPU_TYPE_68010);
@@ -190,6 +194,10 @@ int main(void)
 
 	// Load a disc image
 	FILE *disc = fopen("discim", "rb");
+	if (!disc) {
+		fprintf(stderr, "ERROR loading disc image 'discim'.\n");
+		return -4;
+	}
 	wd2797_load(&state.fdc_ctx, disc, 512, 10, 2);
 
 	/***
@@ -212,11 +220,6 @@ int main(void)
 		//
 		if (state.dmaen) { //((state.dma_count < 0x3fff) && state.dmaen) {
 			printf("DMA: copy addr=%08X count=%08X idmarw=%d dmarw=%d\n", state.dma_address, state.dma_count, state.idmarw, state.dma_reading);
-			if (state.dmaenb) {
-				state.dmaenb = false;
-//				state.dma_address++;
-				state.dma_count++;
-			}
 			// DMA ready to go -- so do it.
 			size_t num = 0;
 			while (state.dma_count < 0x4000) {

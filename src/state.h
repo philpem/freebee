@@ -10,6 +10,16 @@
 #define ROM_SIZE 32768
 
 /**
+ * State error codes
+ */
+typedef enum {
+	STATE_E_OK				= 0,	///< Operation succeeded
+	STATE_E_BAD_RAMSIZE		= -1,	///< Bad RAM size specified (not a multiple of 512K, or less than 512K)
+	STATE_E_NO_MEMORY		= -2,	///< Out of memory while allocating state variables
+	STATE_E_ROM_LOAD_FAIL	= -3	///< Error loading ROMs
+} STATE_ERR;
+
+/**
  * @brief Emulator state storage
  *
  * This structure stores the internal state of the emulator.

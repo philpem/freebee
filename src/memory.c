@@ -238,8 +238,9 @@ uint32_t m68k_read_memory_32(uint32_t address)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
-				// U/OERR- is always inactive (bit set)
-				data = (state.dma_count & 0x3fff) | 0x8000;
+				// TODO: U/OERR- is always inactive (bit set)... or should it be = DMAEN+?
+				// Bit 14 is always unused, so leave it set
+				data = (state.dma_count & 0x3fff) | 0xC000;
 				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
@@ -408,8 +409,9 @@ uint32_t m68k_read_memory_16(uint32_t address)
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
-				// U/OERR- is always inactive (bit set)
-				data = (state.dma_count & 0x3fff) | 0x8000;
+				// TODO: U/OERR- is always inactive (bit set)... or should it be = DMAEN+?
+				// Bit 14 is always unused, so leave it set
+				data = (state.dma_count & 0x3fff) | 0xC000;
 				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
@@ -758,8 +760,12 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 				state.dma_count = (value & 0x3FFF);
 				state.idmarw = ((value & 0x4000) == 0x4000);
 				state.dmaen = ((value & 0x8000) == 0x8000);
-				state.dmaenb = state.dmaen;
 				printf("\tcount %04X, idmarw %d, dmaen %d\n", state.dma_count, state.idmarw, state.dmaen);
+				// This handles the "dummy DMA transfer" mentioned in the docs
+				// TODO: access check, peripheral access
+				if (!state.idmarw)
+					WR32(state.ram, mapAddr(address, false), state.ram_size - 1, 0xDEAD);
+				state.dma_count++;
 				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
@@ -961,8 +967,12 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 				state.dma_count = (value & 0x3FFF);
 				state.idmarw = ((value & 0x4000) == 0x4000);
 				state.dmaen = ((value & 0x8000) == 0x8000);
-				state.dmaenb = state.dmaen;
 				printf("\tcount %04X, idmarw %d, dmaen %d\n", state.dma_count, state.idmarw, state.dmaen);
+				// This handles the "dummy DMA transfer" mentioned in the docs
+				// TODO: access check, peripheral access
+				if (!state.idmarw)
+					WR32(state.ram, mapAddr(address, false), state.ram_size - 1, 0xDEAD);
+				state.dma_count++;
 				handled = true;
 				break;
 			case 0x070000:				// Line Printer Status Register
