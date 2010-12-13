@@ -596,6 +596,7 @@ uint32_t m68k_read_memory_8(uint32_t address)
 				if (address & 1) {
 					data = 0x12;	// no parity error, no line printer error, no irqs from FDD or HDD
 					data |= (state.fdc_ctx.irql) ? 0x08 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
+					data |= 0x04; // HDD interrupt, i.e. command complete -- HACKHACKHACK!
 				} else {
 					data = 0;
 				}

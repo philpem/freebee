@@ -262,18 +262,19 @@ int main(void)
 			// Turn off DMA engine if we finished this cycle
 			if (state.dma_count >= 0x4000) {
 				printf("\tDMATRAN: transfer complete! dmaa=%06X, dmac=%04X\n", state.dma_address, state.dma_count);
-				state.dma_count = 0;
+				// apparently this isn't required...?
+//				state.dma_count = 0;
 				state.dmaen = false;
 			}
 		}
 
-		// Any interrupts?
-		if (wd2797_get_irq(&state.fdc_ctx)) {
+		// Any interrupts? --> TODO: masking
+/*		if (wd2797_get_irq(&state.fdc_ctx)) {
 			m68k_set_irq(2);
 		} else {
 			m68k_set_irq(0);
 		}
-
+*/
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
 			// Refresh the screen
