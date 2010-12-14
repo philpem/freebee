@@ -596,10 +596,11 @@ uint32_t m68k_read_memory_8(uint32_t address)
 				if (address & 1) {
 					data = 0x12;	// no parity error, no line printer error, no irqs from FDD or HDD
 					data |= (state.fdc_ctx.irql) ? 0x08 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
-					data |= 0x04; // HDD interrupt, i.e. command complete -- HACKHACKHACK!
+//					data |= 0x04; // HDD interrupt, i.e. command complete -- HACKHACKHACK!
 				} else {
 					data = 0;
 				}
+				handled = true;
 				break;
 			case 0x080000:				// Real Time Clock
 				break;
@@ -824,12 +825,12 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)
 			case 0x0D0000:				// DMA Address Register
 				if (address & 0x004000) {
 					// A14 high -- set most significant bits
-					state.dma_address = (state.dma_address & 0xff) | ((address & 0x3fff) << 7);
+					state.dma_address = (state.dma_address & 0x1fe) | ((address & 0x3ffe) << 8);
 				} else {
 					// A14 low -- set least significant bits
-					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
+					state.dma_address = (state.dma_address & 0x3ffe00) | (address & 0x1fe);
 				}
-				printf("WR DMA_ADDR, now %08X\n", state.dma_address);
+				printf("WR32 DMA_ADDR %s, now %08X\n", address & 0x004000 ? "HI" : "LO", state.dma_address);
 				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
@@ -1031,12 +1032,12 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)
 			case 0x0D0000:				// DMA Address Register
 				if (address & 0x004000) {
 					// A14 high -- set most significant bits
-					state.dma_address = (state.dma_address & 0xff) | ((address & 0x3fff) << 7);
+					state.dma_address = (state.dma_address & 0x1fe) | ((address & 0x3ffe) << 8);
 				} else {
 					// A14 low -- set least significant bits
-					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
+					state.dma_address = (state.dma_address & 0x3ffe00) | (address & 0x1fe);
 				}
-				printf("WR DMA_ADDR, now %08X\n", state.dma_address);
+				printf("WR16 DMA_ADDR %s, now %08X\n", address & 0x004000 ? "HI" : "LO", state.dma_address);
 				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
@@ -1235,12 +1236,12 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)
 			case 0x0D0000:				// DMA Address Register
 				if (address & 0x004000) {
 					// A14 high -- set most significant bits
-					state.dma_address = (state.dma_address & 0xff) | ((address & 0x3fff) << 7);
+					state.dma_address = (state.dma_address & 0x1fe) | ((address & 0x3ffe) << 8);
 				} else {
 					// A14 low -- set least significant bits
-					state.dma_address = (state.dma_address & 0x3fff00) | (address & 0xff);
+					state.dma_address = (state.dma_address & 0x3ffe00) | (address & 0x1fe);
 				}
-				printf("WR DMA_ADDR, now %08X\n", state.dma_address);
+				printf("WR08 DMA_ADDR %s, now %08X\n", address & 0x004000 ? "HI" : "LO", state.dma_address);
 				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register

@@ -243,18 +243,18 @@ int main(void)
 					d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
 
 					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
-					m68k_write_memory_16(state.dma_address << 1, d);
+					m68k_write_memory_16(state.dma_address, d);
 				} else {
 					// Data write to FDC
 					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
-					d = m68k_read_memory_16(state.dma_address << 1);
+					d = m68k_read_memory_16(state.dma_address);
 
 					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
 					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
 				}
 
 				// Increment DMA address
-				state.dma_address++;
+				state.dma_address+=2;
 				// Increment number of words transferred
 				num++; state.dma_count++;
 			}
@@ -262,7 +262,7 @@ int main(void)
 			// Turn off DMA engine if we finished this cycle
 			if (state.dma_count >= 0x4000) {
 				printf("\tDMATRAN: transfer complete! dmaa=%06X, dmac=%04X\n", state.dma_address, state.dma_count);
-				// apparently this isn't required...?
+				// FIXME? apparently this isn't required...?
 //				state.dma_count = 0;
 				state.dmaen = false;
 			}

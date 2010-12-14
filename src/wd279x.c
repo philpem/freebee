@@ -170,9 +170,9 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 			// Get current status flags (set by last command)
 			// DRQ bit
 			if (ctx->cmd_has_drq) {
-				printf("\tWDFDC rd sr, has drq, pos=%lu len=%lu\n", ctx->data_pos, ctx->data_len);
 				temp = ctx->status & ~0x03;
 				temp |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
+				printf("\tWDFDC rd sr, has drq, pos=%lu len=%lu, sr=0x%02X\n", ctx->data_pos, ctx->data_len, temp);
 			} else {
 				temp = ctx->status & ~0x01;
 			}
@@ -384,6 +384,20 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					ctx->head = (val & 0x02) ? 1 : 0;
 					printf("WD279X: READ SECTOR cmd=%02X chs=%d:%d:%d\n", cmd, ctx->track, ctx->head, ctx->sector);
 					// Read Sector or Read Sector Multiple
+
+					// Check to see if the cyl, hd and sec are valid
+					if ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || (ctx->sector > ctx->geom_spt) || (ctx->sector == 0)) {
+						fprintf(stderr, "*** WD2797 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, maxCHS=%d:%d:%d\n",
+								ctx->track, ctx->head, ctx->sector,
+								ctx->geom_tracks-1, ctx->geom_heads-1, ctx->geom_spt);
+						// CHS parameters exceed limits
+						ctx->status = 0x10;		// Record Not Found
+						break;
+						// Set IRQ only if IRQL has been cleared (no pending IRQs)
+						ctx->irqe = ctx->irql ? ctx->irqe : true;
+						ctx->irql = true;
+					}
+
 					// reset data pointers
 					ctx->data_pos = ctx->data_len = 0;
 
@@ -395,7 +409,11 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 					for (int i=0; i<temp; i++) {
 						// Calculate the LBA address of the required sector
-						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ((ctx->sector + i - 1) % ctx->geom_spt)) * ctx->geom_secsz;
+//						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ((ctx->sector + i - 1) % ctx->geom_spt)) * ctx->geom_secsz;
+						// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
+						lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector) + i) - 1;
+						// convert LBA to byte address
+						lba *= ctx->geom_secsz;
 						printf("\tREAD lba = %lu\n", lba);
 
 						// Read the sector from the file
@@ -408,7 +426,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					ctx->status = 0;
 					// B6 = 0
 					// B5 = Record Type -- 1 = deleted, 0 = normal. We can't emulate anything but normal data blocks.
-					// B4 = Record Not Found. We're not going to see this... FIXME-not emulated
+					// B4 = Record Not Found. Basically, the CHS parameters are bullcrap.
 					// B3 = CRC Error. Not possible.
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
 					// B1 = DRQ. Data request.
