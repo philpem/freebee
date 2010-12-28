@@ -286,12 +286,14 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				// TODO: handle the ctrl bits properly
 				// TODO: &0x8000 --> dismiss 60hz intr
 				state.dma_reading = (data & 0x4000);
-				state.leds = (~data & 0xF00) >> 8;
-				printf("LEDs: %s %s %s %s\n",
-						(state.leds & 8) ? "R" : "-",
-						(state.leds & 4) ? "G" : "-",
-						(state.leds & 2) ? "Y" : "-",
-						(state.leds & 1) ? "R" : "-");
+				if (state.leds != ((~data & 0xF00) >> 8)) {
+					state.leds = (~data & 0xF00) >> 8;
+					printf("LEDs: %s %s %s %s\n",
+							(state.leds & 8) ? "R" : "-",
+							(state.leds & 4) ? "G" : "-",
+							(state.leds & 2) ? "Y" : "-",
+							(state.leds & 1) ? "R" : "-");
+				}
 				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
