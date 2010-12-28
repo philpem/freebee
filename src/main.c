@@ -219,7 +219,6 @@ int main(void)
 		// Run the DMA engine
 		//
 		if (state.dmaen) { //((state.dma_count < 0x3fff) && state.dmaen) {
-			printf("DMA: copy addr=%08X count=%08X idmarw=%d dmarw=%d\n", state.dma_address, state.dma_count, state.idmarw, state.dma_reading);
 			// DMA ready to go -- so do it.
 			size_t num = 0;
 			while (state.dma_count < 0x4000) {
@@ -230,25 +229,60 @@ int main(void)
 
 				// Evidently we have more words to copy. Copy them.
 				if (!wd2797_get_drq(&state.fdc_ctx)) {
-					printf("\tDMABAIL: no data! dmac=%04X dmaa=%04X\n", state.dma_count, state.dma_address);
 					// Bail out, no data available. Try again later.
 					// TODO: handle HDD controller too
 					break;
 				}
 
+				// Check memory access permissions
+				// TODO: enforce these!!!! use ACCESS_CHECK_* for guidance.
+				bool access_ok;
+				switch (checkMemoryAccess(state.dma_address, !state.dma_reading)) {
+					case MEM_PAGEFAULT:
+					case MEM_PAGE_NO_WE:
+					case MEM_KERNEL:
+					case MEM_UIE:
+						access_ok = false;
+						break;
+					case MEM_ALLOWED:
+						access_ok = true;
+						break;
+				}
+				if (!access_ok) {
+					// TODO!
+					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
+					printf("REALLY BIG FSCKING HUGE ERROR: DMA Memory Access caused a FAULT!\n");
+				}
+
+				// Map logical address to a physical RAM address
+				uint32_t newAddr = mapAddr(state.dma_address, !state.dma_reading);
+
 				if (!state.dma_reading) {
-					// Data available. Get it from the FDC.
+					// Data available. Get it from the FDC. TODO: handle HDD too
 					d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
 					d <<= 8;
 					d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
 
-					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
+					if (newAddr <= 0x1FFFFF) {
+						WR16(state.base_ram, newAddr, state.base_ram_size - 1, d);
+					} else if (newAddr >= 0x200000) {
+						WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, d);
+					}
 					m68k_write_memory_16(state.dma_address, d);
 				} else {
-					// Data write to FDC
-					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
-					d = m68k_read_memory_16(state.dma_address);
+					// Data write to FDC. TODO: handle HDD too.
 
+					// Get the data from RAM
+					if (newAddr <= 0x1fffff) {
+						d = RD16(state.base_ram, newAddr, state.base_ram_size - 1);
+					} else {
+						if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
+							d = RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
+						else
+							d = 0xffff;
+					}
+
+					// Send the data to the FDD
 					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
 					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
 				}
@@ -261,8 +295,7 @@ int main(void)
 
 			// Turn off DMA engine if we finished this cycle
 			if (state.dma_count >= 0x4000) {
-				printf("\tDMATRAN: transfer complete! dmaa=%06X, dmac=%04X\n", state.dma_address, state.dma_count);
-				// FIXME? apparently this isn't required...?
+				// FIXME? apparently this isn't required... or is it?
 //				state.dma_count = 0;
 				state.dmaen = false;
 			}
