@@ -8,8 +8,8 @@
 int state_init(size_t ramsize)
 {
 	// Free RAM if it's allocated
-	if (state.ram != NULL)
-		free(state.ram);
+	if (state.base_ram != NULL)
+		free(state.base_ram);
 
 	// Initialise hardware registers
 	state.romlmap = false;
@@ -18,10 +18,10 @@ int state_init(size_t ramsize)
 	// Basically: 512KiB minimum, 4MiB maximum, in increments of 512KiB.
 	if ((ramsize < 512*1024) || ((ramsize % (512*1024)) != 0))
 		return -1;
-	state.ram = malloc(ramsize);
-	if (state.ram == NULL)
+	state.base_ram = malloc(ramsize);
+	if (state.base_ram == NULL)
 		return -2;
-	state.ram_size = ramsize;
+	state.base_ram_size = ramsize;
 
 	// Load ROMs
 	FILE *r14c, *r15c;
@@ -81,9 +81,9 @@ int state_init(size_t ramsize)
 
 void state_done()
 {
-	if (state.ram != NULL) {
-		free(state.ram);
-		state.ram = NULL;
+	if (state.base_ram != NULL) {
+		free(state.base_ram);
+		state.base_ram = NULL;
 	}
 	
 	// Deinitialise the disc controller

@@ -29,8 +29,8 @@ typedef struct {
 	uint8_t		rom[ROM_SIZE];		///< Boot PROM data buffer
 
 	//// Main system RAM
-	uint8_t		*ram;				///< RAM data buffer
-	size_t		ram_size;			///< Size of RAM buffer in bytes
+	uint8_t		*base_ram;			///< Base RAM data buffer
+	size_t		base_ram_size;		///< Size of Base RAM buffer in bytes
 
 	/// Video RAM
 	uint8_t		vram[0x8000];

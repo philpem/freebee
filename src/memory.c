@@ -235,7 +235,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				// This handles the "dummy DMA transfer" mentioned in the docs
 				// TODO: access check, peripheral access
 				if (!state.idmarw)
-					WR32(state.ram, mapAddr(address, false), state.ram_size - 1, 0xDEAD);
+					WR32(state.base_ram, mapAddr(address, true), state.base_ram_size - 1, 0xDEAD);
 				state.dma_count++;
 				handled = true;
 				break;
@@ -557,26 +557,31 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-		data = RD32(state.rom, address, ROM_SIZE - 1);
-	} else if (address <= (state.ram_size - 1)) {
+		return RD32(state.rom, address, ROM_SIZE - 1);
+	} else if (address <= 0x3fffff) {
 		// RAM access
-		data = RD32(state.ram, mapAddr(address, false), state.ram_size - 1);
+		uint32_t newAddr = mapAddr(address, false);
+//		if (newAddr < state.base_ram_size)
+			return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
+//		else
+//			return 0xFFFFFFFF;
+		// TODO: expansion RAM
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
 				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD32 from MapRAM mirror, addr=0x%08X\n", address);
-				data = RD32(state.map, address, 0x7FF);
+				return RD32(state.map, address, 0x7FF);
 				break;
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD32 from VideoRAM mirror, addr=0x%08X\n", address);
-				data = RD32(state.vram, address, 0x7FFF);
+				return RD32(state.vram, address, 0x7FFF);
 				break;
 			default:
-				data = IoRead(address, 32);
+				return IoRead(address, 32);
 		}
 	} else {
-		data = IoRead(address, 32);
+		return IoRead(address, 32);
 	}
 
 	return data;
@@ -599,9 +604,14 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD16(state.rom, address, ROM_SIZE - 1);
-	} else if (address <= (state.ram_size - 1)) {
+	} else if (address <= 0x3fffff) {
 		// RAM access
-		data = RD16(state.ram, mapAddr(address, false), state.ram_size - 1);
+		uint32_t newAddr = mapAddr(address, false);
+//		if (newAddr < state.base_ram_size)
+			return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
+//		else
+//			return 0xFFFFFFFF;
+		// TODO: expansion RAM
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -640,9 +650,14 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 		data = RD8(state.rom, address, ROM_SIZE - 1);
-	} else if (address <= (state.ram_size - 1)) {
+	} else if (address <= 0x3fffff) {
 		// RAM access
-		data = RD8(state.ram, mapAddr(address, false), state.ram_size - 1);
+		uint32_t newAddr = mapAddr(address, false);
+//		if (newAddr < state.base_ram_size)
+			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
+//		else
+//			return 0xFFFFFFFF;
+		// TODO: expansion RAM
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -678,9 +693,11 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-	} else if (address <= (state.ram_size - 1)) {
+	} else if (address <= 0x3FFFFF) {
 		// RAM access
-		WR32(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+		uint32_t newAddr = mapAddr(address, true);
+		if (newAddr <= 0x1fffff) //(state.base_ram_size - 1))
+			WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -714,9 +731,11 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
-	} else if (address <= (state.ram_size - 1)) {
+	} else if (address <= 0x3FFFFF) {
 		// RAM access
-		WR16(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+		uint32_t newAddr = mapAddr(address, true);
+		if (newAddr <= 0x1fffff) //(state.base_ram_size - 1))
+			WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -750,9 +769,11 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access (read only!)
-	} else if (address <= (state.ram_size - 1)) {
+	} else if (address <= 0x3FFFFF) {
 		// RAM access
-		WR8(state.ram, mapAddr(address, false), state.ram_size - 1, value);
+		uint32_t newAddr = mapAddr(address, true);
+		if (newAddr <= 0x1fffff) //(state.base_ram_size - 1))
+			WR8(state.base_ram, newAddr, state.base_ram_size - 1, value);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
