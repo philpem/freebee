@@ -183,10 +183,10 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 
 // Logging macros
 #define LOG_NOT_HANDLED_R(bits)															\
-	printf("unhandled read%02d, addr=0x%08X\n", bits, address);
+	if (!handled) printf("unhandled read%02d, addr=0x%08X\n", bits, address);
 
 #define LOG_NOT_HANDLED_W(bits)															\
-	printf("unhandled write%02d, addr=0x%08X, data=0x%08X\n", bits, address, value);
+	if (!handled) printf("unhandled write%02d, addr=0x%08X, data=0x%08X\n", bits, address, data);
 
 /********************************************************
  * I/O read/write functions
@@ -391,6 +391,8 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_W(bits);
 }/*}}}*/
 
 uint32_t IoRead(uint32_t address, int bits)/*{{{*/
@@ -533,6 +535,9 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				}
 		}
 	}
+
+	LOG_NOT_HANDLED_R(bits);
+
 	return data;
 }/*}}}*/
 
