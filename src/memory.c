@@ -195,12 +195,22 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 /**
  * Issue a warning if a read operation is made with an invalid size
  */
-inline static void ENFORCE_SIZE(int bits, uint32_t address, int allowed, char *regname)
+inline static void ENFORCE_SIZE(int bits, uint32_t address, bool read, int allowed, char *regname)
 {
 	assert((bits == 8) || (bits == 16) || (bits == 32));
 	if ((bits & allowed) == 0) {
-		printf("WARNING: write to 0x%08X (%s) with invalid size %d!\n", address, regname, bits);
+		printf("WARNING: %s 0x%08X (%s) with invalid size %d!\n", read ? "read from" : "write to", address, regname, bits);
 	}
+}
+
+inline static void ENFORCE_SIZE_R(int bits, uint32_t address, int allowed, char *regname)
+{
+	ENFORCE_SIZE(bits, address, true, allowed, regname);
+}
+
+inline static void ENFORCE_SIZE_W(int bits, uint32_t address, int allowed, char *regname)
+{
+	ENFORCE_SIZE(bits, address, false, allowed, regname);
 }
 
 void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
@@ -228,7 +238,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 			case 0x050000:				// Phone status
 				break;
 			case 0x060000:				// DMA Count
-				ENFORCE_SIZE(bits, address, 16, "DMACOUNT");
+				ENFORCE_SIZE_W(bits, address, 16, "DMACOUNT");
 				state.dma_count = (data & 0x3FFF);
 				state.idmarw = ((data & 0x4000) == 0x4000);
 				state.dmaen = ((data & 0x8000) == 0x8000);
@@ -272,7 +282,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				}
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register
-				ENFORCE_SIZE(bits, address, 16, "MISCCON");
+				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
 				// TODO: handle the ctrl bits properly
 				// TODO: &0x8000 --> dismiss 60hz intr
 				state.dma_reading = (data & 0x4000);
@@ -303,7 +313,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
-				ENFORCE_SIZE(bits, address, 16, "DISKCON");
+				ENFORCE_SIZE_W(bits, address, 16, "DISKCON");
 				// B7 = FDD controller reset
 				if ((data & 0x80) == 0) wd2797_reset(&state.fdc_ctx);
 				// B6 = drive 0 select -- TODO
@@ -341,7 +351,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
-						ENFORCE_SIZE(bits, address, 16, "FDC REGISTERS");
+						ENFORCE_SIZE_W(bits, address, 16, "FDC REGISTERS");
 						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, data);
 						handled = true;
 						break;
@@ -354,28 +364,28 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
 								break;
 							case 0x041000:		// [ef][4c][19]xxx ==> PIE
-								ENFORCE_SIZE(bits, address, 16, "PIE");
+								ENFORCE_SIZE_W(bits, address, 16, "PIE");
 								state.pie = ((data & 0x8000) == 0x8000);
 								handled = true;
 								break;
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
 								break;
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
-								ENFORCE_SIZE(bits, address, 16, "ROMLMAP");
+								ENFORCE_SIZE_W(bits, address, 16, "ROMLMAP");
 								state.romlmap = ((data & 0x8000) == 0x8000);
 								handled = true;
 								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
-								ENFORCE_SIZE(bits, address, 16, "L1 MODEM");
+								ENFORCE_SIZE_W(bits, address, 16, "L1 MODEM");
 								break;
 							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
-								ENFORCE_SIZE(bits, address, 16, "L2 MODEM");
+								ENFORCE_SIZE_W(bits, address, 16, "L2 MODEM");
 								break;
 							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
-								ENFORCE_SIZE(bits, address, 16, "D/N CONNECT");
+								ENFORCE_SIZE_W(bits, address, 16, "D/N CONNECT");
 								break;
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
-								ENFORCE_SIZE(bits, address, 16, "WHOLE SCREEN REVERSE VIDEO");
+								ENFORCE_SIZE_W(bits, address, 16, "WHOLE SCREEN REVERSE VIDEO");
 								break;
 						}
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
@@ -404,24 +414,24 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
 			case 0x010000:				// General Status Register
-				ENFORCE_SIZE(bits, address, 16, "GENSTAT");
+				ENFORCE_SIZE_R(bits, address, 16, "GENSTAT");
 				return ((uint32_t)state.genstat << 16) + (uint32_t)state.genstat;
 				break;
 			case 0x030000:				// Bus Status Register 0
-				ENFORCE_SIZE(bits, address, 16, "BSR0");
+				ENFORCE_SIZE_R(bits, address, 16, "BSR0");
 				return ((uint32_t)state.bsr0 << 16) + (uint32_t)state.bsr0;
 				break;
 			case 0x040000:				// Bus Status Register 1
-				ENFORCE_SIZE(bits, address, 16, "BSR1");
+				ENFORCE_SIZE_R(bits, address, 16, "BSR1");
 				return ((uint32_t)state.bsr1 << 16) + (uint32_t)state.bsr1;
 				break;
 			case 0x050000:				// Phone status
-				ENFORCE_SIZE(bits, address, 16, "PHONE STATUS");
+				ENFORCE_SIZE_R(bits, address, 8 | 16, "PHONE STATUS");
 				break;
 			case 0x060000:				// DMA Count
 				// TODO: U/OERR- is always inactive (bit set)... or should it be = DMAEN+?
 				// Bit 14 is always unused, so leave it set
-				ENFORCE_SIZE(bits, address, 16, "DMACOUNT");
+				ENFORCE_SIZE_R(bits, address, 16, "DMACOUNT");
 				return (state.dma_count & 0x3fff) | 0xC000;
 				break;
 			case 0x070000:				// Line Printer Status Register
@@ -500,7 +510,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
-						ENFORCE_SIZE(bits, address, 16, "FDC REGISTERS");
+						ENFORCE_SIZE_R(bits, address, 16, "FDC REGISTERS");
 						return wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
