@@ -561,10 +561,10 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-//		if (newAddr < state.base_ram_size)
+		if (newAddr <= 0x1fffff)
 			return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
-//		else
-//			return 0xFFFFFFFF;
+		else
+			return 0xFFFFFFFF;
 		// TODO: expansion RAM
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -607,10 +607,10 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-//		if (newAddr < state.base_ram_size)
+		if (newAddr <= 0x1fffff)
 			return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
-//		else
-//			return 0xFFFFFFFF;
+		else
+			return 0xFFFF;
 		// TODO: expansion RAM
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -653,10 +653,10 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-//		if (newAddr < state.base_ram_size)
+		if (newAddr <= 0x1fffff)
 			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
-//		else
-//			return 0xFFFFFFFF;
+		else
+			return 0xFFFFFFFF;
 		// TODO: expansion RAM
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -696,8 +696,9 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) //(state.base_ram_size - 1))
+		if (newAddr <= 0x1fffff)
 			WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
+		// TODO: expansion ram
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -734,8 +735,9 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) //(state.base_ram_size - 1))
+		if (newAddr <= 0x1fffff)
 			WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
+		// TODO: expansion ram
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -772,8 +774,9 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) //(state.base_ram_size - 1))
+		if (newAddr <= 0x1fffff)
 			WR8(state.base_ram, newAddr, state.base_ram_size - 1, value);
+		// TODO: expansion ram
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
