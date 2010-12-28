@@ -67,7 +67,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 		return MEM_KERNEL;
 
 	// Check page is write enabled
-	if ((pagebits & 0x04) == 0)
+	if (writing && ((pagebits & 0x04) == 0))
 		return MEM_PAGE_NO_WE;
 
 	// Page access allowed.
@@ -112,14 +112,14 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
-				/* TODO: which regs need setting? */				\
+				/* FIXME: which regs need setting? */				\
 				fault = true;										\
 				break;												\
 		}															\
 																	\
 		if (fault) {												\
 			if (bits >= 16)											\
-				state.bsr0 = 0x7F00;								\
+				state.bsr0 = 0x7C00;								\
 			else													\
 				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
 			state.bsr0 |= (address >> 16);							\
@@ -162,14 +162,14 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
-				/* TODO: which regs need setting? */				\
+				/* FIXME: which regs need setting? */				\
 				fault = true;										\
 				break;												\
 		}															\
 																	\
 		if (fault) {												\
 			if (bits >= 16)											\
-				state.bsr0 = 0x7F00;								\
+				state.bsr0 = 0x7C00;								\
 			else													\
 				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
 			state.bsr0 |= (address >> 16);							\
