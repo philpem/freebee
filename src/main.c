@@ -239,19 +239,42 @@ int main(void)
 				bool access_ok;
 				switch (checkMemoryAccess(state.dma_address, !state.dma_reading)) {
 					case MEM_PAGEFAULT:
-					case MEM_PAGE_NO_WE:
-					case MEM_KERNEL:
-					case MEM_UIE:
+						// Page fault
+						state.genstat = 0x8BFF
+							| (state.dma_reading ? 0x4000 : 0)
+							| (state.pie ? 0x0400 : 0);
 						access_ok = false;
 						break;
+
+					case MEM_UIE:
+						// User access to memory above 4MB
+						// FIXME? Shouldn't be possible with DMA... assert this?
+						state.genstat = 0x9AFF
+							| (state.dma_reading ? 0x4000 : 0)
+							| (state.pie ? 0x0400 : 0);
+						access_ok = false;
+						break;
+
+					case MEM_KERNEL:
+					case MEM_PAGE_NO_WE:
+						// Kernel access or page not write enabled
+						access_ok = false;
+						break;
+
 					case MEM_ALLOWED:
 						access_ok = true;
 						break;
 				}
 				if (!access_ok) {
-					// TODO!
+					state.bsr0 = 0x3C00;
+					state.bsr0 |= (state.dma_address >> 16);
+					state.bsr1 = state.dma_address & 0xffff;
+					m68k_pulse_bus_error();
+					printf("BUS ERROR FROM DMA: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
+
 					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
 					printf("REALLY BIG FSCKING HUGE ERROR: DMA Memory Access caused a FAULT!\n");
+					exit(-1);
 				}
 
 				// Map logical address to a physical RAM address
