@@ -4,7 +4,9 @@
 #include "musashi/m68k.h"
 #include "wd279x.h"
 
+#ifndef WD279X_DEBUG
 #define NDEBUG
+#endif
 #include "utils.h"
 
 /// WD2797 command constants
@@ -412,7 +414,6 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 					for (int i=0; i<temp; i++) {
 						// Calculate the LBA address of the required sector
-//						lba = ((((ctx->track * ctx->geom_heads) + ctx->head) * ctx->geom_spt) + ((ctx->sector + i - 1) % ctx->geom_spt)) * ctx->geom_secsz;
 						// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
 						lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector) + i) - 1;
 						// convert LBA to byte address
