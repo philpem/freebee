@@ -128,7 +128,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			m68k_pulse_bus_error();									\
 			return;													\
 		}															\
-	} while (false)
+	} while (0)
 /*}}}*/
 
 /**
@@ -178,7 +178,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			m68k_pulse_bus_error();									\
 			return 0xFFFFFFFF;										\
 		}															\
-	} while (false)
+	} while (0)
 /*}}}*/
 
 // Logging macros
@@ -721,11 +721,10 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) {
+		if (newAddr <= 0x1fffff)
 			WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
-		} else {
+		else
 			WR32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
-		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -762,11 +761,10 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) {
+		if (newAddr <= 0x1fffff)
 			WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
-		} else {
+		else
 			WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
-		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -803,11 +801,10 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) {
+		if (newAddr <= 0x1fffff)
 			WR8(state.base_ram, newAddr, state.base_ram_size - 1, value);
-		} else {
+		else
 			WR8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
-		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {

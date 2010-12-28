@@ -23,22 +23,23 @@
 	((uint32_t)array[(address + 0) & (andmask)])
 
 /// Array write, 32-bit
-#define WR32(array, address, andmask, value) {					\
+#define WR32(array, address, andmask, value) do {				\
 	array[(address + 0) & (andmask)] = (value >> 24) & 0xff;	\
 	array[(address + 1) & (andmask)] = (value >> 16) & 0xff;	\
 	array[(address + 2) & (andmask)] = (value >> 8)  & 0xff;	\
 	array[(address + 3) & (andmask)] =  value        & 0xff;	\
-}
+} while (0)
 
 /// Array write, 16-bit
-#define WR16(array, address, andmask, value) {					\
+#define WR16(array, address, andmask, value) do {				\
 	array[(address + 0) & (andmask)] = (value >> 8)  & 0xff;	\
 	array[(address + 1) & (andmask)] =  value        & 0xff;	\
-}
+} while (0)
 
 /// Array write, 8-bit
-#define WR8(array, address, andmask, value)						\
-	array[(address + 0) & (andmask)] =  value        & 0xff;
+#define WR8(array, address, andmask, value) do {				\
+	array[(address + 0) & (andmask)] =  value        & 0xff;	\
+} while (0)
 
 /******************
  * Memory mapping
