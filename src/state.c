@@ -5,23 +5,34 @@
 #include "wd279x.h"
 #include "state.h"
 
-int state_init(size_t ramsize)
+int state_init(size_t base_ram_size, size_t exp_ram_size)
 {
 	// Free RAM if it's allocated
 	if (state.base_ram != NULL)
 		free(state.base_ram);
+	if (state.exp_ram != NULL)
+		free(state.exp_ram);
 
 	// Initialise hardware registers
 	state.romlmap = false;
 
-	// Allocate RAM, making sure the user has specified a valid RAM amount first
-	// Basically: 512KiB minimum, 4MiB maximum, in increments of 512KiB.
-	if ((ramsize < 512*1024) || ((ramsize % (512*1024)) != 0))
+	// Allocate Base RAM, making sure the user has specified a valid RAM amount first
+	// Basically: 512KiB minimum, 2MiB maximum, in increments of 512KiB.
+	if ((base_ram_size < 512*1024) || (base_ram_size > 2048*1024) || ((base_ram_size % (512*1024)) != 0))
 		return -1;
-	state.base_ram = malloc(ramsize);
+	state.base_ram = malloc(base_ram_size);
 	if (state.base_ram == NULL)
 		return -2;
-	state.base_ram_size = ramsize;
+	state.base_ram_size = base_ram_size;
+
+	// Now allocate expansion RAM
+	// The difference here is that we can have zero bytes of Expansion RAM; we're not limited to having a minimum of 512KiB.
+	if ((exp_ram_size > 2048*1024) || ((exp_ram_size % (512*1024)) != 0))
+		return -1;
+	state.exp_ram = malloc(exp_ram_size);
+	if (state.exp_ram == NULL)
+		return -2;
+	state.exp_ram_size = exp_ram_size;
 
 	// Load ROMs
 	FILE *r14c, *r15c;
@@ -85,7 +96,12 @@ void state_done()
 		free(state.base_ram);
 		state.base_ram = NULL;
 	}
-	
+
+	if (state.exp_ram != NULL) {
+		free(state.exp_ram);
+		state.exp_ram = NULL;
+	}
+
 	// Deinitialise the disc controller
 	wd2797_done(&state.fdc_ctx);
 }

@@ -31,6 +31,8 @@ typedef struct {
 	//// Main system RAM
 	uint8_t		*base_ram;			///< Base RAM data buffer
 	size_t		base_ram_size;		///< Size of Base RAM buffer in bytes
+	uint8_t		*exp_ram;			///< Expansion RAM data buffer
+	size_t		exp_ram_size;		///< Size of Expansion RAM buffer in bytes
 
 	/// Video RAM
 	uint8_t		vram[0x8000];
@@ -81,11 +83,12 @@ S_state state;
 /**
  * @brief	Initialise system state
  *
- * @param	ramsize		RAM size in bytes -- must be a multiple of 512KiB, min 512KiB, max 4MiB.
+ * @param	base_ram_size		Base RAM size in bytes -- must be a multiple of 512KiB, min 512KiB, max 2MiB.
+ * @param	exp_ram_size		Expansion RAM size in bytes -- must be a multiple of 512KiB, min 0, max 2MiB.
  *
  * Initialises the emulator's internal state.
  */
-int state_init(size_t ramsize);
+int state_init(size_t base_ram_size, size_t exp_ram_size);
 
 /**
  * @brief Deinitialise system state
