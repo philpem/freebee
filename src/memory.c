@@ -489,7 +489,8 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 					case 0xD40000:		// Expansion slot 5
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
-						fprintf(stderr, "NOTE: RD32 from expansion card space, addr=0x%08X\n", address);
+						fprintf(stderr, "NOTE: RD%d from expansion card space, addr=0x%08X\n", bits, address);
+						handled = true;
 						break;
 				}
 				break;
@@ -713,7 +714,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 		if (newAddr <= 0x1fffff) {
 			WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
 		} else {
-//			WR32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+			WR32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
 		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -754,7 +755,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 		if (newAddr <= 0x1fffff) {
 			WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
 		} else {
-//			WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+			WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
 		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -795,7 +796,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 		if (newAddr <= 0x1fffff) {
 			WR8(state.base_ram, newAddr, state.base_ram_size - 1, value);
 		} else {
-//			WR8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+			WR8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
 		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
