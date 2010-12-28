@@ -4,6 +4,9 @@
 #include "musashi/m68k.h"
 #include "wd279x.h"
 
+#define NDEBUG
+#include "utils.h"
+
 /// WD2797 command constants
 enum {
 	CMD_MASK				= 0xF0,		///< Bit mask to detect command bits
@@ -172,7 +175,7 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 			if (ctx->cmd_has_drq) {
 				temp = ctx->status & ~0x03;
 				temp |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
-				printf("\tWDFDC rd sr, has drq, pos=%lu len=%lu, sr=0x%02X\n", ctx->data_pos, ctx->data_len, temp);
+				LOG("\tWDFDC rd sr, has drq, pos=%lu len=%lu, sr=0x%02X", ctx->data_pos, ctx->data_len, temp);
 			} else {
 				temp = ctx->status & ~0x01;
 			}
@@ -382,12 +385,12 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_READ_SECTOR:
 				case CMD_READ_SECTOR_MULTI:
 					ctx->head = (val & 0x02) ? 1 : 0;
-					printf("WD279X: READ SECTOR cmd=%02X chs=%d:%d:%d\n", cmd, ctx->track, ctx->head, ctx->sector);
+					LOG("WD279X: READ SECTOR cmd=%02X chs=%d:%d:%d", cmd, ctx->track, ctx->head, ctx->sector);
 					// Read Sector or Read Sector Multiple
 
 					// Check to see if the cyl, hd and sec are valid
 					if ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || (ctx->sector > ctx->geom_spt) || (ctx->sector == 0)) {
-						fprintf(stderr, "*** WD2797 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, maxCHS=%d:%d:%d\n",
+						LOG("*** WD2797 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, maxCHS=%d:%d:%d",
 								ctx->track, ctx->head, ctx->sector,
 								ctx->geom_tracks-1, ctx->geom_heads-1, ctx->geom_spt);
 						// CHS parameters exceed limits
@@ -414,13 +417,13 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 						lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector) + i) - 1;
 						// convert LBA to byte address
 						lba *= ctx->geom_secsz;
-						printf("\tREAD lba = %lu\n", lba);
+						LOG("\tREAD lba = %lu", lba);
 
 						// Read the sector from the file
 						fseek(ctx->disc_image, lba, SEEK_SET);
-						ctx->data_len += fread(&ctx->data[ctx->data_len], 1, ctx->geom_secsz, ctx->disc_image);
-						printf("\tREAD len=%lu, pos=%lu, ssz=%d\n", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 						// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
+						ctx->data_len += fread(&ctx->data[ctx->data_len], 1, ctx->geom_secsz, ctx->disc_image);
+						LOG("\tREAD len=%lu, pos=%lu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 					}
 
 					ctx->status = 0;
