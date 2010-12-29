@@ -27,11 +27,8 @@ typedef struct {
 	int						track, head, sector;
 	// Geometry of current disc
 	int						geom_secsz, geom_spt, geom_heads, geom_tracks;
-	// IRQ status, level and edge sensitive.
-	// Edge sensitive is cleared when host polls the IRQ status.
-	// Level sensitive is cleared when emulated CPU polls the status reg or writes a new cmnd.
-	// No EDGE sensitive interrupts will be issued unless the LEVEL SENSITIVE IRQ is clear.
-	bool					irql, irqe;
+	// IRQ status
+	bool					irq;
 	// Status of last command
 	uint8_t					status;
 	// Last command uses DRQ bit?

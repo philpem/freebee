@@ -204,12 +204,13 @@ int main(void)
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * around 60Hz (???), with a 60Hz periodic interrupt.
 	 */
-	const uint32_t TIMESLOT_FREQUENCY = 240;	// Hz
+	const uint32_t TIMESLOT_FREQUENCY = 1000;//240;	// Hz
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
 	const uint32_t CLOCKS_PER_60HZ = (10e6 / 60);
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0;
 	bool exitEmu = false;
+	bool lastirq_fdc = false;
 	for (;;) {
 		// Run the CPU for however many cycles we need to. CPU core clock is
 		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
@@ -217,8 +218,7 @@ int main(void)
 		clock_cycles += m68k_execute(10e6/TIMESLOT_FREQUENCY);
 
 		// Run the DMA engine
-		//
-		if (state.dmaen) { //((state.dma_count < 0x3fff) && state.dmaen) {
+		if (state.dmaen) {
 			// DMA ready to go -- so do it.
 			size_t num = 0;
 			while (state.dma_count < 0x4000) {
@@ -325,8 +325,13 @@ int main(void)
 		}
 
 		// Any interrupts? --> TODO: masking
-/*		if (wd2797_get_irq(&state.fdc_ctx)) {
-			m68k_set_irq(2);
+/*		if (!lastirq_fdc) {
+			if (wd2797_get_irq(&state.fdc_ctx)) {
+				lastirq_fdc = true;
+				m68k_set_irq(2);
+			} else {
+				lastirq_fdc = false;
+			}
 		} else {
 			m68k_set_irq(0);
 		}

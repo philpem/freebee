@@ -438,7 +438,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				break;
 			case 0x070000:				// Line Printer Status Register
 				data = 0x00120012;	// no parity error, no line printer error, no irqs from FDD or HDD
-				data |= (state.fdc_ctx.irql) ? 0x00080008 : 0;	// FIXME! HACKHACKHACK! shouldn't peek inside FDC structs like this
+				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
 				return data;
 				break;
 			case 0x080000:				// Real Time Clock

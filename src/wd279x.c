@@ -37,19 +37,20 @@ void wd2797_init(WD2797_CTX *ctx)
 	ctx->track = ctx->head = ctx->sector = 0;
 
 	// no IRQ pending
-	ctx->irql = ctx->irqe = false;
+	ctx->irq = false;
 
 	// no data available
 	ctx->data_pos = ctx->data_len = 0;
 	ctx->data = NULL;
 
-	// Status register clear, not busy
+	// Status register clear, not busy; type1 command
 	ctx->status = 0;
+	ctx->cmd_has_drq = false;
 
 	// Clear data register
 	ctx->data_reg = 0;
 
-	// Last step direction
+	// Last step direction = "towards zero"
 	ctx->last_step_dir = -1;
 
 	// No disc image loaded
@@ -64,7 +65,7 @@ void wd2797_reset(WD2797_CTX *ctx)
 	ctx->track = ctx->head = ctx->sector = 0;
 
 	// no IRQ pending
-	ctx->irql = ctx->irqe = false;
+	ctx->irq = false;
 
 	// no data available
 	ctx->data_pos = ctx->data_len = 0;
@@ -95,13 +96,7 @@ void wd2797_done(WD2797_CTX *ctx)
 
 bool wd2797_get_irq(WD2797_CTX *ctx)
 {
-	// If an IRQ is pending, clear it and return true, otherwise return false
-	if (ctx->irqe) {
-		ctx->irqe = false;
-		return true;
-	} else {
-		return false;
-	}
+	return ctx->irq;
 }
 
 
@@ -169,8 +164,7 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 	switch (addr & 0x03) {
 		case WD2797_REG_STATUS:		// Status register
 			// Read from status register clears IRQ
-			ctx->irql = false;
-			ctx->irqe = false;
+			ctx->irq = false;
 
 			// Get current status flags (set by last command)
 			// DRQ bit
@@ -197,9 +191,8 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 			if (ctx->data_pos < ctx->data_len) {
 				// set IRQ if this is the last data byte
 				if (ctx->data_pos == (ctx->data_len-1)) {
-					// Set IRQ only if IRQL has been cleared (no pending IRQs)
-					ctx->irqe = ctx->irql ? ctx->irqe : true;
-					ctx->irql = true;
+					// Set IRQ
+					ctx->irq = true;
 				}
 				// return data byte and increment pointer
 				return ctx->data[ctx->data_pos++];
@@ -228,7 +221,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 	switch (addr) {
 		case WD2797_REG_COMMAND:	// Command register
 			// write to command register clears interrupt request
-			ctx->irql = false;
+			ctx->irq = false;
 
 			// Is the drive ready?
 			if (ctx->disc_image == NULL) {
@@ -319,9 +312,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				// S0 = Busy. We just exec'd the command, thus we're not busy.
 				// 		TODO: Set a timer for seeks, and ONLY clear BUSY when that timer expires. Need periodics for that.
 				
-				// Set IRQ only if IRQL has been cleared (no pending IRQs)
-				ctx->irqe = ctx->irql ? ctx->irqe : true;
-				ctx->irql = true;
+				// Set IRQ
+				ctx->irq = true;
 				return;
 			}
 
@@ -344,9 +336,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					// Set Write Protect bit and bail.
 					ctx->status = 0x40;
 
-					// Set IRQ only if IRQL has been cleared (no pending IRQs)
-					ctx->irqe = ctx->irql ? ctx->irqe : true;
-					ctx->irql = true;
+					// Set IRQ
+					ctx->irq = true;
 
 					return;
 				}
@@ -398,9 +389,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 						// CHS parameters exceed limits
 						ctx->status = 0x10;		// Record Not Found
 						break;
-						// Set IRQ only if IRQL has been cleared (no pending IRQs)
-						ctx->irqe = ctx->irql ? ctx->irqe : true;
-						ctx->irql = true;
+						// Set IRQ
+						ctx->irq = true;
 					}
 
 					// reset data pointers
@@ -485,9 +475,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					// TODO!
 					ctx->status = 0;
 					ctx->data_pos = ctx->data_len = 0;
-					// Set IRQ only if IRQL has been cleared (no pending IRQs)
-					ctx->irqe = ctx->irql ? ctx->irqe : true;
-					ctx->irql = true;
+					// Set IRQ
+					ctx->irq = true;
 					break;
 			}
 			break;
@@ -509,9 +498,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 			if (ctx->data_pos < ctx->data_len) {
 				// set IRQ if this is the last data byte
 				if (ctx->data_pos == (ctx->data_len-1)) {
-					// Set IRQ only if IRQL has been cleared (no pending IRQs)
-					ctx->irqe = ctx->irql ? ctx->irqe : true;
-					ctx->irql = true;
+					// Set IRQ
+					ctx->irq = true;
 				}
 
 				// store data byte and increment pointer
