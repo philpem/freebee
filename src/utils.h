@@ -1,6 +1,8 @@
 #ifndef _UTILS_H
 #define _UTILS_H
 
+#include <stdio.h>
+
 #ifndef NDEBUG
 /// Log a message to stderr
 #  define LOG(x, ...) do { fprintf(stderr, "%s:%d:%s(): " x "\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, ##__VA_ARGS__); } while (0)
