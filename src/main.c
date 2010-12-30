@@ -210,7 +210,7 @@ int main(void)
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0;
 	bool exitEmu = false;
-	bool lastirq_fdc = false;
+//	bool lastirq_fdc = false;
 	for (;;) {
 		// Run the CPU for however many cycles we need to. CPU core clock is
 		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
@@ -333,6 +333,7 @@ int main(void)
 				lastirq_fdc = false;
 			}
 		} else {
+			lastirq_fdc = wd2797_get_irq(&state.fdc_ctx);
 			m68k_set_irq(0);
 		}
 */
