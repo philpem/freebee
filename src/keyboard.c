@@ -1,4 +1,5 @@
 #include "SDL.h"
+#include "keyboard.h"
 
 /**
  * Key map -- a mapping from SDLK_xxx constants to scancodes and vice versa.
@@ -73,7 +74,9 @@ struct {
 	{ SDLK_SEMICOLON,		0,	0x3b },	// ;			[Semicolon]
 // Keycode 3C not used
 	{ SDLK_EQUALS,			0,	0x3d },	// =			[Equals]
-// Keycodes 3E, 3F, 40 not used
+// Keycode 3E not used
+// Keycode 3F = BOGUS (Bad Keycode)
+// Keycode 40 = All Up
 //	{ SDLK_,				1,	0x41 },	// CMD
 //	{ SDLK_,				1,	0x42 },	// CLOSE/OPEN
 	{ SDLK_KP7,				0,	0x43 },	// PRINT
@@ -87,8 +90,8 @@ struct {
 	{ SDLK_KP5,				0,	0x4a },	// Home			[Keypad 5]
 	{ SDLK_END,				0,	0x4b },	// End
 	{ SDLK_KP6,				0,	0x4b },	// End			[Keypad 6]
-	{ SDLK_LCTRL,			0,	0x4c },	// Left Ctrl?	\___ not sure which is left and which is right...
-	{ SDLK_RCTRL,			0,	0x4d },	// Right Ctrl?	/
+	{ SDLK_LCTRL,			0,	0x4c },	// Left Ctrl
+	{ SDLK_RCTRL,			0,	0x4d },	// Right Ctrl
 // Keycodes 4E thru 5A not used
 	{ SDLK_LEFTBRACKET,		0,	0x5b },	// [
 	{ SDLK_BACKSLASH,		0,	0x5c },	// \ (backslash)
@@ -122,23 +125,79 @@ struct {
 	{ SDLK_y,				0,	0x79 },	// Y
 	{ SDLK_z,				0,	0x7a },	// Z
 // Keycodes 7B, 7C, 7D not used
-	{ SDLK_NUMLOCK,			0,	0x7e }		// Numlock
+	{ SDLK_NUMLOCK,			0,	0x7e }	// Numlock
 //	{ SDLK_,				1,	0x7f },	// Dlete
 };
 
 /**
- * List of key states
+ * List of special key codes
  */
-int keystate[0x80];
+enum {
+	KEY_ALL_UP				= 0x40,		///< All keys up
+	KEY_LIST_END			= 0x80,		///< End of key code list
+	KEY_BEGIN_MOUSE			= 0xCF,		///< Mouse data follows
+	KEY_BEGIN_KEYBOARD		= 0xDF,		///< Keyboard data follows
+};
 
-void keyboard_init(void)
+/**
+ * List of keyboard commands
+ */
+enum {
+	KEY_CMD_RESET			= 0x92,		///< Reset keyboard
+	KEY_CMD_CAPSLED_OFF		= 0xB1,		///< Caps Lock LED off--CHECK!
+	KEY_CMD_CAPSLED_ON		= 0xB0,		///< Caps Lock LED on --CHECK!
+	KEY_CMD_NUMLED_OFF		= 0xA1,		///< Num Lock LED off --CHECK!
+	KEY_CMD_NUMLED_ON		= 0xA0,		///< Num Lock LED on  --CHECK!
+	KEY_CMD_MOUSE_ENABLE	= 0xD0,		///< Enable mouse
+	KEY_CMD_MOUSE_DISABLE	= 0xD1		///< Disable mouse
+};
+
+void keyboard_init(KEYBOARD_STATE *state)
 {
 	// Set all key states to "not pressed"
-	for (int i=0; i<(sizeof(keystate)/sizeof(keystate[0])); i++) {
-		keystate[i] = 0;
+	for (int i=0; i<(sizeof(state->keystate)/sizeof(state->keystate[0])); i++) {
+		state->keystate[i] = 0;
 	}
 }
 
-void keyboard_event(SDL_Event *ev)
+void keyboard_event(KEYBOARD_STATE *state, SDL_Event *ev)
 {
+	int ks;
+
+	// Figure out the event type
+	if (ev->type == SDL_KEYDOWN) {
+		// Key down event
+		ks = 1;
+	} else if (ev->type == SDL_KEYUP) {
+		// Key up event
+		ks = 0;
+	} else {
+		// Not a keyboard event
+		return;
+	}
+
+	// Loop over the keyinfo, try and find a match for this key
+	// TODO: handle Extended Keymap
+	for (int i=0; i<(sizeof(keymap)/sizeof(keymap[0])); i++) {
+		if (ev->key.keysym.sym == keymap[i].key) {
+			// Key code match. Is this an Extended Map key?
+			if (keymap[i].extended) {
+				// Key is on the Extended map. Need ALT set when pressing the key.
+				if (ev->key.keysym.mod & KMOD_ALT) {
+					// ALT is down, key matches.
+					state->keystate[keymap[i].scancode] = ks;
+					break;
+				}
+			} else {
+				// Key is on the Standard map. ALT must NOT be set when pressing the key.
+				if (!(ev->key.keysym.mod & KMOD_ALT)) {
+					// ALT is up, key matches
+					state->keystate[keymap[i].scancode] = ks;
+					break;
+				}
+			}
+		}
+	}
 }
+
+// TODO: register read and write
