@@ -235,7 +235,7 @@ uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr)
 //			0 +								// SR5: Receiver Overrun
 //			0 +								// SR6: Parity Error
 		if (keyboard_get_irq(ks)) sr |= 0x80;	// SR7: IRQ status
-		printf("\tKBD DBG: sr=%02X\n", sr);
+		printf("\tKBC DBG: sr=%02X\n", sr);
 		return sr;
 	} else {
 		// return data, pop off the fifo

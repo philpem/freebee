@@ -336,10 +336,13 @@ int main(void)
 			} else {
 				lastirq_fdc = false;
 			}
+*/		if (keyboard_get_irq(&state.kbd)) {
+			// TODO: this is a LEVEL, not an EDGE!
+			m68k_set_irq(3);
 		} else {
 			m68k_set_irq(0);
 		}
-*/
+
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
 			// Refresh the screen
