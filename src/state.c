@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include "wd279x.h"
+#include "keyboard.h"
 #include "state.h"
 
 int state_init(size_t base_ram_size, size_t exp_ram_size)
@@ -92,6 +93,8 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 
 	// Initialise the disc controller
 	wd2797_init(&state.fdc_ctx);
+	// Initialise the keyboard controller
+	keyboard_init(&state.kbd);
 
 	return 0;
 }

@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "wd279x.h"
+#include "keyboard.h"
 
 // Maximum size of the Boot PROMs. Must be a binary power of two.
 #define ROM_SIZE 32768
@@ -70,6 +71,9 @@ typedef struct {
 
 	/// Floppy disc controller context
 	WD2797_CTX	fdc_ctx;
+
+	/// Keyboard controller context
+	KEYBOARD_STATE	kbd;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't

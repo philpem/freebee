@@ -1,4 +1,6 @@
+#include <stdbool.h>
 #include "SDL.h"
+#include "keyboard.h"
 
 /**
  * Key map -- a mapping from SDLK_xxx constants to scancodes and vice versa.
@@ -126,19 +128,96 @@ struct {
 //	{ SDLK_,				1,	0x7f },	// Dlete
 };
 
-/**
- * List of key states
- */
-int keystate[0x80];
-
-void keyboard_init(void)
+void keyboard_init(KEYBOARD_STATE *ks)
 {
 	// Set all key states to "not pressed"
-	for (int i=0; i<(sizeof(keystate)/sizeof(keystate[0])); i++) {
-		keystate[i] = 0;
+	for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
+		ks->keystate[i] = 0;
+	}
+
+	// Reset the R/W pointers and length
+	ks->readp = ks->writep = ks->buflen = 0;
+}
+
+void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
+{
+	// event handler -- handles SDL events
+}
+
+void keyboard_scan(KEYBOARD_STATE *ks)
+{
+	// if buffer empty, do a keyboard scan
+	if (ks->buflen == 0) {
+		for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
+			if (ks->keystate[i]) {
+				ks->buffer[ks->writep] = i;
+				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+			}
+		}
 	}
 }
 
-void keyboard_event(SDL_Event *ev)
+bool keyboard_get_irq(KEYBOARD_STATE *ks)
 {
+	bool irq_status = false;
+
+	// Conditions which may cause an IRQ :-
+	//   Read Data Reg has data and RxIRQ enabled
+	if (ks->rxie)
+		if (ks->buflen > 0) irq_status = true;
+
+	//   Transmit Data Reg empty and TxIRQ enabled
+//	if (ks->txie)
+
+	//   DCD set and RxIRQ enabled
+//
+
+	// returns interrupt status -- i.e. is there data in the buffer?
+	return irq_status;
 }
+
+uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr)
+{
+	if ((addr & 1) == 0) {
+		// Status register -- RS=0, read
+		return
+			(ks->buflen > 0) ? 1 : 0 +		// SR0: a new character has been received
+			0 +								// SR1: Transmitter Data Register Empty
+			0 +								// SR2: Data Carrier Detect
+			0 +								// SR3: Clear To Send
+			0 +								// SR4: Framing Error
+			0 +								// SR5: Receiver Overrun
+			0 +								// SR6: Parity Error
+			(keyboard_get_irq(ks)) ? 0x80 : 0;	// SR7: IRQ status
+	} else {
+		// return data, pop off the fifo
+		uint8_t x = ks->buffer[ks->readp];
+		ks->readp = (ks->readp + 1) % KEYBOARD_BUFFER_SIZE;
+		return x;
+	}
+}
+
+void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
+{
+	if ((addr & 1) == 0) {
+		// write to control register
+		// transmit intr enabled when CR6,5 = 01
+		// receive intr enabled when CR7 = 1
+
+		// CR0,1 = divider registers. When =11, do a software reset
+		if ((val & 3) == 3) {
+			ks->readp = ks->writep = ks->buflen = 0;
+		}
+
+		// Ignore CR2,3,4 (word length)...
+
+		// CR5,6 = Transmit Mode
+		ks->txie = (val & 0x60)==0x20;
+
+		// CR7 = Receive Interrupt Enable
+		ks->rxie = (val & 0x80)==0x80;
+	} else {
+		// Write command to KBC -- TODO!
+	}
+}
+

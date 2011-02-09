@@ -123,6 +123,10 @@ bool HandleSDLEvents(SDL_Surface *screen)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+		if ((event.type == SDL_KEYDOWN) || (event.type == SDL_KEYUP)) {
+			keyboard_event(&state.kbd, &event);
+		}
+
 		switch (event.type) {
 			case SDL_QUIT:
 				// Quit button tagged. Exit.
@@ -341,6 +345,8 @@ int main(void)
 			// Refresh the screen
 			refreshScreen(screen);
 			// TODO: trigger periodic interrupt (if enabled)
+			// scan the keyboard
+			keyboard_scan(&state.kbd);
 			// decrement clock cycle counter, we've handled the intr.
 			clock_cycles -= CLOCKS_PER_60HZ;
 		}
