@@ -399,6 +399,11 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						}
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+						// TODO: figure out which sizes are valid (probably just 8 and 16)
+						// ENFORCE_SIZE_W(bits, address, 16, "KEYBOARD CONTROLLER");
+						printf("KBD WR %02X => %04X\n", (address >> 1) & 3, data >> 8);
+						keyboard_write(&state.kbd, (address >> 1) & 3, data >> 8);
+						handled = true;
 						break;
 				}
 		}
@@ -544,6 +549,14 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 						}
 						break;
 					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+						// TODO: figure out which sizes are valid (probably just 8 and 16)
+						//ENFORCE_SIZE_R(bits, address, 16, "KEYBOARD CONTROLLER");
+						{
+							uint16_t data = keyboard_read(&state.kbd, (address >> 1) & 3);
+							data = (data << 8) + data;
+							//printf("KBD RD %02X => %04X\n", (address >> 1) & 3, data);
+							return data;
+						}
 						break;
 				}
 		}

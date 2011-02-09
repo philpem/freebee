@@ -146,8 +146,12 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 
 	// scan the keymap
 	int keyidx = 0;
+	bool found = false;
 	for (keyidx=0; keyidx < sizeof(keymap)/sizeof(keymap[0]); keyidx++) {
-		if (keymap[keyidx].key == ev->key.keysym.sym) break;
+		if (keymap[keyidx].key == ev->key.keysym.sym) {
+			found = true;
+			break;
+		}
 	}
 
 	switch (ev->type) {
@@ -157,23 +161,45 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 			break;
 		// key released
 		case SDL_KEYUP:
-			ks->keystate[keymap[keyidx].scancode] = 1;
+			ks->keystate[keymap[keyidx].scancode] = 0;
 			break;
 	}
 }
 
 void keyboard_scan(KEYBOARD_STATE *ks)
 {
+	int nkeys = 0;
+
 	// if buffer empty, do a keyboard scan
 	if (ks->buflen == 0) {
-		// TODO: inject "keyboard data follows" chunk header
+		// Keyboard Data Begins Here (BEGKBD)
+		ks->buffer[ks->writep] = 0xDF;
+		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+
 		for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
 			if (ks->keystate[i]) {
+				printf("\tKBC KEY DOWN: %d\n", i);
 				ks->buffer[ks->writep] = i;
 				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+				if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+				nkeys++;
 			}
 		}
+
+		// If no keys down, then send All Keys Up byte
+		if (nkeys == 0) {
+			ks->buffer[ks->writep] = 0x40;
+			ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+			if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+		}
+
 		// TODO: inject "mouse data follows" chunk header and mouse movement info
+
+		// Last Entry In List
+		ks->buffer[ks->writep] = 0x80;
+		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 	}
 }
 
@@ -200,19 +226,22 @@ uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr)
 {
 	if ((addr & 1) == 0) {
 		// Status register -- RS=0, read
-		return
-			(ks->buflen > 0) ? 1 : 0 +		// SR0: a new character has been received
-			0 +								// SR1: Transmitter Data Register Empty
-			0 +								// SR2: Data Carrier Detect
-			0 +								// SR3: Clear To Send
-			0 +								// SR4: Framing Error
-			0 +								// SR5: Receiver Overrun
-			0 +								// SR6: Parity Error
-			(keyboard_get_irq(ks)) ? 0x80 : 0;	// SR7: IRQ status
+		uint8_t sr = 0;
+		if (ks->buflen > 0) sr |= 1;			// SR0: a new character has been received
+		sr |= 2;								// SR1: Transmitter Data Register Empty
+//			0 +								// SR2: Data Carrier Detect
+//			0 +								// SR3: Clear To Send
+//			0 +								// SR4: Framing Error
+//			0 +								// SR5: Receiver Overrun
+//			0 +								// SR6: Parity Error
+		if (keyboard_get_irq(ks)) sr |= 0x80;	// SR7: IRQ status
+		printf("\tKBD DBG: sr=%02X\n", sr);
+		return sr;
 	} else {
 		// return data, pop off the fifo
 		uint8_t x = ks->buffer[ks->readp];
 		ks->readp = (ks->readp + 1) % KEYBOARD_BUFFER_SIZE;
+		if (ks->buflen > 0) ks->buflen--;
 		return x;
 	}
 }
@@ -238,6 +267,7 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 		ks->rxie = (val & 0x80)==0x80;
 	} else {
 		// Write command to KBC -- TODO!
+		printf("KBC TODO: write keyboard data 0x%02X\n", val);
 	}
 }
 
