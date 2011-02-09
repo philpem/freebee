@@ -160,6 +160,9 @@ void keyboard_init(KEYBOARD_STATE *ks)
 
 	// Reset the R/W pointers and length
 	ks->readp = ks->writep = ks->buflen = 0;
+
+	// Clear the update flag
+	ks->update_flag = false;
 }
 
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
@@ -178,6 +181,9 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 			// Not a keyboard event
 			return;
 	}
+
+	// If we got here, then the keystate must have changed...!
+	ks->update_flag = true;
 
 	// scan the keymap
 	for (int i=0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
@@ -204,10 +210,13 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 {
 	int nkeys = 0;
 
+	// Skip doing the scan if the keyboard hasn't changed state
+	if (!ks->update_flag) return;
+
 	// if buffer empty, do a keyboard scan
 	if (ks->buflen == 0) {
 		// Keyboard Data Begins Here (BEGKBD)
-		ks->buffer[ks->writep] = 0xDF;
+		ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
 		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 
@@ -223,7 +232,7 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 		// If no keys down, then send All Keys Up byte
 		if (nkeys == 0) {
-			ks->buffer[ks->writep] = 0x40;
+			ks->buffer[ks->writep] = KEY_ALL_UP;
 			ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 			if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 		}
@@ -231,10 +240,13 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 		// TODO: inject "mouse data follows" chunk header and mouse movement info
 
 		// Last Entry In List
-		ks->buffer[ks->writep] = 0x80;
-		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+//		ks->buffer[ks->writep] = 0x80;
+//		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+//		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 	}
+
+	// Clear the update flag
+	ks->update_flag = false;
 }
 
 bool keyboard_get_irq(KEYBOARD_STATE *ks)
@@ -302,6 +314,10 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 	} else {
 		// Write command to KBC -- TODO!
 		printf("KBC TODO: write keyboard data 0x%02X\n", val);
+		if (val == KEY_CMD_RESET) {
+			printf("\tKBC: KEYBOARD RESET!\n");
+			ks->readp = ks->writep = ks->buflen = 0;
+		}
 	}
 }
 

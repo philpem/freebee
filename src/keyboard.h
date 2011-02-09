@@ -27,6 +27,9 @@ typedef struct {
 
 	/// Receive Interrupt Enable
 	bool rxie;
+
+	/// "Keyboard State Changed" flag
+	bool update_flag;
 } KEYBOARD_STATE;
 
 /**
