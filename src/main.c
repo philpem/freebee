@@ -340,6 +340,7 @@ int main(void)
 			// TODO: this is a LEVEL, not an EDGE!
 			m68k_set_irq(3);
 		} else {
+			lastirq_fdc = wd2797_get_irq(&state.fdc_ctx);
 			m68k_set_irq(0);
 		}
 

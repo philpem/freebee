@@ -128,6 +128,29 @@ struct {
 	{ SDLK_DELETE,			0,	0x7f }	// Dlete
 };
 
+/**
+ * List of special key codes
+ */
+enum {
+	KEY_ALL_UP				= 0x40,		///< All keys up
+	KEY_LIST_END			= 0x80,		///< End of key code list
+	KEY_BEGIN_MOUSE			= 0xCF,		///< Mouse data follows
+	KEY_BEGIN_KEYBOARD		= 0xDF,		///< Keyboard data follows
+};
+
+/**
+ * List of keyboard commands
+ */
+enum {
+	KEY_CMD_RESET			= 0x92,		///< Reset keyboard
+	KEY_CMD_CAPSLED_OFF		= 0xB1,		///< Caps Lock LED off--CHECK!
+	KEY_CMD_CAPSLED_ON		= 0xB0,		///< Caps Lock LED on --CHECK!
+	KEY_CMD_NUMLED_OFF		= 0xA1,		///< Num Lock LED off --CHECK!
+	KEY_CMD_NUMLED_ON		= 0xA0,		///< Num Lock LED on  --CHECK!
+	KEY_CMD_MOUSE_ENABLE	= 0xD0,		///< Enable mouse
+	KEY_CMD_MOUSE_DISABLE	= 0xD1		///< Disable mouse
+};
+
 void keyboard_init(KEYBOARD_STATE *ks)
 {
 	// Set all key states to "not pressed"
@@ -141,28 +164,39 @@ void keyboard_init(KEYBOARD_STATE *ks)
 
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 {
-	// Ignore non-keyboard events
-	if ((ev->type != SDL_KEYDOWN) && (ev->type != SDL_KEYUP)) return;
-
-	// scan the keymap
-	int keyidx = 0;
-	bool found = false;
-	for (keyidx=0; keyidx < sizeof(keymap)/sizeof(keymap[0]); keyidx++) {
-		if (keymap[keyidx].key == ev->key.keysym.sym) {
-			found = true;
+	int v = 0;
+	switch (ev->type) {
+		case SDL_KEYDOWN:
+			// Key down (pressed)
+			v = 1;
 			break;
-		}
+		case SDL_KEYUP:
+			// Key up (released)
+			v = 0;
+			break;
+		default:
+			// Not a keyboard event
+			return;
 	}
 
-	switch (ev->type) {
-		// key pressed
-		case SDL_KEYDOWN:
-			ks->keystate[keymap[keyidx].scancode] = 1;
-			break;
-		// key released
-		case SDL_KEYUP:
-			ks->keystate[keymap[keyidx].scancode] = 0;
-			break;
+	// scan the keymap
+	for (int i=0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
+		if (keymap[i].key == ev->key.keysym.sym) {
+			// Keycode match. Is this an Extended Map key?
+			if (keymap[i].extended) {
+				// Yes -- need ALT set when pressing the key for this to be a match
+				if (ev->key.keysym.mod & KMOD_ALT) {
+					ks->keystate[keymap[i].scancode] = v;
+					break;
+				}
+			} else {
+				// Standard Map key. ALT must NOT be pressed for this to be a match
+				if (!(ev->key.keysym.mod & KMOD_ALT)) {
+					ks->keystate[keymap[i].scancode] = v;
+					break;
+				}
+			}
+		}
 	}
 }
 

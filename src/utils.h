@@ -1,5 +1,7 @@
-#ifndef _H_UTILS
-#define _H_UTILS
+#ifndef _UTILS_H
+#define _UTILS_H
+
+#include <stdio.h>
 
 #ifndef NDEBUG
 /// Log a message to stderr
@@ -10,5 +12,8 @@
 #define LOG(x, ...)
 #define LOG_IF(cond, x, ...)
 #endif
+
+/// Get the number of elements in an array
+#define NELEMS(x) (sizeof(x)/sizeof(x[0]))
 
 #endif // _H_UTILS

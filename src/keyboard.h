@@ -11,7 +11,7 @@ typedef struct {
 	int keystate[0x80];
 
 	/// Keyboard buffer
-	char buffer[KEYBOARD_BUFFER_SIZE];
+	uint8_t buffer[KEYBOARD_BUFFER_SIZE];
 
 	/// Read pointer
 	size_t readp;
@@ -24,6 +24,7 @@ typedef struct {
 
 	/// Transmit Interrupt Enable
 	bool txie;
+
 	/// Receive Interrupt Enable
 	bool rxie;
 } KEYBOARD_STATE;
