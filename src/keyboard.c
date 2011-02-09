@@ -124,8 +124,8 @@ struct {
 	{ SDLK_y,				0,	0x79 },	// Y
 	{ SDLK_z,				0,	0x7a },	// Z
 // Keycodes 7B, 7C, 7D not used
-	{ SDLK_NUMLOCK,			0,	0x7e }		// Numlock
-//	{ SDLK_,				1,	0x7f },	// Dlete
+	{ SDLK_NUMLOCK,			0,	0x7e }	// Numlock
+	{ SDLK_DELETE,			0,	0x7f },	// Dlete
 };
 
 void keyboard_init(KEYBOARD_STATE *ks)
@@ -141,19 +141,39 @@ void keyboard_init(KEYBOARD_STATE *ks)
 
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 {
-	// event handler -- handles SDL events
+	// Ignore non-keyboard events
+	if ((event->type != SDL_KEYDOWN) && (event->type != SDL_KEYUP)) return;
+
+	// scan the keymap
+	int keyidx = 0;
+	for (keyidx=0; keyidx < sizeof(keymap)/sizeof(keymap[0]); keyidx++) {
+		if (keymap[keyidx].key == event->key.keysym.sym) break;
+	}
+
+	switch (event->type) {
+		// key pressed
+		case SDL_KEYDOWN:
+			ks->keystate[keymap[keyidx].scancode] = 1;
+			break;
+		// key released
+		case SDL_KEYUP:
+			ks->keystate[keymap[keyidx].scancode] = 1;
+			break;
+	}
 }
 
 void keyboard_scan(KEYBOARD_STATE *ks)
 {
 	// if buffer empty, do a keyboard scan
 	if (ks->buflen == 0) {
+		// TODO: inject "keyboard data follows" chunk header
 		for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
 			if (ks->keystate[i]) {
 				ks->buffer[ks->writep] = i;
 				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 			}
 		}
+		// TODO: inject "mouse data follows" chunk header and mouse movement info
 	}
 }
 
