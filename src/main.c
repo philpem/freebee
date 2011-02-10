@@ -208,21 +208,20 @@ int main(void)
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * around 60Hz (???), with a 60Hz periodic interrupt.
 	 */
+	const uint32_t SYSTEM_CLOCK = 10e6; // Hz
 	const uint32_t TIMESLOT_FREQUENCY = 1000;//240;	// Hz
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
-	const uint32_t CLOCKS_PER_60HZ = (10e6 / 60);
-	const uint32_t CLOCKS_PER_KBC_REFRESH = (10e6 / 10);
+	const uint32_t CLOCKS_PER_60HZ = (SYSTEM_CLOCK / 60);
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
-	uint32_t clock_cycles = 0, keyb_clocks = 0, tmp;
+	uint32_t clock_cycles = 0, tmp;
 	bool exitEmu = false;
-	bool lastirq_fdc = false, lastirq_kbc = false;
+	bool lastirq_fdc = false;
 	for (;;) {
 		// Run the CPU for however many cycles we need to. CPU core clock is
 		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 		// 41667 cycles per timeslot.
-		tmp = m68k_execute(10e6/TIMESLOT_FREQUENCY);
+		tmp = m68k_execute(SYSTEM_CLOCK/TIMESLOT_FREQUENCY);
 		clock_cycles += tmp;
-		keyb_clocks += tmp;
 
 		// Run the DMA engine
 		if (state.dmaen) {
@@ -337,14 +336,11 @@ int main(void)
 				lastirq_fdc = true;
 				m68k_set_irq(2);
 			}
-*/		if (!lastirq_kbc) {
-			if (keyboard_get_irq(&state.kbd)) {
-				lastirq_fdc = true;
-				m68k_set_irq(3);
-			}
+*/
+		if (keyboard_get_irq(&state.kbd)) {
+			m68k_set_irq(3);
 		} else {
 			lastirq_fdc = wd2797_get_irq(&state.fdc_ctx);
-			lastirq_kbc = keyboard_get_irq(&state.kbd);
 			m68k_set_irq(0);
 		}
 
@@ -353,16 +349,10 @@ int main(void)
 			// Refresh the screen
 			refreshScreen(screen);
 			// TODO: trigger periodic interrupt (if enabled)
-			// decrement clock cycle counter, we've handled the intr.
-			clock_cycles -= CLOCKS_PER_60HZ;
-		}
-
-		// Is it time to run the keyboard refresh yet?
-		if (keyb_clocks > CLOCKS_PER_KBC_REFRESH) {
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
-			// decrement clock cycle counter
-			keyb_clocks -= CLOCKS_PER_KBC_REFRESH;
+			// decrement clock cycle counter, we've handled the intr.
+			clock_cycles -= CLOCKS_PER_60HZ;
 		}
 
 		// handle SDL events -- returns true if we need to exit

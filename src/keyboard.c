@@ -232,6 +232,7 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 		// If no keys down, then send All Keys Up byte
 		if (nkeys == 0) {
+				printf("\tKBC ALL KEYS UP\n");
 			ks->buffer[ks->writep] = KEY_ALL_UP;
 			ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 			if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
@@ -240,7 +241,7 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 		// TODO: inject "mouse data follows" chunk header and mouse movement info
 
 		// Last Entry In List
-//		ks->buffer[ks->writep] = 0x80;
+//		ks->buffer[ks->writep] = KEY_LIST_END;
 //		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 //		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 	}
