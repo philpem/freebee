@@ -71,6 +71,8 @@ typedef struct {
 
 	/// Floppy disc controller context
 	WD2797_CTX	fdc_ctx;
+	/// Current disc image file
+	FILE *fdc_disc;
 
 	/// Keyboard controller context
 	KEYBOARD_STATE	kbd;

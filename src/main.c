@@ -133,6 +133,23 @@ bool HandleSDLEvents(SDL_Surface *screen)
 				return true;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
+					case SDLK_F11:
+						if (state.fdc_disc) {
+							wd2797_unload(&state.fdc_ctx);
+							fclose(state.fdc_disc);
+							state.fdc_disc = NULL;
+							fprintf(stderr, "Disc image unloaded.\n");
+						} else {
+							state.fdc_disc = fopen("discim", "rb");
+							if (!state.fdc_disc) {
+								fprintf(stderr, "ERROR loading disc image 'discim'.\n");
+								state.fdc_disc = NULL;
+							} else {
+								wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 10, 2);
+								fprintf(stderr, "Disc image loaded.\n");
+							}
+						}
+						break;
 					case SDLK_F12:
 						if (event.key.keysym.mod & (KMOD_LALT | KMOD_RALT))
 							// ALT-F12 pressed; exit emulator
@@ -197,12 +214,12 @@ int main(void)
 	SDL_WM_SetCaption("FreeBee 3B1 emulator", "FreeBee");
 
 	// Load a disc image
-	FILE *disc = fopen("discim", "rb");
-	if (!disc) {
+	state.fdc_disc = fopen("discim", "rb");
+	if (!state.fdc_disc) {
 		fprintf(stderr, "ERROR loading disc image 'discim'.\n");
 		return -4;
 	}
-	wd2797_load(&state.fdc_ctx, disc, 512, 10, 2);
+	wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 10, 2);
 
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
@@ -379,7 +396,7 @@ int main(void)
 
 	// Release the disc image
 	wd2797_unload(&state.fdc_ctx);
-	fclose(disc);
+	fclose(state.fdc_disc);
 
 	return 0;
 }
