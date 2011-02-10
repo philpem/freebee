@@ -182,9 +182,6 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 			return;
 	}
 
-	// If we got here, then the keystate must have changed...!
-	ks->update_flag = true;
-
 	// scan the keymap
 	for (int i=0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
 		if (keymap[i].key == ev->key.keysym.sym) {
@@ -193,12 +190,14 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 				// Yes -- need ALT set when pressing the key for this to be a match
 				if (ev->key.keysym.mod & KMOD_ALT) {
 					ks->keystate[keymap[i].scancode] = v;
+					ks->update_flag = true;
 					break;
 				}
 			} else {
 				// Standard Map key. ALT must NOT be pressed for this to be a match
 				if (!(ev->key.keysym.mod & KMOD_ALT)) {
 					ks->keystate[keymap[i].scancode] = v;
+					ks->update_flag = true;
 					break;
 				}
 			}
