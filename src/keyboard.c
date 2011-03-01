@@ -204,7 +204,6 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 		}
 	}
 }
-
 void keyboard_scan(KEYBOARD_STATE *ks)
 {
 	int nkeys = 0;
@@ -212,26 +211,30 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 	// Skip doing the scan if the keyboard hasn't changed state
 	if (!ks->update_flag) return;
 
+
 	// if buffer empty, do a keyboard scan
 	if (ks->buflen == 0) {
+		size_t last_writep;
 		// Keyboard Data Begins Here (BEGKBD)
-		ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
-		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+		//ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
+		//ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+		//if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 
 		for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
 			if (ks->keystate[i]) {
 				printf("\tKBC KEY DOWN: %d\n", i);
 				ks->buffer[ks->writep] = i;
+				last_writep = ks->writep;
 				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 				if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 				nkeys++;
 			}
 		}
-
-		// If no keys down, then send All Keys Up byte
-		if (nkeys == 0) {
-				printf("\tKBC ALL KEYS UP\n");
+		if (nkeys) {
+			ks->buffer[ks->writep - 1] |= 0x80;
+		}else{
+			// If no keys down, then send All Keys Up byte
+			printf("\tKBC ALL KEYS UP\n");
 			ks->buffer[ks->writep] = KEY_ALL_UP;
 			ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 			if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
@@ -239,10 +242,6 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 		// TODO: inject "mouse data follows" chunk header and mouse movement info
 
-		// Last Entry In List
-//		ks->buffer[ks->writep] = KEY_LIST_END;
-//		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-//		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 	}
 
 	// Clear the update flag
@@ -288,6 +287,7 @@ uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr)
 		uint8_t x = ks->buffer[ks->readp];
 		ks->readp = (ks->readp + 1) % KEYBOARD_BUFFER_SIZE;
 		if (ks->buflen > 0) ks->buflen--;
+		//printf("\tKBC DBG: rxd=%02X\n", x);
 		return x;
 	}
 }
