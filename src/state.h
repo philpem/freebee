@@ -50,6 +50,9 @@ typedef struct {
 	bool		dma_reading;		///< True if Disc DMA reads from the controller, false otherwise
 	uint8_t		leds;				///< LED status, 1=on, in order red3/green2/yellow1/red0 from bit3 to bit0
 
+	bool		timer_enabled;
+	bool		timer_asserted;
+
 	//// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.

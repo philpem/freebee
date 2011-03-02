@@ -285,6 +285,12 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
 				// TODO: handle the ctrl bits properly
 				// TODO: &0x8000 --> dismiss 60hz intr
+				if (data & 0x8000){
+					state.timer_enabled = 1;
+				}else{
+					state.timer_enabled = 0;
+					state.timer_asserted = 0;
+				}
 				state.dma_reading = (data & 0x4000);
 				if (state.leds != ((~data & 0xF00) >> 8)) {
 					state.leds = (~data & 0xF00) >> 8;

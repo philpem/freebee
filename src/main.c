@@ -358,14 +358,19 @@ int main(void)
 			m68k_set_irq(3);
 		} else {
 			lastirq_fdc = wd2797_get_irq(&state.fdc_ctx);
-			m68k_set_irq(0);
+			if (!state.timer_asserted){
+				m68k_set_irq(0);
+			}
 		}
 
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
 			// Refresh the screen
 			refreshScreen(screen);
-			// TODO: trigger periodic interrupt (if enabled)
+			if (state.timer_enabled){
+				m68k_set_irq(6);
+				state.timer_asserted = true;
+			}
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// decrement clock cycle counter, we've handled the intr.
