@@ -1,6 +1,10 @@
 #include <stdbool.h>
 #include "SDL.h"
+#include "utils.h"
 #include "keyboard.h"
+
+// Enable/disable KBC debugging
+#define kbc_debug false
 
 /**
  * Key map -- a mapping from SDLK_xxx constants to scancodes and vice versa.
@@ -222,7 +226,7 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 		for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
 			if (ks->keystate[i]) {
-				printf("\tKBC KEY DOWN: %d\n", i);
+				LOG_IF(kbc_debug, "KBC KEY DOWN: %d\n", i);
 				ks->buffer[ks->writep] = i;
 				last_writep = ks->writep;
 				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
@@ -234,7 +238,7 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 			ks->buffer[ks->writep - 1] |= 0x80;
 		}else{
 			// If no keys down, then send All Keys Up byte
-			printf("\tKBC ALL KEYS UP\n");
+			LOG_IFS(kbc_debug, "KBC ALL KEYS UP\n");
 			ks->buffer[ks->writep] = KEY_ALL_UP;
 			ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 			if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
@@ -280,14 +284,14 @@ uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr)
 //			0 +								// SR5: Receiver Overrun
 //			0 +								// SR6: Parity Error
 		if (keyboard_get_irq(ks)) sr |= 0x80;	// SR7: IRQ status
-		printf("\tKBC DBG: sr=%02X\n", sr);
+		//LOG_IF(kbc_debug, "KBC DBG: sr=%02X\n", sr);
 		return sr;
 	} else {
 		// return data, pop off the fifo
 		uint8_t x = ks->buffer[ks->readp];
 		ks->readp = (ks->readp + 1) % KEYBOARD_BUFFER_SIZE;
 		if (ks->buflen > 0) ks->buflen--;
-		//printf("\tKBC DBG: rxd=%02X\n", x);
+		//LOG_IF(kbc_debug, "\tKBC DBG: rxd=%02X\n", x);
 		return x;
 	}
 }
@@ -313,10 +317,11 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 		ks->rxie = (val & 0x80)==0x80;
 	} else {
 		// Write command to KBC -- TODO!
-		printf("KBC TODO: write keyboard data 0x%02X\n", val);
 		if (val == KEY_CMD_RESET) {
-			printf("\tKBC: KEYBOARD RESET!\n");
+			LOG_IFS(kbc_debug, "KBC: KEYBOARD RESET!\n");
 			ks->readp = ks->writep = ks->buflen = 0;
+		} else {
+			LOG("KBC TODO: write keyboard data 0x%02X\n", val);
 		}
 	}
 }
