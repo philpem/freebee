@@ -5,6 +5,7 @@
 #include <assert.h>
 #include "musashi/m68k.h"
 #include "state.h"
+#include "utils.h"
 #include "memory.h"
 
 /******************
@@ -25,11 +26,33 @@ uint32_t mapAddr(uint32_t addr, bool writing)/*{{{*/
 
 		// Update the Page Status bits
 		uint8_t pagebits = (MAPRAM(page) >> 13) & 0x03;
-		if (pagebits != 0) {
-			if (writing)
-				state.map[page*2] |= 0x60;		// Page written to (dirty)
-			else
-				state.map[page*2] |= 0x40;		// Page accessed but not written
+		// Pagebits --
+		//   0 = not present
+		//   1 = present but not accessed
+		//   2 = present, accessed (read from)
+		//   3 = present, dirty (written to)
+		switch (pagebits) {
+			case 0:
+				// Page not present
+				// This should cause a page fault
+				LOGS("Whoa! Pagebit update, when the page is not present!");
+				break;
+
+			case 1:
+				// Page present -- first access
+				state.map[page*2] &= 0x1F;	// turn off "present" bit
+				if (writing)
+					state.map[page*2] |= 0x60;		// Page written to (dirty)
+				else
+					state.map[page*2] |= 0x40;		// Page accessed but not written
+				break;
+
+			case 2:
+			case 3:
+				// Page present, 2nd or later access
+				if (writing)
+					state.map[page*2] |= 0x60;		// Page written to (dirty)
+				break;
 		}
 
 		// Return the address with the new physical page spliced in
