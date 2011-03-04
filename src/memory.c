@@ -787,11 +787,11 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
 			case 0x000000:				// Map RAM access
-				if (address > 0x4007FF) fprintf(stderr, "NOTE: RD32 from MapRAM mirror, addr=0x%08X\n", address);
+				if (address > 0x4007FF) fprintf(stderr, "NOTE: WR32 to MapRAM mirror, addr=0x%08X\n", address);
 				WR32(state.map, address, 0x7FF, value);
 				break;
 			case 0x020000:				// Video RAM
-				if (address > 0x427FFF) fprintf(stderr, "NOTE: RD32 from VideoRAM mirror, addr=0x%08X\n", address);
+				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR32 to VideoRAM mirror, addr=0x%08X\n", address);
 				WR32(state.vram, address, 0x7FFF, value);
 				break;
 			default:
