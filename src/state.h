@@ -59,6 +59,8 @@ typedef struct {
 	bool		romlmap;
 	/// GENCON.PIE -- Parity Error Check Enable
 	bool		pie;
+	/// GENCON.EE -- Error Enable
+	bool		ee;
 
 	/// DMA Address Register
 	uint32_t	dma_address;
