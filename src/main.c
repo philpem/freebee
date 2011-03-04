@@ -292,7 +292,7 @@ int main(void)
 					state.bsr0 = 0x3C00;
 					state.bsr0 |= (state.dma_address >> 16);
 					state.bsr1 = state.dma_address & 0xffff;
-					m68k_pulse_bus_error();
+					if (state.ee) m68k_pulse_bus_error();
 					printf("BUS ERROR FROM DMA: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
 
 					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
@@ -358,9 +358,9 @@ int main(void)
 			m68k_set_irq(3);
 		} else {
 			lastirq_fdc = wd2797_get_irq(&state.fdc_ctx);
-			if (!state.timer_asserted){
-				m68k_set_irq(0);
-			}
+//			if (!state.timer_asserted){
+//				m68k_set_irq(0);
+//			}
 		}
 
 		// Is it time to run the 60Hz periodic interrupt yet?
