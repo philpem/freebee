@@ -393,6 +393,10 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
+								// Error Enable. If =0, Level7 intrs and bus errors are masked.
+								ENFORCE_SIZE_W(bits, address, 16, "EE");
+								state.ee = ((data & 0x8000) == 0x8000);
+								handled = true;
 								break;
 							case 0x041000:		// [ef][4c][19]xxx ==> PIE
 								ENFORCE_SIZE_W(bits, address, 16, "PIE");
