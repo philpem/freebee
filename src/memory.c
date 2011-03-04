@@ -40,7 +40,7 @@ uint32_t mapAddr(uint32_t addr, bool writing)/*{{{*/
 
 			case 1:
 				// Page present -- first access
-				state.map[page*2] &= 0x1F;	// turn off "present" bit
+				state.map[page*2] &= 0x9F;	// turn off "present" bit (but not write enable!)
 				if (writing)
 					state.map[page*2] |= 0x60;		// Page written to (dirty)
 				else
@@ -66,6 +66,16 @@ uint32_t mapAddr(uint32_t addr, bool writing)/*{{{*/
 
 MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 {
+	// Get the page bits for this page.
+	uint16_t page = (addr >> 12) & 0x3FF;
+	uint8_t pagebits = (MAPRAM(page) >> 13) & 0x07;
+
+	// Check page is present (but only for RAM zone)
+	if ((addr < 0x400000) && ((pagebits & 0x03) == 0)) {
+		LOG("Page not mapped in: addr %08X, page %04X, mapbits %04X", addr, page, MAPRAM(page));
+		return MEM_PAGEFAULT;
+	}
+
 	// Are we in Supervisor mode?
 	if (m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)
 		// Yes. We can do anything we like.
@@ -75,14 +85,6 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 	// Check that the user didn't access memory outside of the RAM area
 	if (addr >= 0x400000)
 		return MEM_UIE;
-
-	// This leaves us with Page Fault checking. Get the page bits for this page.
-	uint16_t page = (addr >> 12) & 0x3FF;
-	uint8_t pagebits = (MAPRAM(page) >> 13) & 0x07;
-
-	// Check page is present
-	if ((pagebits & 0x03) == 0)
-		return MEM_PAGEFAULT;
 
 	// User attempt to access the kernel
 	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
