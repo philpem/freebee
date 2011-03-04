@@ -83,17 +83,24 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 
 	// If we're here, then we must be in User mode.
 	// Check that the user didn't access memory outside of the RAM area
-	if (addr >= 0x400000)
+	if (addr >= 0x400000) {
+		LOGS("User accessed privileged memory");
 		return MEM_UIE;
+	}
 
 	// User attempt to access the kernel
 	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
-	if (((addr >> 19) & 0x0F) == 0)
+	if (((addr >> 19) & 0x0F) == 0) {
+		LOGS("Attempt by user code to access kernel space");
 		return MEM_KERNEL;
+	}
 
 	// Check page is write enabled
-	if (writing && ((pagebits & 0x04) == 0))
+	if (writing && ((pagebits & 0x04) == 0)) {
+		LOG("Page not write enabled: inaddr %08X, page %04X, mapram %04X [%02X %02X], pagebits %d",
+				addr, page, MAPRAM(page), state.map[page*2], state.map[(page*2)+1], pagebits);
 		return MEM_PAGE_NO_WE;
+	}
 
 	// Page access allowed.
 	return MEM_ALLOWED;
