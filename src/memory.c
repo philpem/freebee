@@ -117,8 +117,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 #define ACCESS_CHECK_WR(address, bits)								\
 	do {															\
 		bool fault = false;											\
-		/* MEM_STATUS st; */										\
-		switch (checkMemoryAccess(address, true)) {					\
+		MEM_STATUS st;												\
+		switch (st = checkMemoryAccess(address, true)) {			\
 			case MEM_ALLOWED:										\
 				/* Access allowed */								\
 				break;												\
@@ -147,8 +147,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
 			state.bsr0 |= (address >> 16);							\
 			state.bsr1 = address & 0xffff;							\
-			printf("ERR: BusError WR\n");							\
-			m68k_pulse_bus_error();									\
+			LOG("Bus Error while writing, addr %08X, statcode %d", address, st);		\
+			if (state.ee) m68k_pulse_bus_error();					\
 			return;													\
 		}															\
 	} while (0)
@@ -167,8 +167,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 #define ACCESS_CHECK_RD(address, bits)								\
 	do {															\
 		bool fault = false;											\
-		/* MEM_STATUS st; */										\
-		switch (checkMemoryAccess(address, false)) {				\
+		MEM_STATUS st;												\
+		switch (st = checkMemoryAccess(address, false)) {			\
 			case MEM_ALLOWED:										\
 				/* Access allowed */								\
 				break;												\
@@ -197,8 +197,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
 			state.bsr0 |= (address >> 16);							\
 			state.bsr1 = address & 0xffff;							\
-			printf("ERR: BusError RD\n");							\
-			m68k_pulse_bus_error();									\
+			LOG("Bus Error while reading, addr %08X, statcode %d", address, st);		\
+			if (state.ee) m68k_pulse_bus_error();					\
 			return 0xFFFFFFFF;										\
 		}															\
 	} while (0)
