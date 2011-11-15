@@ -322,6 +322,8 @@
 #define CPU_ADDRESS_MASK m68ki_cpu.address_mask
 #define CPU_SR_MASK      m68ki_cpu.sr_mask
 
+#define BUS_ERROR_OCCURRED m68ki_cpu.bus_error_occurred
+
 #define CYC_INSTRUCTION  m68ki_cpu.cyc_instruction
 #define CYC_EXCEPTION    m68ki_cpu.cyc_exception
 #define CYC_BCC_NOTAKE_B m68ki_cpu.cyc_bcc_notake_b
@@ -775,6 +777,8 @@ typedef struct
 	uint pref_data;    /* Data in the prefetch queue */
 	uint address_mask; /* Available address pins */
 	uint sr_mask;      /* Implemented status register bits */
+
+	uint bus_error_occurred;
 
 	/* Clocks required for instructions / exceptions */
 	uint cyc_bcc_notake_b;
@@ -1688,14 +1692,17 @@ INLINE void m68ki_exception_privilege_violation(void)
 /* Exception for bus error */
 INLINE void m68ki_exception_bus_error(void)
 {
-	uint sr = m68ki_init_exception();
-	m68ki_stack_frame_0000(REG_PC, sr, EXCEPTION_BUS_ERROR);
-	m68ki_jump_vector(EXCEPTION_BUS_ERROR);
-
+	BUS_ERROR_OCCURRED = 1;
 	/* Use up some clock cycles and undo the instruction's cycles */
 	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_BUS_ERROR] - CYC_INSTRUCTION[REG_IR]);
 }
 
+INLINE void m68ki_jump_bus_error_vector(void)
+{
+	uint sr = m68ki_init_exception();
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
+	m68ki_jump_vector(EXCEPTION_BUS_ERROR);
+}
 
 /* Exception for A-Line instructions */
 INLINE void m68ki_exception_1010(void)
