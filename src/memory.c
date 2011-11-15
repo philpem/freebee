@@ -153,7 +153,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			if (bits >= 16)											\
 				state.bsr0 = 0x7C00;								\
 			else													\
-				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
+				state.bsr0 = (address & 1) ? 0x7E00 : 0x7D00;		\
 			state.bsr0 |= (address >> 16);							\
 			state.bsr1 = address & 0xffff;							\
 			LOG("Bus Error while writing, addr %08X, statcode %d", address, st);		\
@@ -203,7 +203,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			if (bits >= 16)											\
 				state.bsr0 = 0x7C00;								\
 			else													\
-				state.bsr0 = (address & 1) ? 0x7D00 : 0x7E00;		\
+				state.bsr0 = (address & 1) ? 0x7E00 : 0x7D00;		\
 			state.bsr0 |= (address >> 16);							\
 			state.bsr1 = address & 0xffff;							\
 			LOG("Bus Error while reading, addr %08X, statcode %d", address, st);		\
