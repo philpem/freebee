@@ -1700,7 +1700,7 @@ INLINE void m68ki_exception_bus_error(void)
 INLINE void m68ki_jump_bus_error_vector(void)
 {
 	uint sr = m68ki_init_exception();
-	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
+	m68ki_stack_frame_1000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
 	m68ki_jump_vector(EXCEPTION_BUS_ERROR);
 }
 
