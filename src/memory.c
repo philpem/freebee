@@ -213,7 +213,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			if (bits == 32)											\
 				return 0xFFFFFFFF;									\
 			else													\
-				return (1 << bits)-1;								\
+				return (1UL << bits)-1;								\
 		}															\
 	} while (0)
 /*}}}*/
