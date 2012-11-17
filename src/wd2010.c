@@ -154,7 +154,7 @@ uint8_t wd2010_read_data(WD2010_CTX *ctx)
 		return ctx->data[ctx->data_pos++];
 	} else {
 		// empty buffer (this shouldn't happen)
-		LOG("WD2010: attempt to read from empty data buffer");
+		LOGS("WD2010: attempt to read from empty data buffer");
 		return 0xff;
 	}
 }
@@ -185,7 +185,7 @@ void wd2010_write_data(WD2010_CTX *ctx, uint8_t val)
 			ctx->drq = false;
 		}
 	}else{
-		LOG("WD2010: attempt to write to data buffer without a write command in progress");
+		LOGS("WD2010: attempt to write to data buffer without a write command in progress");
 	}
 }
 
