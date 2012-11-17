@@ -472,7 +472,9 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
-						/*TODO: implement P5.1 second hard drive select*/
+						// MCR2 - UNIX PC Rev. P5.1 HDD head select b3 and potential HDD#2 select
+						wd2010_write_reg(&state.hdc_ctx, UNIXPC_REG_MCR2, data);
+						handled = true;
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
@@ -546,8 +548,14 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
 			case 0x010000:				// General Status Register
-				ENFORCE_SIZE_R(bits, address, 16, "GENSTAT");
-				return ((uint32_t)state.genstat << 16) + (uint32_t)state.genstat;
+				/* ENFORCE_SIZE_R(bits, address, 16, "GENSTAT"); */
+				if (bits == 32) {
+					return ((uint32_t)state.genstat << 16) + (uint32_t)state.genstat;
+				} else if (bits == 16) {
+					return (uint16_t)state.genstat;
+				} else {
+					return (uint8_t)(state.genstat & 0xff);
+				}
 				break;
 			case 0x030000:				// Bus Status Register 0
 				ENFORCE_SIZE_R(bits, address, 16, "BSR0");

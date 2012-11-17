@@ -102,6 +102,8 @@ void wd2010_reset(WD2010_CTX *ctx)
 	ctx->cylinder_low_reg = 0;
 	ctx->cylinder_high_reg = 0;
 	ctx->sdh = 0;
+	ctx->mcr2_hdsel3 = 0;
+	ctx->mcr2_ddrive1 = 0;
 }
 
 void wd2010_done(WD2010_CTX *ctx)
@@ -260,6 +262,17 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 	/*cpu_log_enabled = 1;*/
 
+	if (addr == UNIXPC_REG_MCR2) {
+		// The UNIX PC has an "MCR2" register with the following format:
+		//   [ 7..2 ][1][0]
+		//   Bits 7..2: Not used
+		//   Bit 1:     DDRIVE1 (hard disk drive 1 select - not used?)
+		//   Bit 0:     HDSEL3  (head-select bit 3)
+		ctx->mcr2_hdsel3 = ((val & 1) == 1);
+		ctx->mcr2_ddrive1 = ((val & 2) == 2);
+		return;
+	}
+
 	switch (addr & 0x07) {
 		case WD2010_REG_WRITE_PRECOMP_CYLINDER:
 			break;
@@ -313,7 +326,8 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 						ctx->irq = true;
 						break;
 					}
-					ctx->head = ctx->sdh & 0x07;
+					// The SDH register provides 3 head select bits; the 4th comes from MCR2.
+					ctx->head = (ctx->sdh & 0x07) + (ctx->mcr2_hdsel3 ? 8 : 0);
 					ctx->sector = ctx->sector_number;
 
 					ctx->formatting = cmd == CMD_WRITE_FORMAT;

@@ -8,16 +8,16 @@
 
 /// WD2010 registers
 typedef enum {
-	WD2010_REG_ERROR                   = 1, ///< Error register
-	WD2010_REG_WRITE_PRECOMP_CYLINDER  = 1, ///< Write precompensation cylinder
-                                             ///< register
-	WD2010_REG_SECTOR_COUNT            = 2, ///< Sector count register
-	WD2010_REG_SECTOR_NUMBER           = 3, ///< Sector number register
-	WD2010_REG_CYLINDER_LOW            = 4, ///< Low byte of cylinder
-	WD2010_REG_CYLINDER_HIGH           = 5, ///< High byte of cylinder
-	WD2010_REG_SDH                     = 6, ///< Sector size, drive, and head
-	WD2010_REG_STATUS                   = 7, ///< Status register
-	WD2010_REG_COMMAND                  = 7, ///< Command register
+	WD2010_REG_ERROR					= 1, ///< Error register
+	WD2010_REG_WRITE_PRECOMP_CYLINDER	= 1, ///< Write precompensation cylinder register
+	WD2010_REG_SECTOR_COUNT				= 2, ///< Sector count register
+	WD2010_REG_SECTOR_NUMBER			= 3, ///< Sector number register
+	WD2010_REG_CYLINDER_LOW				= 4, ///< Low byte of cylinder
+	WD2010_REG_CYLINDER_HIGH			= 5, ///< High byte of cylinder
+	WD2010_REG_SDH						= 6, ///< Sector size, drive, and head
+	WD2010_REG_STATUS					= 7, ///< Status register
+	WD2010_REG_COMMAND					= 7, ///< Command register
+	UNIXPC_REG_MCR2						= 255	///< UNIX-PC MCR2 register (special!)
 } WD2010_REG;
 
 /// WD2010 emulator error codes
@@ -42,6 +42,8 @@ typedef struct {
 	uint8_t					cylinder_high_reg, cylinder_low_reg;
 	// SDH register (sets sector size, drive number, and head number)
 	uint8_t					sdh;
+	// MCR2 register (LSB is HDSEL3 - head select bit 3)
+	bool					mcr2_hdsel3, mcr2_ddrive1;
 	// Sector number and count registers
 	int						sector_number, sector_count;
 	// Last command has the multiple sector flag set?
