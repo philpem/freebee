@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include "wd279x.h"
+#include "wd2010.h"
 #include "keyboard.h"
 #include "state.h"
 
@@ -114,6 +115,7 @@ void state_done()
 
 	// Deinitialise the disc controller
 	wd2797_done(&state.fdc_ctx);
+	wd2010_done(&state.hdc_ctx);
 }
 
 

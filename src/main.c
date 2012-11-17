@@ -39,6 +39,23 @@ static int load_fd()
 	}
 }
 
+static int load_hd()
+{
+
+	state.hdc_disc0 = fopen("hd.img", "r+b");
+	if (!state.hdc_disc0){
+		fprintf(stderr, "ERROR loading disc image 'hd.img'.\n");
+		state.hdc_disc0 = NULL;
+		return (0);
+	}else{
+		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 512, 16, 8);
+		fprintf(stderr, "Disc image loaded.\n");
+		return (1);
+	}
+}
+
+
+
 /**
  * @brief Set the pixel at (x, y) to the given value
  * @note The surface must be locked before calling this!
@@ -229,6 +246,8 @@ int main(void)
 	// Load a disc image
 	load_fd();
 
+	load_hd();
+
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * around 60Hz (???), with a 60Hz periodic interrupt.
@@ -240,7 +259,8 @@ int main(void)
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, tmp;
 	bool exitEmu = false;
-	bool lastirq_fdc = false;
+
+	/*bool lastirq_fdc = false;*/
 	for (;;) {
 		// Run the CPU for however many cycles we need to. CPU core clock is
 		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
@@ -254,77 +274,48 @@ int main(void)
 			size_t num = 0;
 			while (state.dma_count < 0x4000) {
 				uint16_t d = 0;
-
 				// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
 				if (num > (1e6/TIMESLOT_FREQUENCY)) break;
 
 				// Evidently we have more words to copy. Copy them.
-				if (!wd2797_get_drq(&state.fdc_ctx)) {
-					// Bail out, no data available. Try again later.
-					// TODO: handle HDD controller too
+				if (state.fd_selected){
+					if (!wd2797_get_drq(&state.fdc_ctx)) {
+						// Bail out, no data available. Try again later.
+						break;
+					}
+				}else if (state.hd_selected){
+					if (!wd2010_get_drq(&state.hdc_ctx)) {
+						// Bail out, no data available. Try again later.
+						break;
+					}
+				}else{
+					printf("ERROR: DMA attempt with no drive selected!\n");
+				}
+				if (!access_check_dma(state.dma_reading)) {
 					break;
 				}
-
-				// Check memory access permissions
-				// TODO: enforce these!!!! use ACCESS_CHECK_* for guidance.
-				bool access_ok;
-				switch (checkMemoryAccess(state.dma_address, !state.dma_reading)) {
-					case MEM_PAGEFAULT:
-						// Page fault
-						state.genstat = 0x8BFF
-							| (state.dma_reading ? 0x4000 : 0)
-							| (state.pie ? 0x0400 : 0);
-						access_ok = false;
-						break;
-
-					case MEM_UIE:
-						// User access to memory above 4MB
-						// FIXME? Shouldn't be possible with DMA... assert this?
-						state.genstat = 0x9AFF
-							| (state.dma_reading ? 0x4000 : 0)
-							| (state.pie ? 0x0400 : 0);
-						access_ok = false;
-						break;
-
-					case MEM_KERNEL:
-					case MEM_PAGE_NO_WE:
-						// Kernel access or page not write enabled
-						access_ok = false;
-						break;
-
-					case MEM_ALLOWED:
-						access_ok = true;
-						break;
-				}
-				if (!access_ok) {
-					state.bsr0 = 0x3C00;
-					state.bsr0 |= (state.dma_address >> 16);
-					state.bsr1 = state.dma_address & 0xffff;
-					if (state.ee) m68k_pulse_bus_error();
-					printf("BUS ERROR FROM DMA: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
-
-					// TODO: FIXME: if we get a pagefault, it NEEDS to be tagged as 'peripheral sourced'... this is a HACK!
-					printf("REALLY BIG FSCKING HUGE ERROR: DMA Memory Access caused a FAULT!\n");
-					exit(-1);
-				}
-
+				uint32_t newAddr;
 				// Map logical address to a physical RAM address
-				uint32_t newAddr = mapAddr(state.dma_address, !state.dma_reading);
+				newAddr = mapAddr(state.dma_address, !state.dma_reading);
 
 				if (!state.dma_reading) {
-					// Data available. Get it from the FDC. TODO: handle HDD too
-					d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
-					d <<= 8;
-					d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
-
+					// Data available. Get it from the FDC or HDC.
+					if (state.fd_selected) {
+						d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
+						d <<= 8;
+						d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
+					}else if (state.hd_selected) {
+						d = wd2010_read_data(&state.hdc_ctx);
+						d <<= 8;
+						d += wd2010_read_data(&state.hdc_ctx);
+					}
 					if (newAddr <= 0x1FFFFF) {
 						WR16(state.base_ram, newAddr, state.base_ram_size - 1, d);
 					} else if (newAddr >= 0x200000) {
 						WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, d);
 					}
-					m68k_write_memory_16(state.dma_address, d);
 				} else {
-					// Data write to FDC. TODO: handle HDD too.
+					// Data write to FDC or HDC.
 
 					// Get the data from RAM
 					if (newAddr <= 0x1fffff) {
@@ -336,9 +327,14 @@ int main(void)
 							d = 0xffff;
 					}
 
-					// Send the data to the FDD
-					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
-					wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
+					// Send the data to the FDD or HDD
+					if (state.fd_selected){
+						wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
+						wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
+					}else if (state.hd_selected){
+						wd2010_write_data(&state.hdc_ctx, (d >> 8));
+						wd2010_write_data(&state.hdc_ctx, (d & 0xff));
+					}
 				}
 
 				// Increment DMA address
@@ -350,9 +346,11 @@ int main(void)
 			// Turn off DMA engine if we finished this cycle
 			if (state.dma_count >= 0x4000) {
 				// FIXME? apparently this isn't required... or is it?
-//				state.dma_count = 0;
-				state.dmaen = false;
+				state.dma_count = 0x3fff;
+				/*state.dmaen = false;*/
 			}
+		}else if (wd2010_get_drq(&state.hdc_ctx)){
+			wd2010_dma_miss(&state.hdc_ctx);
 		}else if (wd2797_get_drq(&state.fdc_ctx)){
 			wd2797_dma_miss(&state.fdc_ctx);
 		}
@@ -364,8 +362,9 @@ int main(void)
 				lastirq_fdc = true;
 				m68k_set_irq(2);
 			}
+		}
 */
-		if (wd2797_get_irq(&state.fdc_ctx)){
+		if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
 			m68k_set_irq(2);
 		}else if (keyboard_get_irq(&state.kbd)) {
 			m68k_set_irq(3);

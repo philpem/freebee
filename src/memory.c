@@ -144,7 +144,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
-				/* FIXME: which regs need setting? */				\
+				/* XXX: is this the correct value? */				\
+				state.genstat = 0x9BFF | (state.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 		}															\
@@ -194,7 +195,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
-				/* FIXME: which regs need setting? */				\
+				/* XXX: is this the correct value? */				\
+				state.genstat = 0xDBFF | (state.pie ? 0x0400 : 0);	\
 				fault = true;										\
 				break;												\
 		}															\
@@ -212,6 +214,52 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 		}															\
 	} while (0)
 /*}}}*/
+
+bool access_check_dma(int reading)
+{
+	// Check memory access permissions
+	bool access_ok;
+	switch (checkMemoryAccess(state.dma_address, !reading)) {
+		case MEM_PAGEFAULT:
+			// Page fault
+			state.genstat = 0xABFF
+				| (reading ? 0x4000 : 0)
+				| (state.pie ? 0x0400 : 0);
+			access_ok = false;
+			break;
+
+		case MEM_UIE:
+			// User access to memory above 4MB
+			// FIXME? Shouldn't be possible with DMA... assert this?
+			state.genstat = 0xBAFF
+				| (reading ? 0x4000 : 0)
+				| (state.pie ? 0x0400 : 0);
+			access_ok = false;
+			break;
+
+		case MEM_KERNEL:
+		case MEM_PAGE_NO_WE:
+			// Kernel access or page not write enabled
+			/* XXX: is this correct? */
+			state.genstat = 0xBBFF
+				| (reading ? 0x4000 : 0)
+				| (state.pie ? 0x0400 : 0);
+			access_ok = false;
+			break;
+
+		case MEM_ALLOWED:
+			access_ok = true;
+			break;
+	}
+	if (!access_ok) {
+		state.bsr0 = 0x3C00;
+		state.bsr0 |= (state.dma_address >> 16);
+		state.bsr1 = state.dma_address & 0xffff;
+		if (state.ee) m68k_set_irq(7);
+		printf("BUS ERROR FROM DMA: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
+	}
+	return (access_ok);
+}
 
 // Logging macros
 #define LOG_NOT_HANDLED_R(bits)															\
@@ -275,9 +323,19 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				state.idmarw = ((data & 0x4000) == 0x4000);
 				state.dmaen = ((data & 0x8000) == 0x8000);
 				// This handles the "dummy DMA transfer" mentioned in the docs
-				// TODO: access check, peripheral access
-				if (!state.idmarw)
-					WR32(state.base_ram, mapAddr(address, true), state.base_ram_size - 1, 0xDEAD);
+				// disabled because it causes the floppy test to fail
+#if 0
+				if (!state.idmarw){
+					if (access_check_dma(true)){
+						uint32_t newAddr = mapAddr(state.dma_address, true);
+						// RAM access
+						if (newAddr <= 0x1fffff)
+							WR16(state.base_ram, newAddr, state.base_ram_size - 1, 0xFF);
+						else if (address <= 0x3FFFFF)
+							WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, 0xFF);
+					}
+				}
+#endif
 				state.dma_count++;
 				handled = true;
 				break;
@@ -316,7 +374,6 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 			case 0x0A0000:				// Miscellaneous Control Register
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
 				// TODO: handle the ctrl bits properly
-				// TODO: &0x8000 --> dismiss 60hz intr
 				if (data & 0x8000){
 					state.timer_enabled = 1;
 				}else{
@@ -353,16 +410,30 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				handled = true;
 				break;
 			case 0x0E0000:				// Disk Control Register
-				ENFORCE_SIZE_W(bits, address, 16, "DISKCON");
-				// B7 = FDD controller reset
-				if ((data & 0x80) == 0) wd2797_reset(&state.fdc_ctx);
-				// B6 = drive 0 select -- TODO
-				// B5 = motor enable -- TODO
-				// B4 = HDD controller reset -- TODO
-				// B3 = HDD0 select -- TODO
-				// B2,1,0 = HDD0 head select
-				handled = true;
-				break;
+				{
+					bool fd_selected;
+					bool hd_selected;
+					ENFORCE_SIZE_W(bits, address, 16, "DISKCON");
+					// B7 = FDD controller reset
+					if ((data & 0x80) == 0) wd2797_reset(&state.fdc_ctx);
+					// B6 = drive 0 select
+					fd_selected = (data & 0x40) != 0;
+					// B5 = motor enable -- TODO
+					// B4 = HDD controller reset
+					if ((data & 0x10) == 0) wd2010_reset(&state.hdc_ctx);
+					// B3 = HDD0 select
+					hd_selected = (data & 0x08) != 0;
+					// B2,1,0 = HDD0 head select -- TODO?
+					if (hd_selected && !state.hd_selected){
+						state.fd_selected = false;
+						state.hd_selected = true;
+					}else if (fd_selected && !state.fd_selected){
+						state.hd_selected = false;
+						state.fd_selected = true;
+					}
+					handled = true;
+					break;
+				}
 			case 0x0F0000:				// Line Printer Data Register
 				break;
 		}
@@ -388,14 +459,17 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 			case 0xE00000:				// HDC, FDC, MCR2 and RTC data bits
 			case 0xF00000:
 				switch (address & 0x070000) {
-					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+					case 0x000000:		// [ef][08]xxxx ==> WD2010 hard disc controller
+						wd2010_write_reg(&state.hdc_ctx, (address >> 1) & 7, data);
+						handled = true;
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
-						ENFORCE_SIZE_W(bits, address, 16, "FDC REGISTERS");
+						/*ENFORCE_SIZE_W(bits, address, 16, "FDC REGISTERS");*/
 						wd2797_write_reg(&state.fdc_ctx, (address >> 1) & 3, data);
 						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						/*TODO: implement P5.1 second hard drive select*/
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						break;
@@ -492,6 +566,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 			case 0x070000:				// Line Printer Status Register
 				data = 0x00120012;	// no parity error, no line printer error, no irqs from FDD or HDD
 				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
+				data |= wd2010_get_irq(&state.hdc_ctx) ? 0x00040004 : 0;
 				return data;
 				break;
 			case 0x080000:				// Real Time Clock
@@ -563,9 +638,11 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 			case 0xF00000:
 				switch (address & 0x070000) {
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
+						return (wd2010_read_reg(&state.hdc_ctx, (address >> 1) & 7));
+
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
-						ENFORCE_SIZE_R(bits, address, 16, "FDC REGISTERS");
+						/*ENFORCE_SIZE_R(bits, address, 16, "FDC REGISTERS");*/
 						return wd2797_read_reg(&state.fdc_ctx, (address >> 1) & 3);
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
@@ -826,6 +903,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
+
 		if (newAddr <= 0x1fffff)
 			WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
 		else

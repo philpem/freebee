@@ -70,4 +70,12 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing);
  */
 uint32_t mapAddr(uint32_t addr, bool writing);
 
+/**
+ * @brief   Check access flags for a DMA transfer and trigger an exception if
+ *          the access is not permitted
+ * @param   reading     true if reading from memory, false if writing
+ * @return  true if the access is permitted, false if not
+ */
+bool access_check_dma(int reading);
+
 #endif

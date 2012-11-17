@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "wd279x.h"
+#include "wd2010.h"
 #include "keyboard.h"
 
 // Maximum size of the Boot PROMs. Must be a binary power of two.
@@ -74,10 +75,18 @@ typedef struct {
 	bool		dmaen;
 	bool		dmaenb;
 
+	/// DMA device selection flags
+	bool		fd_selected;
+	bool       	hd_selected;
 	/// Floppy disc controller context
 	WD2797_CTX	fdc_ctx;
 	/// Current disc image file
 	FILE *fdc_disc;
+
+	/// Hard disc controller context
+	WD2010_CTX  hdc_ctx;
+	FILE *hdc_disc0;
+	FILE *hdc_disc1;
 
 	/// Keyboard controller context
 	KEYBOARD_STATE	kbd;
