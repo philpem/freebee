@@ -35,6 +35,7 @@ void wd2797_init(WD2797_CTX *ctx)
 {
 	// track, head and sector unknown
 	ctx->track = ctx->head = ctx->sector = 0;
+	ctx->track_reg = 0;
 
 	// no IRQ pending
 	ctx->irq = false;
@@ -46,6 +47,9 @@ void wd2797_init(WD2797_CTX *ctx)
 	// Status register clear, not busy; type1 command
 	ctx->status = 0;
 	ctx->cmd_has_drq = false;
+
+	// No format command in progress
+	ctx->formatting = false;
 
 	// Clear data register
 	ctx->data_reg = 0;
@@ -63,6 +67,7 @@ void wd2797_reset(WD2797_CTX *ctx)
 {
 	// track, head and sector unknown
 	ctx->track = ctx->head = ctx->sector = 0;
+	ctx->track_reg = 0;
 
 	// no IRQ pending
 	ctx->irq = false;
@@ -99,14 +104,13 @@ bool wd2797_get_irq(WD2797_CTX *ctx)
 	return ctx->irq;
 }
 
-
 bool wd2797_get_drq(WD2797_CTX *ctx)
 {
 	return (ctx->data_pos < ctx->data_len);
 }
 
 
-WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
+WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads, int writeable)
 {
 	size_t filesize;
 
@@ -136,7 +140,7 @@ WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 	ctx->geom_secsz = secsz;
 	ctx->geom_heads = heads;
 	ctx->geom_spt = spt;
-
+	ctx->writeable = writeable;
 	return WD2797_ERR_OK;
 }
 
@@ -160,6 +164,7 @@ void wd2797_unload(WD2797_CTX *ctx)
 uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 {
 	uint8_t temp = 0;
+	m68k_end_timeslice();
 
 	switch (addr & 0x03) {
 		case WD2797_REG_STATUS:		// Status register
@@ -176,12 +181,12 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 				temp = ctx->status & ~0x01;
 			}
 			// FDC is busy if there is still data in the buffer
-			temp |= (ctx->data_pos < ctx->data_len) ? 0x01 : 0x00;	// if data in buffer, then DMA hasn't copied it yet, and we're still busy!
+			temp |= (ctx->data_pos < ctx->data_len) ? 0x81 : 0x00;	// if data in buffer, then DMA hasn't copied it yet, and we're still busy!
 																	// TODO: also if seek delay / read delay hasn't passed (but that's for later)
 			return temp;
 
 		case WD2797_REG_TRACK:		// Track register
-			return ctx->track;
+			return ctx->track_reg;
 
 		case WD2797_REG_SECTOR:		// Sector register
 			return ctx->sector;
@@ -198,7 +203,7 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr)
 				return ctx->data[ctx->data_pos++];
 			} else {
 				// command finished
-				return 0xff;
+				return ctx->data_reg;
 			}
 
 		default:
@@ -215,7 +220,6 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 	size_t lba;
 	bool is_type1 = false;
 	int temp;
-
 	m68k_end_timeslice();
 
 	switch (addr) {
@@ -235,14 +239,14 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_RESTORE:
 					// Restore. Set track to 0 and throw an IRQ.
 					is_type1 = true;
-					ctx->track = 0;
+					ctx->track = ctx->track_reg = 0;
 					break;
 
 				case CMD_SEEK:
 					// Seek. Seek to the track specced in the Data Register.
 					is_type1 = true;
 					if (ctx->data_reg < ctx->geom_tracks) {
-						ctx->track = ctx->data_reg;
+						ctx->track = ctx->track_reg = ctx->data_reg;
 					} else {
 						// Seek error. :(
 						ctx->status = 0x10;
@@ -256,25 +260,16 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 				case CMD_STEPIN:
 				case CMD_STEPOUT:
-					// TODO! deal with trk0!
-					// Need to keep a copy of the track register; when it hits 0, set the TRK0 flag.
-					if (cmd == CMD_STEPIN) {
-						ctx->last_step_dir = 1;
-					} else {
-						ctx->last_step_dir = -1;
-					}
-					is_type1 = true;
-					break;
-
 				case CMD_STEP_TU:
 				case CMD_STEPIN_TU:
 				case CMD_STEPOUT_TU:
 					// if this is a Step In or Step Out cmd, set the step-direction
-					if (cmd == CMD_STEPIN_TU) {
+					if ((cmd & ~0x10) == CMD_STEPIN) {
 						ctx->last_step_dir = 1;
-					} else if (cmd == CMD_STEPOUT_TU) {
+					} else if ((cmd & ~0x10) == CMD_STEPOUT) {
 						ctx->last_step_dir = -1;
 					}
+
 
 					// Seek one step in the last direction used.
 					ctx->track += ctx->last_step_dir;
@@ -284,6 +279,10 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 						ctx->status = 0x10;
 						ctx->track = ctx->geom_tracks - 1;
 					}
+					if (cmd & 0x10){
+						ctx->track_reg = ctx->track;
+					}
+
 					is_type1 = true;
 					break;
 
@@ -329,8 +328,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 			}
 
 			// If this is a Write command, check write protect status too
-			// TODO!
-			if (false) {
+			if (!ctx->writeable) {
 				// Write protected disc...
 				if ((cmd == CMD_WRITE_SECTOR) || (cmd == CMD_WRITE_SECTOR_MULTI) || (cmd == CMD_FORMAT_TRACK)) {
 					// Set Write Protect bit and bail.
@@ -388,9 +386,9 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 								ctx->geom_tracks-1, ctx->geom_heads-1, ctx->geom_spt);
 						// CHS parameters exceed limits
 						ctx->status = 0x10;		// Record Not Found
-						break;
 						// Set IRQ
 						ctx->irq = true;
+						break;
 					}
 
 					// reset data pointers
@@ -430,12 +428,14 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_READ_TRACK:
 					// Read Track
 					// TODO! implement this
-					ctx->head = (val & 0x02) ? 1 : 0;
-					ctx->status = 0;
+					// ctx->head = (val & 0x02) ? 1 : 0;
+					// ctx->status = 0;
 					// B6, B5, B4, B3 = 0
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
 					// B1 = DRQ. Data request.
-					ctx->status |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
+					// ctx->status |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
+					ctx->irq = true;
+					ctx->status = 0x10;
 					break;
 
 				case CMD_WRITE_SECTOR:
@@ -444,12 +444,21 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 
 					ctx->head = (val & 0x02) ? 1 : 0;
 					// reset data pointers
-					ctx->data_pos = ctx->data_len = 0;
+					ctx->data_pos = 0;
 
-					// TODO: set "write pending" flag, and write LBA, and go from there.
+					// Calculate number of sectors to write to disc
+					if (cmd == CMD_WRITE_SECTOR_MULTI)
+						/*XXX: is this the correct value?*/
+						temp = ctx->geom_spt;
+					else
+						temp = 1;
+					ctx->data_len = temp * ctx->geom_secsz;
+
+					lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector)) - 1;
+					ctx->write_pos = lba * ctx->geom_secsz;
 
 					ctx->status = 0;
-					// B6 = Write Protect. FIXME -- emulate this!
+					// B6 = Write Protect. This would have been set earlier.
 					// B5 = 0
 					// B4 = Record Not Found. We're not going to see this... FIXME-not emulated
 					// B3 = CRC Error. Not possible.
@@ -465,24 +474,35 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					// B6 = Write Protect. FIXME -- emulate this!
 					// B5, B4, B3 = 0
 					// B2 = Lost Data. Caused if DRQ isn't serviced in time. FIXME-not emulated
+					ctx->data_pos = 0;
+					ctx->data_len = 7170;
 					// B1 = DRQ. Data request.
 					ctx->status |= (ctx->data_pos < ctx->data_len) ? 0x02 : 0x00;
+					ctx->formatting = true;
 					break;
 
 				case CMD_FORCE_INTERRUPT:
 					// Force Interrupt...
 					// Terminates current operation and sends an interrupt
 					// TODO!
-					ctx->status = 0;
+					ctx->status = 0x20;
+					if (!ctx->writeable){
+						ctx->status |= 0x40;
+					}
+					if (ctx->track == 0){
+						ctx->status = 0x04;
+					}
 					ctx->data_pos = ctx->data_len = 0;
-					// Set IRQ
-					ctx->irq = true;
+					if (cmd & 8){
+						// Set IRQ
+						ctx->irq = true;
+					}
 					break;
 			}
 			break;
 
 		case WD2797_REG_TRACK:		// Track register
-			ctx->track = val;
+			ctx->track = ctx->track_reg = val;
 			break;
 
 		case WD2797_REG_SECTOR:		// Sector register
@@ -492,20 +512,35 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 		case WD2797_REG_DATA:		// Data register
 			// Save the value written into the data register
 			ctx->data_reg = val;
-
 			// If we're processing a write command, and there's space in the
 			// buffer, allow the write.
-			if (ctx->data_pos < ctx->data_len) {
-				// set IRQ if this is the last data byte
-				if (ctx->data_pos == (ctx->data_len-1)) {
-					// Set IRQ
+			if (ctx->data_pos < ctx->data_len && (ctx->write_pos >= 0 || ctx->formatting)) {
+				if (!ctx->formatting) ctx->data[ctx->data_pos] = val;
+				// store data byte and increment pointer
+				ctx->data_pos++;
+
+				// set IRQ and write data if this is the last data byte
+				if (ctx->data_pos == ctx->data_len) {
+					if (!ctx->formatting){
+						fseek(ctx->disc_image, ctx->write_pos, SEEK_SET);
+						fwrite(ctx->data, 1, ctx->data_len, ctx->disc_image);
+						fflush(ctx->disc_image);
+					}
+					// Set IRQ and reset write pointer
 					ctx->irq = true;
+					ctx->write_pos = -1;
+					ctx->formatting = false;
 				}
 
-				// store data byte and increment pointer
-				ctx->data[ctx->data_pos++] = val;
 			}
 			break;
 	}
 }
 
+void wd2797_dma_miss(WD2797_CTX *ctx)
+{
+	ctx->data_pos = ctx->data_len;
+	ctx->write_pos = 0;
+	ctx->status = 4; /* lost data */
+	ctx->irq = true;
+}

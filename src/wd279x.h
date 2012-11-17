@@ -25,6 +25,8 @@ typedef enum {
 typedef struct {
 	// Current track, head and sector
 	int						track, head, sector;
+	// Track and sector registers
+	int						track_reg, sector_reg;
 	// Geometry of current disc
 	int						geom_secsz, geom_spt, geom_heads, geom_tracks;
 	// IRQ status
@@ -42,6 +44,12 @@ typedef struct {
 	size_t					data_pos, data_len;
 	// Current disc image file
 	FILE					*disc_image;
+	// Write protect flag
+	int						writeable;
+	// LBA at which to start writing
+	int						write_pos;
+	// True if a format command is in progress
+	int						formatting;
 } WD2797_CTX;
 
 /**
@@ -88,7 +96,7 @@ bool wd2797_get_drq(WD2797_CTX *ctx);
  * @param	heads	Number of heads (1 or 2).
  * @return	Error code; WD279X_E_OK if everything worked OK.
  */
-WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads);
+WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads, int writeable);
 
 /**
  * @brief	Deassign the current image file.
@@ -111,5 +119,5 @@ uint8_t wd2797_read_reg(WD2797_CTX *ctx, uint8_t addr);
  */
 void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val);
 
-
+void wd2797_dma_miss(WD2797_CTX *ctx);
 #endif

@@ -19,6 +19,26 @@ void FAIL(char *err)
 	exit(EXIT_FAILURE);
 }
 
+static int load_fd()
+{
+
+	int writeable = 1;
+	state.fdc_disc = fopen("discim", "r+b");
+	if (!state.fdc_disc){
+		writeable = 0;
+		state.fdc_disc = fopen("discim", "rb");
+	}
+	if (!state.fdc_disc){
+		fprintf(stderr, "ERROR loading disc image 'discim'.\n");
+		state.fdc_disc = NULL;
+		return (0);
+	}else{
+		wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 10, 2, writeable);
+		fprintf(stderr, "Disc image loaded.\n");
+		return (1);
+	}
+}
+
 /**
  * @brief Set the pixel at (x, y) to the given value
  * @note The surface must be locked before calling this!
@@ -140,14 +160,7 @@ bool HandleSDLEvents(SDL_Surface *screen)
 							state.fdc_disc = NULL;
 							fprintf(stderr, "Disc image unloaded.\n");
 						} else {
-							state.fdc_disc = fopen("discim", "rb");
-							if (!state.fdc_disc) {
-								fprintf(stderr, "ERROR loading disc image 'discim'.\n");
-								state.fdc_disc = NULL;
-							} else {
-								wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 10, 2);
-								fprintf(stderr, "Disc image loaded.\n");
-							}
+							load_fd();
 						}
 						break;
 					case SDLK_F12:
@@ -214,12 +227,7 @@ int main(void)
 	SDL_WM_SetCaption("FreeBee 3B1 emulator", "FreeBee");
 
 	// Load a disc image
-	state.fdc_disc = fopen("discim", "rb");
-	if (!state.fdc_disc) {
-		fprintf(stderr, "ERROR loading disc image 'discim'.\n");
-		return -4;
-	}
-	wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 10, 2);
+	load_fd();
 
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
@@ -345,7 +353,10 @@ int main(void)
 //				state.dma_count = 0;
 				state.dmaen = false;
 			}
+		}else if (wd2797_get_drq(&state.fdc_ctx)){
+			wd2797_dma_miss(&state.fdc_ctx);
 		}
+
 
 		// Any interrupts? --> TODO: masking
 /*		if (!lastirq_fdc) {
@@ -354,12 +365,13 @@ int main(void)
 				m68k_set_irq(2);
 			}
 */
-		if (keyboard_get_irq(&state.kbd)) {
+		if (wd2797_get_irq(&state.fdc_ctx)){
+			m68k_set_irq(2);
+		}else if (keyboard_get_irq(&state.kbd)) {
 			m68k_set_irq(3);
 		} else {
-			lastirq_fdc = wd2797_get_irq(&state.fdc_ctx);
 //			if (!state.timer_asserted){
-//				m68k_set_irq(0);
+				m68k_set_irq(0);
 //			}
 		}
 
