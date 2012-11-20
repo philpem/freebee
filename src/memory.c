@@ -386,11 +386,13 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				state.dma_reading = (data & 0x4000);
 				if (state.leds != ((~data & 0xF00) >> 8)) {
 					state.leds = (~data & 0xF00) >> 8;
+#ifdef SHOW_LEDS
 					printf("LEDs: %s %s %s %s\n",
 							(state.leds & 8) ? "R" : "-",
 							(state.leds & 4) ? "G" : "-",
 							(state.leds & 2) ? "Y" : "-",
 							(state.leds & 1) ? "R" : "-");
+#endif
 				}
 				handled = true;
 				break;
