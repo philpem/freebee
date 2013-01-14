@@ -8,6 +8,11 @@
 #include "utils.h"
 #include "memory.h"
 
+// The value which will be returned if the CPU attempts to read from empty memory
+// TODO (FIXME?) - need to figure out if R/W ops wrap around. This seems to appease the UNIX kernel and P4TEST.
+#define EMPTY 0xFFFFFFFFUL
+// #define EMPTY 0x55555555UL
+
 /******************
  * Memory mapping
  ******************/
@@ -211,9 +216,9 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			LOG("Bus Error while reading, addr %08X, statcode %d", address, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
 			if (bits == 32)											\
-				return 0xFFFFFFFF;									\
+				return EMPTY & 0xFFFFFFFF;									\
 			else													\
-				return (1UL << bits)-1;								\
+				return EMPTY & ((1UL << bits)-1);								\
 		}															\
 	} while (0)
 /*}}}*/
@@ -544,7 +549,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 {
 	bool handled = false;
-	uint32_t data = 0xFFFFFFFF;
+	uint32_t data = EMPTY & 0xFFFFFFFF;
 
 	if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -717,7 +722,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
  */
 uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 {
-	uint32_t data = 0xFFFFFFFF;
+	uint32_t data = EMPTY & 0xFFFFFFFF;
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -733,12 +738,15 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 		if (newAddr <= 0x1fffff) {
-			return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
+			if (newAddr >= state.base_ram_size)
+				return EMPTY & 0xffffffff;
+			else
+				return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
+			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
 				return RD32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
-				return 0xffffffff;
+				return EMPTY & 0xffffffff;
 		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -766,7 +774,7 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
  */
 uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 {
-	uint16_t data = 0xFFFF;
+	uint16_t data = EMPTY & 0xFFFF;
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -782,12 +790,15 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 		if (newAddr <= 0x1fffff) {
-			return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
+			if (newAddr >= state.base_ram_size)
+				return EMPTY & 0xffff;
+			else
+				return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
+			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
 				return RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
-				return 0xffff;
+				return EMPTY & 0xffff;
 		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -815,7 +826,7 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
  */
 uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 {
-	uint8_t data = 0xFF;
+	uint8_t data = EMPTY & 0xFF;
 
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
@@ -831,12 +842,15 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 		if (newAddr <= 0x1fffff) {
-			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
+			if (newAddr >= state.base_ram_size)
+				return EMPTY & 0xff;
+			else
+				return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
+			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
 				return RD8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
-				return 0xff;
+				return EMPTY & 0xff;
 		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -876,10 +890,15 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff)
-			WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
-		else
-			WR32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+		if (newAddr <= 0x1fffff) {
+			if (newAddr < state.base_ram_size) {
+				WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
+			}
+		} else {
+			if ((newAddr - 0x200000) < state.exp_ram_size) {
+				WR32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+			}
+		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -917,10 +936,15 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
 
-		if (newAddr <= 0x1fffff)
-			WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
-		else
-			WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+		if (newAddr <= 0x1fffff) {
+			if (newAddr < state.base_ram_size) {
+				WR16(state.base_ram, newAddr, state.base_ram_size - 1, value);
+			}
+		} else {
+			if ((newAddr - 0x200000) < state.exp_ram_size) {
+				WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+			}
+		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -957,10 +981,15 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff)
-			WR8(state.base_ram, newAddr, state.base_ram_size - 1, value);
-		else
-			WR8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+		if (newAddr <= 0x1fffff) {
+			if (newAddr < state.base_ram_size) {
+				WR8(state.base_ram, newAddr, state.base_ram_size - 1, value);
+			}
+		} else {
+			if ((newAddr - 0x200000) < state.exp_ram_size) {
+				WR8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
+			}
+		}
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
