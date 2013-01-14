@@ -641,10 +641,6 @@ int m68k_execute(int num_cycles)
 		/* Main loop.  Keep going until we run out of clock cycles */
 		do
 		{
-			if (BUS_ERROR_OCCURRED){
-				m68ki_jump_bus_error_vector();
-				BUS_ERROR_OCCURRED = 0;
-			}
 			/* Set tracing accodring to T1. (T0 is done inside instruction) */
 			m68ki_trace_t1(); /* auto-disable (see m68kcpu.h) */
 
@@ -659,11 +655,18 @@ int m68k_execute(int num_cycles)
 
 			/* Read an instruction and call its handler */
 			REG_IR = m68ki_read_imm_16();
-			m68ki_instruction_jump_table[REG_IR]();
+			if (!BUS_ERROR_OCCURRED){
+				m68ki_instruction_jump_table[REG_IR]();
+			}
 			USE_CYCLES(CYC_INSTRUCTION[REG_IR]);
 
 			/* Trace m68k_exception, if necessary */
 			m68ki_exception_if_trace(); /* auto-disable (see m68kcpu.h) */
+
+			if (BUS_ERROR_OCCURRED){
+				m68ki_jump_bus_error_vector();
+				BUS_ERROR_OCCURRED = 0;
+			}
 		} while(GET_CYCLES() > 0);
 
 		/* set previous PC to current PC for the next entry into the loop */
