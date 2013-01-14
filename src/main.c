@@ -216,7 +216,7 @@ int main(void)
 	// set up system state
 	// 512K of RAM
 	int i;
-	if ((i = state_init(512*1024, 512*1024)) != STATE_E_OK) {
+	if ((i = state_init(2048*1024, 2048*1024)) != STATE_E_OK) {
 		fprintf(stderr, "ERROR: Emulator initialisation failed. Error code %d.\n", i);
 		return i;
 	}
