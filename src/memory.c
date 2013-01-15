@@ -111,7 +111,6 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 	return MEM_ALLOWED;
 }/*}}}*/
 
-#undef MAPRAM
 
 
 /********************************************************
@@ -1011,7 +1010,72 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 
 
 // for the disassembler
-uint32_t m68k_read_disassembler_32(uint32_t addr) { return m68k_read_memory_32(addr); }
-uint32_t m68k_read_disassembler_16(uint32_t addr) { return m68k_read_memory_16(addr); }
-uint32_t m68k_read_disassembler_8 (uint32_t addr) { return m68k_read_memory_8 (addr); }
+uint32_t m68k_read_disassembler_32(uint32_t addr)
+{
+	if (addr < 0x400000) {
+		uint16_t page = (addr >> 12) & 0x3FF;
+		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
+		uint32_t newAddr = (new_page_addr << 12) + (addr & 0xFFF);
+		if (newAddr <= 0x1fffff) {
+			if (newAddr >= state.base_ram_size)
+				return EMPTY;
+			else
+				return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
+		} else {
+			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+				return RD32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
+			else
+				return EMPTY;
+		}
+	} else {
+		printf(">>> WARNING Disassembler RD32 out of range 0x%08X\n", addr);
+		return EMPTY;
+	}
+}
+
+uint32_t m68k_read_disassembler_16(uint32_t addr)
+{
+	if (addr < 0x400000) {
+		uint16_t page = (addr >> 12) & 0x3FF;
+		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
+		uint32_t newAddr = (new_page_addr << 12) + (addr & 0xFFF);
+		if (newAddr <= 0x1fffff) {
+			if (newAddr >= state.base_ram_size)
+				return EMPTY & 0xffff;
+			else
+				return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
+		} else {
+			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+				return RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
+			else
+				return EMPTY & 0xffff;
+		}
+	} else {
+		printf(">>> WARNING Disassembler RD16 out of range 0x%08X\n", addr);
+		return EMPTY & 0xffff;
+	}
+}
+
+uint32_t m68k_read_disassembler_8 (uint32_t addr)
+{
+	if (addr < 0x400000) {
+		uint16_t page = (addr >> 12) & 0x3FF;
+		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
+		uint32_t newAddr = (new_page_addr << 12) + (addr & 0xFFF);
+		if (newAddr <= 0x1fffff) {
+			if (newAddr >= state.base_ram_size)
+				return EMPTY & 0xff;
+			else
+				return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
+		} else {
+			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+				return RD8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
+			else
+				return EMPTY & 0xff;
+		}
+	} else {
+		printf(">>> WARNING Disassembler RD8 out of range 0x%08X\n", addr);
+		return EMPTY & 0xff;
+	}
+}
 
