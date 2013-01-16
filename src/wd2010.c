@@ -145,7 +145,7 @@ uint8_t wd2010_read_data(WD2010_CTX *ctx)
 {
 	// If there's data in the buffer, return it. Otherwise return 0xFF.
 	if (ctx->data_pos < ctx->data_len) {
-		if (ctx->multi_sector && ctx->data_pos & !(ctx->data_pos & ~(ctx->geom_secsz - 1))){
+		if (ctx->multi_sector && (ctx->data_pos > 0) && ((ctx->data_pos % ctx->geom_secsz) == 0)){
 			ctx->sector_count--;
 			ctx->sector_number++;
 		}
@@ -171,7 +171,7 @@ void wd2010_write_data(WD2010_CTX *ctx, uint8_t val)
 	// buffer, allow the write.
 	if (ctx->write_pos >= 0 && ctx->data_pos < ctx->data_len) {
 		// store data byte and increment pointer
-		if (ctx->multi_sector && ctx->data_pos & !(ctx->data_pos & ~(ctx->geom_secsz - 1))){
+		if (ctx->multi_sector && (ctx->data_pos > 0) && ((ctx->data_pos % ctx->geom_secsz) == 0)){
 			ctx->sector_count--;
 			ctx->sector_number++;
 		}
