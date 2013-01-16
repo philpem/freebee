@@ -51,19 +51,23 @@ enum {
 
 int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 {
-	long filesize;
+	size_t filesize;
+
 	wd2010_reset(ctx);
+
 	// Start by finding out how big the image file is
 	fseek(fp, 0, SEEK_END);
 	filesize = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 
 	// Now figure out how many tracks it contains
-	int tracks = filesize / secsz / spt / heads;
+	unsigned int tracks = filesize / secsz / spt / heads;
 	// Confirm...
 	if (tracks < 1) {
 		return WD2010_ERR_BAD_GEOM;
 	}
+
+	LOG("WD2010 initialised, %d cylinders, %d heads, %d sectors per track", tracks, heads, spt);
 
 	// Allocate enough memory to store one disc track
 	if (ctx->data) {
@@ -79,8 +83,8 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 	ctx->geom_secsz = secsz;
 	ctx->geom_heads = heads;
 	ctx->geom_spt = spt;
-	return WD2010_ERR_OK;
 
+	return WD2010_ERR_OK;
 }
 
 void wd2010_reset(WD2010_CTX *ctx)
