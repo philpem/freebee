@@ -341,7 +341,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 							break;
 						case CMD_READ_SECTOR:
 							/*XXX: does a separate function to set the head have to be added?*/
-							LOG("WD2010: READ SECTOR cmd=%02X chs=%d:%d:%d", cmd, ctx->track, ctx->head, ctx->sector);
+							LOG("WD2010: READ SECTOR cmd=%02X chs=%d:%d:%d nsectors=%d", cmd, ctx->track, ctx->head, ctx->sector, ctx->sector_count);
 
 							// Read Sector
 
@@ -391,8 +391,8 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 						case CMD_WRITE_FORMAT:
 							ctx->sector = 0;
 						case CMD_WRITE_SECTOR:
-							LOG("WD2010: WRITE SECTOR cmd=%02X chs=%d:%d:%d", cmd, ctx->track, ctx->head, ctx->sector);
-							// Read Sector
+							LOG("WD2010: WRITE SECTOR cmd=%02X chs=%d:%d:%d nsectors=%d", cmd, ctx->track, ctx->head, ctx->sector, ctx->sector_count);
+							// Write Sector
 
 							// Check to see if the cyl, hd and sec are valid
 							if ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || (ctx->sector > ctx->geom_spt-1)) {
@@ -420,8 +420,8 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 							ctx->data_len = ctx->geom_secsz * sector_count;
 							lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector));
 							// convert LBA to byte address
-							ctx->write_pos = lba * ctx->geom_secsz;
-							LOG("\tWRITE lba = %lu", lba);
+							ctx->write_pos = (lba *= ctx->geom_secsz);
+							LOG("\tWRITE lba = %zu", lba);
 
 							ctx->status = 0;
 							ctx->status |= (ctx->data_pos < ctx->data_len) ? SR_DRQ | SR_COMMAND_IN_PROGRESS | SR_BUSY : 0x00;
