@@ -296,7 +296,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 			break;
 		case WD2010_REG_SDH:
 			/*XXX: remove this once the DMA page fault test passes (unless this is actually the correct behavior here)*/
-			ctx->data_pos = ctx->data_len = 0;
+			//ctx->data_pos = ctx->data_len = 0;
 			ctx->sdh = val;
 			break;
 		case WD2010_REG_COMMAND:	// Command register
