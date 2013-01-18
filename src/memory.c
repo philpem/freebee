@@ -11,7 +11,8 @@
 // The value which will be returned if the CPU attempts to read from empty memory
 // TODO (FIXME?) - need to figure out if R/W ops wrap around. This seems to appease the UNIX kernel and P4TEST.
 #define EMPTY 0xFFFFFFFFUL
-// #define EMPTY 0x55555555UL
+//#define EMPTY 0x55555555UL
+//#define EMPTY 0x00000000UL
 
 /******************
  * Memory mapping
@@ -737,10 +738,8 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 		if (newAddr <= 0x1fffff) {
-			if (newAddr >= state.base_ram_size)
-				return EMPTY & 0xffffffff;
-			else
-				return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
+			// Base memory wraps around
+			return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
 			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
 				return RD32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
@@ -789,10 +788,8 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 		if (newAddr <= 0x1fffff) {
-			if (newAddr >= state.base_ram_size)
-				return EMPTY & 0xffff;
-			else
-				return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
+			// Base memory wraps around
+			return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
 			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
 				return RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
@@ -841,10 +838,8 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 		if (newAddr <= 0x1fffff) {
-			if (newAddr >= state.base_ram_size)
-				return EMPTY & 0xff;
-			else
-				return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
+			// Base memory wraps around
+			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
 			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
 				return RD8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
