@@ -1,0 +1,6 @@
+TODO -- things to check
+
+* Realtime clock
+* WD2010 command handler logic
+* Disabling page write protect logic allows userspace to run up but HDD won't mount
+* DMA Page Fault issues (see wd2010.c and test code)
