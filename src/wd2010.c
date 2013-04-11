@@ -239,7 +239,7 @@ uint8_t wd2010_read_reg(WD2010_CTX *ctx, uint8_t addr)
 			if (ctx->cmd_has_drq) {
 				temp = ctx->status & ~(SR_BUSY & SR_DRQ);
 				temp |= (ctx->data_pos < ctx->data_len) ? SR_DRQ : 0;
-				LOG("\tWDFDC rd sr, has drq, pos=%lu len=%lu, sr=0x%02X", ctx->data_pos, ctx->data_len, temp);
+				LOG("\tWDFDC rd sr, has drq, pos=%zu len=%zu, sr=0x%02X", ctx->data_pos, ctx->data_len, temp);
 			} else {
 				temp = ctx->status & ~0x80;
 			}
@@ -379,13 +379,13 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 								lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector) + i);
 								// convert LBA to byte address
 								lba *= ctx->geom_secsz;
-								LOG("\tREAD lba = %lu", lba);
+								LOG("\tREAD lba = %zu", lba);
 
 								// Read the sector from the file
 								fseek(ctx->disc_image, lba, SEEK_SET);
 								// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
 								ctx->data_len += fread(&ctx->data[ctx->data_len], 1, ctx->geom_secsz, ctx->disc_image);
-								LOG("\tREAD len=%lu, pos=%lu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
+								LOG("\tREAD len=%zu, pos=%zu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 							}
 
 							ctx->status = 0;

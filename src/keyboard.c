@@ -218,7 +218,6 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 	// if buffer empty, do a keyboard scan
 	if (ks->buflen == 0) {
-		size_t last_writep;
 		// Keyboard Data Begins Here (BEGKBD)
 		//ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
 		//ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
@@ -228,7 +227,6 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 			if (ks->keystate[i]) {
 				LOG_IF(kbc_debug, "KBC KEY DOWN: %d\n", i);
 				ks->buffer[ks->writep] = i;
-				last_writep = ks->writep;
 				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 				if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 				nkeys++;

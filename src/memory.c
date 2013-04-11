@@ -215,10 +215,10 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 			state.bsr1 = address & 0xffff;							\
 			LOG("Bus Error while reading, addr %08X, statcode %d", address, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
-			if (bits == 32)											\
+			if (bits >= 32)											\
 				return EMPTY & 0xFFFFFFFF;									\
 			else													\
-				return EMPTY & ((1UL << bits)-1);								\
+				return EMPTY & ((1ULL << bits)-1);								\
 		}															\
 	} while (0)
 /*}}}*/
