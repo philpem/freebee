@@ -76,8 +76,14 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	uint8_t *romdat1, *romdat2;
 	romdat1 = malloc(romlen);
 	romdat2 = malloc(romlen2);
-	fread(romdat1, 1, romlen, r15c);
-	fread(romdat2, 1, romlen2, r14c);
+	if (fread(romdat1, 1, romlen, r15c) != romlen) {
+		fprintf(stderr, "[state] Error reading ROM 15C.\n");
+		return -3;
+	}
+	if (fread(romdat2, 1, romlen2, r14c) != romlen) {
+		fprintf(stderr, "[state] Error reading ROM 14C.\n");
+		return -3;
+	}
 
 	// convert the ROM data
 	for (size_t i=0; i<(romlen + romlen2); i+=2) {
