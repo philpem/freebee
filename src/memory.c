@@ -226,7 +226,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 bool access_check_dma(int reading)
 {
 	// Check memory access permissions
-	bool access_ok;
+	bool access_ok = false;
 	switch (checkMemoryAccess(state.dma_address, !reading)) {
 		case MEM_PAGEFAULT:
 			// Page fault
