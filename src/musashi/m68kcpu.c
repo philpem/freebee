@@ -66,6 +66,9 @@ m68ki_cpu_core m68ki_cpu = {0};
 jmp_buf m68ki_address_error_trap;
 #endif /* M68K_EMULATE_ADDRESS_ERROR */
 
+jmp_buf m68ki_bus_error_jmp_buf;
+jmp_buf m68ki_bus_error_return_jmp_buf;
+
 /* Used by shift & rotate instructions */
 uint8 m68ki_shift_8_table[65] =
 {
@@ -638,9 +641,12 @@ int m68k_execute(int num_cycles)
 		/* Return point if we had an address error */
 		m68ki_set_address_error_trap(); /* auto-disable (see m68kcpu.h) */
 
+		m68ki_check_bus_error_trap();
+
 		/* Main loop.  Keep going until we run out of clock cycles */
 		do
 		{
+			int i;
 			/* Set tracing accodring to T1. (T0 is done inside instruction) */
 			m68ki_trace_t1(); /* auto-disable (see m68kcpu.h) */
 
@@ -653,20 +659,16 @@ int m68k_execute(int num_cycles)
 			/* Record previous program counter */
 			REG_PPC = REG_PC;
 
+			for (i = 15; i >= 0; i--){
+				REG_DA_SAVE[i] = REG_DA[i];
+			}
 			/* Read an instruction and call its handler */
 			REG_IR = m68ki_read_imm_16();
-			if (!BUS_ERROR_OCCURRED){
-				m68ki_instruction_jump_table[REG_IR]();
-			}
+			m68ki_instruction_jump_table[REG_IR]();
 			USE_CYCLES(CYC_INSTRUCTION[REG_IR]);
-
 			/* Trace m68k_exception, if necessary */
 			m68ki_exception_if_trace(); /* auto-disable (see m68kcpu.h) */
-
-			if (BUS_ERROR_OCCURRED){
-				m68ki_jump_bus_error_vector();
-				BUS_ERROR_OCCURRED = 0;
-			}
+	
 		} while(GET_CYCLES() > 0);
 
 		/* set previous PC to current PC for the next entry into the loop */
