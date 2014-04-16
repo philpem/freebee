@@ -18,13 +18,13 @@ struct {
 	{ SDLK_KP2,				0,	0x01 },	// ROLL/Up		[Keypad 2]
 //	{ SDLK_,				1,	0x02 },	// Clear Line
 //	{ SDLK_,				1,	0x03 },	// Rstrt / Ref
-//	{ SDLK_,				1,	0x04 },	// Exit
+	{ SDLK_ESCAPE,				1,	0x04 },	// Exit
 	{ SDLK_KP1,				0,	0x05 },	// PREV			[Keypad 1]
 //	{ SDLK_,				1,	0x06 },	// Msg
-//	{ SDLK_,				1,	0x07 },	// Cancl
+	{ SDLK_BACKSPACE,		1,	0x07 },	// Cancl
 	{ SDLK_BACKSPACE,		0,	0x08 },	// Backspace
 	{ SDLK_TAB,				0,	0x09 },	// Tab
-//	{ SDLK_RETURN,			1,	0x0a },	// ENTER
+	{ SDLK_RETURN,			1,	0x0a },	// ENTER
 	{ SDLK_DOWN,			0,	0x0b },	// ROLL/Down	[DownArrow]
 	{ SDLK_KP0,				0,	0x0b },	// ROLL/Down	[Keypad 0]
 	{ SDLK_KP3,				0,	0x0c },	// NEXT			[Keypad 3]
