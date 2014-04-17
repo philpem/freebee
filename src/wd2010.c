@@ -349,7 +349,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 							// Read Sector
 
 							// Check to see if the cyl, hd and sec are valid
-							if ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geom_spt-1)) {
+							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geom_spt-1))) {
 								LOG("*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d",
 										ctx->track, ctx->head, ctx->sector,
 										ctx->sector_count,
