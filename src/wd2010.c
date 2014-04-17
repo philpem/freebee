@@ -390,7 +390,8 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 							ctx->status = 0;
 							ctx->status |= (ctx->data_pos < ctx->data_len) ? SR_DRQ | SR_COMMAND_IN_PROGRESS | SR_BUSY : 0x00;
-							SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)transfer_seek_complete, ctx);
+							/*SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)transfer_seek_complete, ctx);*/
+							ctx->drq = true;
 
 							break;
 						case CMD_WRITE_FORMAT:
@@ -432,7 +433,8 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 							ctx->status = 0;
 							ctx->status |= (ctx->data_pos < ctx->data_len) ? SR_DRQ | SR_COMMAND_IN_PROGRESS | SR_BUSY : 0x00;
-							SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)transfer_seek_complete, ctx);
+							/*SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)transfer_seek_complete, ctx);*/
+							ctx->drq = true;
 
 							break;
 						default:
