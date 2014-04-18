@@ -377,6 +377,13 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 			case 0x070000:				// Line Printer Status Register
 				break;
 			case 0x080000:				// Real Time Clock
+				ENFORCE_SIZE_W(bits, address, 16, "RTCWRITE");
+				/*printf("IoWrite RTCWRITE %x\n", data);*/
+				tc8250_set_chip_enable(&state.rtc_ctx, data & 0x8000);
+				tc8250_set_address_latch_enable(&state.rtc_ctx, data & 0x4000);
+				tc8250_set_write_enable(&state.rtc_ctx, data & 0x2000);
+				tc8250_write_reg(&state.rtc_ctx, (data & 0x0F00) >> 8);
+				handled = true;
 				break;
 			case 0x090000:				// Phone registers
 				switch (address & 0x0FF000) {
@@ -693,7 +700,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
-						break;
+						return (tc8250_read_reg(&state.rtc_ctx));
 					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE

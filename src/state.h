@@ -7,6 +7,8 @@
 #include "wd279x.h"
 #include "wd2010.h"
 #include "keyboard.h"
+#include "tc8250.h"
+
 
 // Maximum size of the Boot PROMs. Must be a binary power of two.
 #define ROM_SIZE 32768
@@ -90,6 +92,9 @@ typedef struct {
 
 	/// Keyboard controller context
 	KEYBOARD_STATE	kbd;
+
+	/// Real time clock context
+	TC8250_CTX rtc_ctx;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't
