@@ -60,7 +60,7 @@ typedef enum {
  * @return	One of the MEM_STATUS constants, specifying whether the access is
  * 			permitted, or what error occurred.
  */
-MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing);
+MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma);
 
 /**
  * @brief	Map a CPU memory address into physical memory space.

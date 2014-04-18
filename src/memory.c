@@ -20,6 +20,15 @@
 
 #define MAPRAM(addr) (((uint16_t)state.map[addr*2] << 8) + ((uint16_t)state.map[(addr*2)+1]))
 
+static uint32_t map_address_debug(uint32_t addr)
+{
+	uint16_t page = (addr >> 12) & 0x3FF;
+
+	// Look it up in the map RAM and get the physical page address
+	uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
+	return (new_page_addr << 12) + (addr & 0xFFF);
+}
+
 uint32_t mapAddr(uint32_t addr, bool writing)/*{{{*/
 {
 	if (addr < 0x400000) {
@@ -70,7 +79,7 @@ uint32_t mapAddr(uint32_t addr, bool writing)/*{{{*/
 	}
 }/*}}}*/
 
-MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
+MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 {
 	// Get the page bits for this page.
 	uint16_t page = (addr >> 12) & 0x3FF;
@@ -83,7 +92,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 	}
 
 	// Are we in Supervisor mode?
-	if (m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)
+	if (dma || (m68k_get_reg(NULL, M68K_REG_SR) & 0x2000))
 		// Yes. We can do anything we like.
 		return MEM_ALLOWED;
 
@@ -96,7 +105,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 
 	// User attempt to access the kernel
 	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
-	if (((addr >> 19) & 0x0F) == 0) {
+	if (((addr >> 19) & 0x0F) == 0 && !(!writing && addr <= 0x1000)) {
 		LOGS("Attempt by user code to access kernel space");
 		return MEM_KERNEL;
 	}
@@ -107,32 +116,13 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 				addr, page, MAPRAM(page), state.map[page*2], state.map[(page*2)+1], pagebits);
 		return MEM_PAGE_NO_WE;
 	}
-
 	// Page access allowed.
 	return MEM_ALLOWED;
 }/*}}}*/
 
-
-
-/********************************************************
- * m68k memory read/write support functions for Musashi
- ********************************************************/
-
-/**
- * @brief	Check memory access permissions for a write operation.
- * @note	This used to be a single macro (merged with ACCESS_CHECK_RD), but
- * 			gcc throws warnings when you have a return-with-value in a void
- * 			function, even if the return-with-value is completely unreachable.
- * 			Similarly it doesn't like it if you have a return without a value
- * 			in a non-void function, even if it's impossible to ever reach the
- * 			return-with-no-value. UGH!
- */
-/*{{{ macro: ACCESS_CHECK_WR(address, bits)*/
-#define ACCESS_CHECK_WR(address, bits)								\
+#define _ACCESS_CHECK_WR_BYTE(address)								\
 	do {															\
-		bool fault = false;											\
-		MEM_STATUS st;												\
-		switch (st = checkMemoryAccess(address, true)) {			\
+		switch (st = checkMemoryAccess(address, true, false)) {			\
 			case MEM_ALLOWED:										\
 				/* Access allowed */								\
 				break;												\
@@ -154,7 +144,33 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 				fault = true;										\
 				break;												\
 		}															\
-																	\
+	}while (0)
+	
+
+
+/********************************************************
+ * m68k memory read/write support functions for Musashi
+ ********************************************************/
+
+/**
+ * @brief	Check memory access permissions for a write operation.
+ * @note	This used to be a single macro (merged with ACCESS_CHECK_RD), but
+ * 			gcc throws warnings when you have a return-with-value in a void
+ * 			function, even if the return-with-value is completely unreachable.
+ * 			Similarly it doesn't like it if you have a return without a value
+ * 			in a non-void function, even if it's impossible to ever reach the
+ * 			return-with-no-value. UGH!
+ */
+/*{{{ macro: ACCESS_CHECK_WR(address, bits)*/
+#define ACCESS_CHECK_WR(address, bits)								\
+	do {															\
+		bool fault = false;											\
+		MEM_STATUS st;												\
+		_ACCESS_CHECK_WR_BYTE(address);								\
+		if (!fault && bits == 32									\
+				&& ((address + 3) & ~0xfff) != ((address & ~0xfff))){	\
+			_ACCESS_CHECK_WR_BYTE(address + 3);						\
+		}															\
 		if (fault) {												\
 			if (bits >= 16)											\
 				state.bsr0 = 0x7C00;								\
@@ -169,21 +185,9 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 	} while (0)
 /*}}}*/
 
-/**
- * @brief Check memory access permissions for a read operation.
- * @note	This used to be a single macro (merged with ACCESS_CHECK_WR), but
- * 			gcc throws warnings when you have a return-with-value in a void
- * 			function, even if the return-with-value is completely unreachable.
- * 			Similarly it doesn't like it if you have a return without a value
- * 			in a non-void function, even if it's impossible to ever reach the
- * 			return-with-no-value. UGH!
- */
-/*{{{ macro: ACCESS_CHECK_RD(address, bits)*/
-#define ACCESS_CHECK_RD(address, bits)								\
+#define _ACCESS_CHECK_RD_BYTE(address)									\
 	do {															\
-		bool fault = false;											\
-		MEM_STATUS st;												\
-		switch (st = checkMemoryAccess(address, false)) {			\
+		switch (st = checkMemoryAccess(address, false, false)) {	\
 			case MEM_ALLOWED:										\
 				/* Access allowed */								\
 				break;												\
@@ -205,15 +209,38 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing)/*{{{*/
 				fault = true;										\
 				break;												\
 		}															\
+	} while (0)	
+
+/**
+ * @brief Check memory access permissions for a read operation.
+ * @note	This used to be a single macro (merged with ACCESS_CHECK_WR), but
+ * 			gcc throws warnings when you have a return-with-value in a void
+ * 			function, even if the return-with-value is completely unreachable.
+ * 			Similarly it doesn't like it if you have a return without a value
+ * 			in a non-void function, even if it's impossible to ever reach the
+ * 			return-with-no-value. UGH!
+ */
+/*{{{ macro: ACCESS_CHECK_RD(address, bits)*/
+#define ACCESS_CHECK_RD(address, bits)								\
+	do {															\
+		bool fault = false;											\
+		uint32_t faultAddr = address;								\
+		MEM_STATUS st;												\
+		_ACCESS_CHECK_RD_BYTE(address);								\
+		if (!fault && bits == 32									\
+				&& ((address + 2) & ~0xfff) != (address & ~0xfff)){	\
+			_ACCESS_CHECK_RD_BYTE(address + 2);						\
+			if (fault) faultAddr = address + 2;						\
+		}															\
 																	\
 		if (fault) {												\
 			if (bits >= 16)											\
 				state.bsr0 = 0x7C00;								\
 			else													\
-				state.bsr0 = (address & 1) ? 0x7E00 : 0x7D00;		\
-			state.bsr0 |= (address >> 16);							\
-			state.bsr1 = address & 0xffff;							\
-			LOG("Bus Error while reading, addr %08X, statcode %d", address, st);		\
+				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			state.bsr0 |= (faultAddr >> 16);							\
+			state.bsr1 = faultAddr & 0xffff;							\
+			LOG("Bus Error while reading, addr %08X, statcode %d", faultAddr, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
 			if (bits >= 32)											\
 				return EMPTY & 0xFFFFFFFF;									\
@@ -227,7 +254,7 @@ bool access_check_dma(int reading)
 {
 	// Check memory access permissions
 	bool access_ok = false;
-	switch (checkMemoryAccess(state.dma_address, !reading)) {
+	switch (checkMemoryAccess(state.dma_address, !reading, true)) {
 		case MEM_PAGEFAULT:
 			// Page fault
 			state.genstat = 0xABFF
@@ -717,6 +744,20 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
  * m68k memory read/write support functions for Musashi
  ********************************************************/
 
+
+static uint16_t ram_read_16(uint32_t address)
+{
+	if (address <= 0x1fffff) {
+		// Base memory wraps around
+		return RD16(state.base_ram, address, state.base_ram_size - 1);
+	} else {
+		if ((address <= (state.exp_ram_size + 0x200000 - 1)) && (address >= 0x200000)){
+			return RD16(state.exp_ram, address - 0x200000, state.exp_ram_size - 1);
+		}else
+			return EMPTY & 0xffff;
+	}
+}
+
 /**
  * @brief Read M68K memory, 32-bit
  */
@@ -737,15 +778,11 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-		if (newAddr <= 0x1fffff) {
-			// Base memory wraps around
-			return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
-		} else {
-			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
-				return RD32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
-			else
-				return EMPTY & 0xffffffff;
-		}
+		// Base memory wraps around
+		data = ((ram_read_16(newAddr) << 16) | 
+			ram_read_16(mapAddr(address + 2, false)));
+
+		return (data);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -867,6 +904,20 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 	return data;
 }/*}}}*/
 
+
+static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
+{
+	if (address <= 0x1fffff) {
+		if (address < state.base_ram_size) {
+			WR16(state.base_ram, address, state.base_ram_size - 1, value);
+		}
+	} else {
+		if ((address - 0x200000) < state.exp_ram_size) {
+			WR16(state.exp_ram, address - 0x200000, state.exp_ram_size - 1, value);
+		}
+	}
+}
+
 /**
  * @brief Write M68K memory, 32-bit
  */
@@ -878,21 +929,13 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 32);
-
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
-		if (newAddr <= 0x1fffff) {
-			if (newAddr < state.base_ram_size) {
-				WR32(state.base_ram, newAddr, state.base_ram_size - 1, value);
-			}
-		} else {
-			if ((newAddr - 0x200000) < state.exp_ram_size) {
-				WR32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, value);
-			}
-		}
+		ram_write_16(newAddr, (value & 0xffff0000) >> 16);
+		ram_write_16(mapAddr(address + 2, true), (value & 0xffff));
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -1008,20 +1051,12 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 uint32_t m68k_read_disassembler_32(uint32_t addr)
 {
 	if (addr < 0x400000) {
-		uint16_t page = (addr >> 12) & 0x3FF;
-		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
-		uint32_t newAddr = (new_page_addr << 12) + (addr & 0xFFF);
-		if (newAddr <= 0x1fffff) {
-			if (newAddr >= state.base_ram_size)
-				return EMPTY;
-			else
-				return RD32(state.base_ram, newAddr, state.base_ram_size - 1);
-		} else {
-			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
-				return RD32(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
-			else
-				return EMPTY;
-		}
+		uint32_t newAddrHigh, newAddrLow;
+		newAddrHigh = map_address_debug(addr);
+		newAddrLow = map_address_debug(addr + 2);
+		return ((ram_read_16(newAddrHigh) << 16) | 
+			ram_read_16(newAddrLow));
+
 	} else {
 		printf(">>> WARNING Disassembler RD32 out of range 0x%08X\n", addr);
 		return EMPTY;
