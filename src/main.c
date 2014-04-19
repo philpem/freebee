@@ -253,127 +253,129 @@ int main(void)
 	 * around 60Hz (???), with a 60Hz periodic interrupt.
 	 */
 	const uint32_t SYSTEM_CLOCK = 10e6; // Hz
-	const uint32_t TIMESLOT_FREQUENCY = 1000;//240;	// Hz
+	const uint32_t TIMESLOT_FREQUENCY = 100;//240;	// Hz
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
 	const uint32_t CLOCKS_PER_60HZ = (SYSTEM_CLOCK / 60);
+	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, tmp;
 	bool exitEmu = false;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
-		// Run the CPU for however many cycles we need to. CPU core clock is
-		// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
-		// 41667 cycles per timeslot.
-		tmp = m68k_execute(SYSTEM_CLOCK/TIMESLOT_FREQUENCY);
-		clock_cycles += tmp;
+		for (i = 0; i < NUM_CPU_TIMESLOTS; i++){
+			// Run the CPU for however many cycles we need to. CPU core clock is
+			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
+			// 41667 cycles per timeslot.
+			tmp = m68k_execute(SYSTEM_CLOCK/TIMESLOT_FREQUENCY / NUM_CPU_TIMESLOTS);
+			clock_cycles += tmp;
 
-		// Run the DMA engine
-		if (state.dmaen) {
-			// DMA ready to go -- so do it.
-			size_t num = 0;
-			while (state.dma_count < 0x4000) {
-				uint16_t d = 0;
-				// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
-				if (num > (1e6/TIMESLOT_FREQUENCY)) break;
-
-				// Evidently we have more words to copy. Copy them.
-				if (state.fd_selected){
-					if (!wd2797_get_drq(&state.fdc_ctx)) {
-						// Bail out, no data available. Try again later.
-						break;
-					}
-				}else if (state.hd_selected){
-					if (!wd2010_get_drq(&state.hdc_ctx)) {
-						// Bail out, no data available. Try again later.
-						break;
-					}
-				}else{
-					printf("ERROR: DMA attempt with no drive selected!\n");
-				}
-				if (!access_check_dma(state.dma_reading)) {
-					break;
-				}
-				uint32_t newAddr;
-				// Map logical address to a physical RAM address
-				newAddr = mapAddr(state.dma_address, !state.dma_reading);
-
-				if (!state.dma_reading) {
-					// Data available. Get it from the FDC or HDC.
-					if (state.fd_selected) {
-						d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
-						d <<= 8;
-						d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
-					}else if (state.hd_selected) {
-						d = wd2010_read_data(&state.hdc_ctx);
-						d <<= 8;
-						d += wd2010_read_data(&state.hdc_ctx);
-					}
-					if (newAddr <= 0x1FFFFF) {
-						WR16(state.base_ram, newAddr, state.base_ram_size - 1, d);
-					} else if (newAddr >= 0x200000) {
-						WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, d);
-					}
-				} else {
-					// Data write to FDC or HDC.
-
-					// Get the data from RAM
-					if (newAddr <= 0x1fffff) {
-						d = RD16(state.base_ram, newAddr, state.base_ram_size - 1);
-					} else {
-						if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
-							d = RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
-						else
-							d = 0xffff;
-					}
-
-					// Send the data to the FDD or HDD
+			// Run the DMA engine
+			if (state.dmaen) {
+				// DMA ready to go -- so do it.
+				size_t num = 0;
+				while (state.dma_count < 0x4000) {
+					uint16_t d = 0;
+					// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
+					if (num > (1e6/TIMESLOT_FREQUENCY)) break;
+	
+					// Evidently we have more words to copy. Copy them.
 					if (state.fd_selected){
-						wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
-						wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
+						if (!wd2797_get_drq(&state.fdc_ctx)) {
+							// Bail out, no data available. Try again later.
+							break;
+						}
 					}else if (state.hd_selected){
-						wd2010_write_data(&state.hdc_ctx, (d >> 8));
-						wd2010_write_data(&state.hdc_ctx, (d & 0xff));
+						if (!wd2010_get_drq(&state.hdc_ctx)) {
+							// Bail out, no data available. Try again later.
+							break;
+						}
+					}else{
+						printf("ERROR: DMA attempt with no drive selected!\n");
 					}
+					if (!access_check_dma(state.dma_reading)) {
+						break;
+					}
+					uint32_t newAddr;
+					// Map logical address to a physical RAM address
+					newAddr = mapAddr(state.dma_address, !state.dma_reading);
+	
+					if (!state.dma_reading) {
+						// Data available. Get it from the FDC or HDC.
+						if (state.fd_selected) {
+							d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
+							d <<= 8;
+							d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
+						}else if (state.hd_selected) {
+							d = wd2010_read_data(&state.hdc_ctx);
+							d <<= 8;
+							d += wd2010_read_data(&state.hdc_ctx);
+						}
+						if (newAddr <= 0x1FFFFF) {
+							WR16(state.base_ram, newAddr, state.base_ram_size - 1, d);
+						} else if (newAddr >= 0x200000) {
+							WR16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1, d);
+						}
+					} else {
+						// Data write to FDC or HDC.
+
+						// Get the data from RAM
+						if (newAddr <= 0x1fffff) {
+							d = RD16(state.base_ram, newAddr, state.base_ram_size - 1);
+						} else {
+							if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
+								d = RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
+							else
+								d = 0xffff;
+						}
+	
+						// Send the data to the FDD or HDD
+						if (state.fd_selected){
+							wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
+							wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
+						}else if (state.hd_selected){
+							wd2010_write_data(&state.hdc_ctx, (d >> 8));
+							wd2010_write_data(&state.hdc_ctx, (d & 0xff));
+						}
+					}
+
+					// Increment DMA address
+					state.dma_address+=2;
+					// Increment number of words transferred
+					num++; state.dma_count++;
 				}
 
-				// Increment DMA address
-				state.dma_address+=2;
-				// Increment number of words transferred
-				num++; state.dma_count++;
+				// Turn off DMA engine if we finished this cycle
+				if (state.dma_count >= 0x4000) {
+					// FIXME? apparently this isn't required... or is it?
+					state.dma_count = 0x3fff;
+					/*state.dmaen = false;*/
+				}
+			}else if (wd2010_get_drq(&state.hdc_ctx)){
+				wd2010_dma_miss(&state.hdc_ctx);
+			}else if (wd2797_get_drq(&state.fdc_ctx)){
+				wd2797_dma_miss(&state.fdc_ctx);
 			}
 
-			// Turn off DMA engine if we finished this cycle
-			if (state.dma_count >= 0x4000) {
-				// FIXME? apparently this isn't required... or is it?
-				state.dma_count = 0x3fff;
-				/*state.dmaen = false;*/
-			}
-		}else if (wd2010_get_drq(&state.hdc_ctx)){
-			wd2010_dma_miss(&state.hdc_ctx);
-		}else if (wd2797_get_drq(&state.fdc_ctx)){
-			wd2797_dma_miss(&state.fdc_ctx);
-		}
 
-
-		// Any interrupts? --> TODO: masking
-/*		if (!lastirq_fdc) {
-			if (wd2797_get_irq(&state.fdc_ctx)) {
-				lastirq_fdc = true;
-				m68k_set_irq(2);
+			// Any interrupts? --> TODO: masking
+/*			if (!lastirq_fdc) {
+				if (wd2797_get_irq(&state.fdc_ctx)) {
+					lastirq_fdc = true;
+					m68k_set_irq(2);
+				}
 			}
-		}
 */
-		if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
-			m68k_set_irq(2);
-		}else if (keyboard_get_irq(&state.kbd)) {
-			m68k_set_irq(3);
-		} else {
-//			if (!state.timer_asserted){
-				m68k_set_irq(0);
-//			}
+			if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
+				m68k_set_irq(2);
+			}else if (keyboard_get_irq(&state.kbd)) {
+				m68k_set_irq(3);
+			} else {
+//				if (!state.timer_asserted){
+					m68k_set_irq(0);
+//				}
+			}
 		}
-
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
 			// Refresh the screen
