@@ -619,6 +619,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				break;
 			case 0x050000:				// Phone status
 				ENFORCE_SIZE_R(bits, address, 8 | 16, "PHONE STATUS");
+				return (0);
 				break;
 			case 0x060000:				// DMA Count
 				// TODO: U/OERR- is always inactive (bit set)... or should it be = DMAEN+?
@@ -731,7 +732,10 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
 						break;
 					case 0x060000:		// [ef][6e]xxxx ==> Control regs
-						switch (address & 0x07F000) {
+						switch (address & 0x00F000) {
+							case 0x002000:
+								return (0);
+								break;
 							default:
 								break;
 						}
