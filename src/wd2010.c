@@ -157,6 +157,7 @@ uint8_t wd2010_read_data(WD2010_CTX *ctx)
 			// Set IRQ
 			ctx->irq = true;
 			ctx->drq = false;
+			LOG("WD2010: read done");
 		}
 		// return data byte and increment pointer
 		return ctx->data[ctx->data_pos++];
@@ -191,6 +192,7 @@ void wd2010_write_data(WD2010_CTX *ctx, uint8_t val)
 			ctx->irq = true;
 			ctx->write_pos = -1;
 			ctx->drq = false;
+			LOG("WD2010: write done");
 		}
 	}else{
 		LOGS("WD2010: attempt to write to data buffer without a write command in progress");
@@ -286,7 +288,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 			ctx->sector_count = val;
 			break;
 		case WD2010_REG_SECTOR_NUMBER:
-			ctx->sector_number = val;
+			ctx->sector_number = val & 0x1f;
 			break;
 		case WD2010_REG_CYLINDER_HIGH:		// High byte of cylinder
 			ctx->cylinder_high_reg = val;

@@ -319,16 +319,17 @@ int main(void)
 				size_t num = 0;
 				while (state.dma_count < 0x4000) {
 					uint16_t d = 0;
+
 					// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
 					if (num > (1e6/TIMESLOT_FREQUENCY)) break;
 	
 					// Evidently we have more words to copy. Copy them.
-					if (state.fd_selected){
+					if (state.dma_dev == DMA_DEV_FD){
 						if (!wd2797_get_drq(&state.fdc_ctx)) {
 							// Bail out, no data available. Try again later.
 							break;
 						}
-					}else if (state.hd_selected){
+					}else if (state.dma_dev == DMA_DEV_HD0){
 						if (!wd2010_get_drq(&state.hdc_ctx)) {
 							// Bail out, no data available. Try again later.
 							break;
@@ -345,11 +346,11 @@ int main(void)
 	
 					if (!state.dma_reading) {
 						// Data available. Get it from the FDC or HDC.
-						if (state.fd_selected) {
+						if (state.dma_dev == DMA_DEV_FD) {
 							d = wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
 							d <<= 8;
 							d += wd2797_read_reg(&state.fdc_ctx, WD2797_REG_DATA);
-						}else if (state.hd_selected) {
+						}else if (state.dma_dev == DMA_DEV_HD0) {
 							d = wd2010_read_data(&state.hdc_ctx);
 							d <<= 8;
 							d += wd2010_read_data(&state.hdc_ctx);
@@ -373,10 +374,10 @@ int main(void)
 						}
 	
 						// Send the data to the FDD or HDD
-						if (state.fd_selected){
+						if (state.dma_dev == DMA_DEV_FD){
 							wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
 							wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d & 0xff));
-						}else if (state.hd_selected){
+						}else if (state.dma_dev == DMA_DEV_HD0){
 							wd2010_write_data(&state.hdc_ctx, (d >> 8));
 							wd2010_write_data(&state.hdc_ctx, (d & 0xff));
 						}

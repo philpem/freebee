@@ -13,6 +13,10 @@
 // Maximum size of the Boot PROMs. Must be a binary power of two.
 #define ROM_SIZE 32768
 
+#define DMA_DEV_UNDEF -1
+#define DMA_DEV_FD 0
+#define DMA_DEV_HD0 1
+
 /**
  * State error codes
  */
@@ -80,6 +84,8 @@ typedef struct {
 	/// DMA device selection flags
 	bool		fd_selected;
 	bool       	hd_selected;
+
+	int         dma_dev;
 	/// Floppy disc controller context
 	WD2797_CTX	fdc_ctx;
 	/// Current disc image file

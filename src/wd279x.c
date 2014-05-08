@@ -225,12 +225,14 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 	switch (addr) {
 		case WD2797_REG_COMMAND:	// Command register
 			// write to command register clears interrupt request
+			LOG("WD279X: command %x", val);		
 			ctx->irq = false;
 
 			// Is the drive ready?
 			if (ctx->disc_image == NULL) {
 				// No disc image, thus the drive is busy.
 				ctx->status = 0x80;
+				ctx->irq = true;
 				return;
 			}
 

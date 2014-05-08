@@ -455,6 +455,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				break;
 			case 0x0E0000:				// Disk Control Register
 				{
+					uint8_t sdh;
 					bool fd_selected;
 					bool hd_selected;
 					ENFORCE_SIZE_W(bits, address, 16, "DISKCON");
@@ -467,14 +468,24 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					if ((data & 0x10) == 0) wd2010_reset(&state.hdc_ctx);
 					// B3 = HDD0 select
 					hd_selected = (data & 0x08) != 0;
-					// B2,1,0 = HDD0 head select -- TODO?
+					// B2,1,0 = HDD0 head select
+					sdh = wd2010_read_reg(&state.hdc_ctx, WD2010_REG_SDH);
+					sdh = (sdh & ~0x07) | (data & 0x07);
+					wd2010_write_reg(&state.hdc_ctx, WD2010_REG_SDH, sdh);
+
+					//if both devices are selected, whichever one was selected
+					//last should be used
 					if (hd_selected && !state.hd_selected){
-						state.fd_selected = false;
-						state.hd_selected = true;
+						state.dma_dev = DMA_DEV_HD0;
 					}else if (fd_selected && !state.fd_selected){
-						state.hd_selected = false;
-						state.fd_selected = true;
+						state.dma_dev = DMA_DEV_FD;
+					}else if (hd_selected && !fd_selected){
+						state.dma_dev = DMA_DEV_HD0;
+					}else if (fd_selected && !hd_selected){
+						state.dma_dev = DMA_DEV_FD;
 					}
+					state.fd_selected = fd_selected;
+					state.hd_selected = hd_selected;
 					handled = true;
 					break;
 				}
