@@ -167,6 +167,9 @@ void keyboard_init(KEYBOARD_STATE *ks)
 
 	// Clear the update flag
 	ks->update_flag = false;
+
+	ks->mouse_enabled = 0;
+	ks->lastdata_mouse = 0;
 }
 
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
@@ -208,6 +211,53 @@ void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 		}
 	}
 }
+
+bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db)
+{
+	uint8_t flags = 0, xbyte, ybyte;
+
+	if (!ks->mouse_enabled){
+		return (1);
+	}
+	ks->buffer[ks->writep] = KEY_BEGIN_MOUSE;
+	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+
+	/* The first byte of mouse data contains the signs of X and Y as well as the
+	 * buttons (strangely, the signs of X and Y are opposite)*/
+	if (dx > 0){
+		flags |= 0x10;
+	}
+	if (dy < 0){
+		flags |= 0x08;
+	}
+
+	flags |= db;
+
+	ks->buffer[ks->writep] = flags;
+	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+
+
+	/* Second and third bytes are X and Y deltas */
+	xbyte = abs(dx);
+	ks->buffer[ks->writep] = xbyte;
+	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+
+	ybyte = abs(dy);
+	ybyte &= 0x7f;
+
+	ks->buffer[ks->writep] = ybyte;
+	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+
+	ks->lastdata_mouse = 1;
+	return 1;
+}
+
+
+
 void keyboard_scan(KEYBOARD_STATE *ks)
 {
 	int nkeys = 0;
@@ -216,34 +266,33 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 	if (!ks->update_flag) return;
 
 
-	// if buffer empty, do a keyboard scan
-	if (ks->buflen == 0) {
-		// Keyboard Data Begins Here (BEGKBD)
-		//ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
-		//ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-		//if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+	if (ks->lastdata_mouse){
+		//Keyboard Data Begins Here (BEGKBD)
+		//This is only supposed to be sent if the last data sent was from the 
+		//mouse (sending it otherwise breaks the keyboard)*/
+		ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
+		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+		ks->lastdata_mouse = 0;
+	}
 
-		for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
-			if (ks->keystate[i]) {
-				LOG_IF(kbc_debug, "KBC KEY DOWN: %d\n", i);
-				ks->buffer[ks->writep] = i;
-				ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-				if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
-				nkeys++;
-			}
-		}
-		if (nkeys) {
-			ks->buffer[ks->writep - 1] |= 0x80;
-		}else{
-			// If no keys down, then send All Keys Up byte
-			LOG_IFS(kbc_debug, "KBC ALL KEYS UP\n");
-			ks->buffer[ks->writep] = KEY_ALL_UP;
+	for (int i=0; i<(sizeof(ks->keystate)/sizeof(ks->keystate[0])); i++) {
+		if (ks->keystate[i]) {
+			LOG_IF(kbc_debug, "KBC KEY DOWN: %d\n", i);
+			ks->buffer[ks->writep] = i;
 			ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 			if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+			nkeys++;
 		}
-
-		// TODO: inject "mouse data follows" chunk header and mouse movement info
-
+	}
+	if (nkeys) {
+		ks->buffer[ks->writep - 1] |= 0x80;
+	}else{
+		// If no keys down, then send All Keys Up byte
+		LOG_IFS(kbc_debug, "KBC ALL KEYS UP\n");
+		ks->buffer[ks->writep] = KEY_ALL_UP;
+		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 	}
 
 	// Clear the update flag
@@ -314,10 +363,14 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 		// CR7 = Receive Interrupt Enable
 		ks->rxie = (val & 0x80)==0x80;
 	} else {
-		// Write command to KBC -- TODO!
+		// Write command to KBC
 		if (val == KEY_CMD_RESET) {
 			LOG_IFS(kbc_debug, "KBC: KEYBOARD RESET!\n");
 			ks->readp = ks->writep = ks->buflen = 0;
+		} else if (val == KEY_CMD_MOUSE_ENABLE){
+			ks->mouse_enabled = 1;
+		} else if (val == KEY_CMD_MOUSE_DISABLE){
+			ks->mouse_enabled = 0;
 		} else {
 			LOG("KBC TODO: write keyboard data 0x%02X\n", val);
 		}

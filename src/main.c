@@ -12,6 +12,8 @@
 #include "state.h"
 #include "memory.h"
 
+extern int cpu_log_enabled;
+
 void FAIL(char *err)
 {
 	state_done();
@@ -158,6 +160,9 @@ void refreshScreen(SDL_Surface *s)
 bool HandleSDLEvents(SDL_Surface *screen)
 {
 	SDL_Event event;
+	static int mouse_grabbed = 0, mouse_buttons = 0;
+	int dx = 0, dy = 0;
+
 	while (SDL_PollEvent(&event))
 	{
 		if ((event.type == SDL_KEYDOWN) || (event.type == SDL_KEYUP)) {
@@ -170,6 +175,17 @@ bool HandleSDLEvents(SDL_Surface *screen)
 				return true;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
+					case SDLK_F10:
+						if (mouse_grabbed){
+							SDL_ShowCursor(1);
+							SDL_WM_GrabInput(SDL_GRAB_OFF);
+							mouse_grabbed = 0;
+						}else{
+							SDL_ShowCursor(0);
+							SDL_WM_GrabInput(SDL_GRAB_ON);
+							mouse_grabbed = 1;
+						}
+						break;
 					case SDLK_F11:
 						if (state.fdc_disc) {
 							wd2797_unload(&state.fdc_ctx);
@@ -187,6 +203,33 @@ bool HandleSDLEvents(SDL_Surface *screen)
 						break;
 					default:
 						break;
+				}
+				break;
+			case SDL_MOUSEMOTION:
+				SDL_GetRelativeMouseState(&dx, &dy);
+			case SDL_MOUSEBUTTONUP:
+			case SDL_MOUSEBUTTONDOWN:
+				if (mouse_grabbed){
+					if (event.type == SDL_MOUSEBUTTONDOWN) {
+						if (event.button.button == SDL_BUTTON_LEFT){
+							mouse_buttons |= MOUSE_BUTTON_LEFT;
+						}else if (event.button.button == SDL_BUTTON_MIDDLE){
+							mouse_buttons |= MOUSE_BUTTON_MIDDLE;
+						}else if (event.button.button == SDL_BUTTON_RIGHT){
+							mouse_buttons |= MOUSE_BUTTON_RIGHT;
+						}
+					} else if (event.type == SDL_MOUSEBUTTONUP) {
+						if (event.button.button == SDL_BUTTON_LEFT){
+							mouse_buttons &= ~MOUSE_BUTTON_LEFT;
+						}else if (event.button.button == SDL_BUTTON_MIDDLE){
+							mouse_buttons &= ~MOUSE_BUTTON_MIDDLE;
+						}else if (event.button.button == SDL_BUTTON_RIGHT){
+							mouse_buttons &= ~MOUSE_BUTTON_RIGHT;
+						}
+					}
+					mouse_event(&state.kbd, dx, dy, mouse_buttons);
+					dx = 0;
+					dy = 0;
 				}
 				break;
 			default:

@@ -6,6 +6,10 @@
 /// Keyboard buffer size in bytes
 #define KEYBOARD_BUFFER_SIZE 256
 
+#define MOUSE_BUTTON_RIGHT 0x01
+#define MOUSE_BUTTON_MIDDLE 0x02
+#define MOUSE_BUTTON_LEFT 0x04
+
 typedef struct {
 	/// Key states
 	int keystate[0x80];
@@ -30,6 +34,12 @@ typedef struct {
 
 	/// "Keyboard State Changed" flag
 	bool update_flag;
+
+	/// Mouse enable flag
+	bool mouse_enabled;
+
+	/// Flag indicating whether last data sent was from the mouse
+	bool lastdata_mouse;
 } KEYBOARD_STATE;
 
 /**
@@ -56,5 +66,7 @@ void keyboard_scan(KEYBOARD_STATE *ks);
 bool keyboard_get_irq(KEYBOARD_STATE *ks);
 uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr);
 void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val);
+
+bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db);
 
 #endif
