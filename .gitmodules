@@ -1,0 +1,3 @@
+[submodule "src/musashi"]
+	path = src/musashi
+	url = git@github.com:philpem/Musashi.git

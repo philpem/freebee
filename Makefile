@@ -119,7 +119,7 @@ TARGET		=	freebee
 
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c tc8250.c
-SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/m68kopac.c musashi/m68kopdm.c musashi/m68kopnz.c
+SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/m68kfpu.c
 
 # source type - either "c" or "cpp" (C or C++)
 SRC_TYPE	=	c
@@ -128,7 +128,7 @@ SRC_TYPE	=	c
 EXT_OBJ		=
 # libraries to link in -- these will be specified as "-l" parameters, the -l
 # is prepended automatically
-LIB			=
+LIB			= m
 # library paths -- where to search for the above libraries
 LIBPATH		=
 # include paths -- where to search for #include files (in addition to the
@@ -417,7 +417,7 @@ endif
 obj/musashi/m68kmake:	obj/musashi/m68kmake.o
 	$(CC) $(CFLAGS) $(CPPFLAGS) obj/musashi/m68kmake.o -o $@
 # 68k CPU sources
-src/musashi/m68kops.h src/musashi/m68kops.c src/musashi/m68kopac.c src/musashi/m68kopdm.c src/musashi/m68kopnz.c:	obj/musashi/m68kmake src/musashi/m68k_in.c
+src/musashi/m68kops.h src/musashi/m68kops.c:	obj/musashi/m68kmake src/musashi/m68k_in.c
 	./obj/musashi/m68kmake src/musashi src/musashi/m68k_in.c
 
 ####

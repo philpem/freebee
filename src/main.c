@@ -265,6 +265,7 @@ int main(void)
 	}
 
 	// set up musashi and reset the CPU
+	m68k_init();
 	m68k_set_cpu_type(M68K_CPU_TYPE_68010);
 	m68k_pulse_reset();
 
