@@ -33,11 +33,50 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * Serial ports (or Combo Card)
   * Printer port
   * Modem
-  * P5.1 expansion PAL --
-    * 4th drive select pin
-    * 2nd hard drive select
+    * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
+  * Second hard drive (WD2010 driver stores the drive-select state, but doesn't use it)
 
 
-# Installation instructions
+# Build instructions
 
-TODO.
+  - Install the 'libsdl1.2-dev' package
+  - Clone a copy of Freebee (remember to check out the submodules too)
+  - Build Freebee (run 'make')
+
+
+# Running Freebee
+
+  - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
+  - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
+    * These will need to be converted from Imagedisk to binary format
+    * The disk images on unixpc.org don't work: the boot track is missing.
+  - Unzip the ROMs ZIP file and put the ROMs in a directory called 'roms':
+    * Rename '14C 72-00616.bin' to '14c.bin'.
+    * Rename '15C 72-00617.bin' to '15c.bin'.
+  - Create a hard drive image file:
+    * `dd if=/dev/zero of=hd.img bs=512 count=69632`
+      * "Count" is `cylinders * heads * sectors`
+    * This creates a drive image with geometry Cyl:Head:Sec = 1088:8:16.
+    * Note that you need the Enhanced Diagnostics disk to format 16-head hard drives.
+  - Install the operating system
+    * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
+    * To change disks:
+      * Press F11 to release the disk image.
+      * Copy the next disk image as "discim" in the Freebee directory.
+      * Press F11 to load the disk image.
+
+
+# Keyboard commands
+
+  * F10 -- Grab/Release mouse cursor
+  * F11 -- Load/unload floppy disk
+  * Alt-F12 -- exit
+
+
+# Useful links
+
+  * [AT&T 3B1 Information](unixpc.taronga.com) -- the "Taronga archive".
+    * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
+    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.
+  * unixpc.org
+  * bitsavers
