@@ -37,6 +37,15 @@
 #define SR_COMMAND_IN_PROGRESS 0x02
 #define SR_ERROR 0x01
 
+// Cylinder high mask.
+// 3.51m Kernel uses the width of Cylinder High to identify whether the controller
+// is WD1010 or WD2010.
+#ifdef EMULATE_WD1010
+# define CYLH_MASK 0x03
+#else
+# define CYLH_MASK 0x07
+#endif
+
 extern int cpu_log_enabled;
 
 /// WD2010 command constants
@@ -228,7 +237,7 @@ uint8_t wd2010_read_reg(WD2010_CTX *ctx, uint8_t addr)
 		case WD2010_REG_SECTOR_NUMBER:
 			return ctx->sector_number;
 		case WD2010_REG_CYLINDER_HIGH:      // High byte of cylinder
-			return ctx->cylinder_high_reg;
+			return ctx->cylinder_high_reg & CYLH_MASK;
 		case WD2010_REG_CYLINDER_LOW:       // Low byte of cylinder
 			return ctx->cylinder_low_reg;
 		case WD2010_REG_SDH:
@@ -291,7 +300,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 			ctx->sector_number = val & 0x1f;
 			break;
 		case WD2010_REG_CYLINDER_HIGH:		// High byte of cylinder
-			ctx->cylinder_high_reg = val;
+			ctx->cylinder_high_reg = val & CYLH_MASK;
 			break;
 		case WD2010_REG_CYLINDER_LOW:		// Low byte of cylinder
 			ctx->cylinder_low_reg = val;
@@ -314,7 +323,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 					SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)seek_complete, ctx);
 					break;
 				case CMD_SCAN_ID:
-					ctx->cylinder_high_reg = (ctx->track >> 8) & 0xff;
+					ctx->cylinder_high_reg = (ctx->track >> 8) & CYLH_MASK;
 					ctx->cylinder_low_reg = ctx->track & 0xff;
 					ctx->sector_number = ctx->sector;
 					ctx->sdh = (ctx->sdh & ~7) | (ctx->head & 7);
