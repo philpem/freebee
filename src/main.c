@@ -457,9 +457,12 @@ int main(void)
 		if (exitEmu) break;
 	}
 
-	// Release the disc image
+	// Close the disc images before exiting
 	wd2797_unload(&state.fdc_ctx);
-	fclose(state.fdc_disc);
+
+	if (state.fdc_disc != NULL) {
+		fclose(state.fdc_disc);
+	}
 
 	return 0;
 }
