@@ -63,6 +63,13 @@ Phil Pemberton -- <philpem@philpem.me.uk>
       * Press F11 to release the disk image.
       * Copy the next disk image as "discim" in the Freebee directory.
       * Press F11 to load the disk image.
+  - After installation has finished (when the login prompt appears):
+    * Log in as `root`
+    * `cd /etc`
+    * `cp rc rc.old`
+    * `sed 's/.phinit .modeminit//' rc.old > rc`
+    * `reboot`
+    * The above commands disable the phone and modem initialisation, which crash due to un-emulated hardware.
 
 
 # Keyboard commands
