@@ -39,7 +39,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 # Build instructions
 
-  - Install the 'libsdl1.2-dev' package
+  - Install the `libsdl1.2-dev` package
   - Clone a copy of Freebee (remember to check out the submodules too)
   - Build Freebee (run 'make')
 
@@ -50,13 +50,12 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
     * These will need to be converted from Imagedisk to binary format
     * The disk images on unixpc.org don't work: the boot track is missing.
-  - Unzip the ROMs ZIP file and put the ROMs in a directory called 'roms':
-    * Rename '14C 72-00616.bin' to '14c.bin'.
-    * Rename '15C 72-00617.bin' to '15c.bin'.
+  - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
+    * Rename `14C 72-00616.bin` to `14c.bin`.
+    * Rename `15C 72-00617.bin` to `15c.bin`.
   - Create a hard drive image file:
-    * `dd if=/dev/zero of=hd.img bs=512 count=69632`
-      * "Count" is `cylinders * heads * sectors`
-    * This creates a drive image with geometry Cyl:Head:Sec = 1088:8:16.
+    * `dd if=/dev/zero of=hd.img bs=512 count=$(expr 16 \* 8 \* 1024)`
+    * This creates a "Miniscribe 64MB" (CHS 1024:8:16, 512 bytes per sector).
     * Note that you need the Enhanced Diagnostics disk to format 16-head hard drives.
   - Install the operating system
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
@@ -78,5 +77,6 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * [AT&T 3B1 Information](unixpc.taronga.com) -- the "Taronga archive".
     * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
     * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.
-  * unixpc.org
-  * bitsavers
+  * [unixpc.org](http://www.unixpc.org/)
+  * Bitsavers: [documentation and firmware (ROMs)](http://bitsavers.org/pdf/att/3b1/), [software](http://bitsavers.org/bits/ATT/unixPC/)
+
