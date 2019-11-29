@@ -280,7 +280,7 @@ int main(void)
 
 	// Set up the video display
 	SDL_Surface *screen = NULL;
-	if ((screen = SDL_SetVideoMode(720, 384, 8, SDL_SWSURFACE | SDL_ANYFORMAT)) == NULL) {
+	if ((screen = SDL_SetVideoMode(720, 348, 8, SDL_SWSURFACE | SDL_ANYFORMAT)) == NULL) {
 		printf("Could not find a suitable video mode: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
