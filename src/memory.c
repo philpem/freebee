@@ -166,22 +166,26 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
  * 			return-with-no-value. UGH!
  */
 /*{{{ macro: ACCESS_CHECK_WR(address, bits)*/
+// TODO: 32-bit check is broken, problem with 32-bit write straddling 2 pages, proper page faults may not occur
+//       if 1st word faults, 2nd page is never checked for PF (only an issue when straddling 2 pages)
 #define ACCESS_CHECK_WR(address, bits)								\
 	do {															\
 		bool fault = false;											\
+		uint32_t faultAddr = address;								\
 		MEM_STATUS st;												\
 		_ACCESS_CHECK_WR_BYTE(address);								\
 		if (!fault && bits == 32									\
-				&& ((address + 3) & ~0xfff) != ((address & ~0xfff))){	\
-			_ACCESS_CHECK_WR_BYTE(address + 3);						\
+				&& ((address + 2) & ~0xfff) != (address & ~0xfff)){	\
+			_ACCESS_CHECK_WR_BYTE(address + 2);						\
+			if (fault) faultAddr = address + 2;						\
 		}															\
 		if (fault) {												\
 			if (bits >= 16)											\
 				state.bsr0 = 0x7C00;								\
 			else													\
-				state.bsr0 = (address & 1) ? 0x7E00 : 0x7D00;		\
-			state.bsr0 |= (address >> 16);							\
-			state.bsr1 = address & 0xffff;							\
+				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			state.bsr0 |= (faultAddr >> 16);							\
+			state.bsr1 = faultAddr & 0xffff;							\
 			LOG("Bus Error while writing, addr %08X, statcode %d", address, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
 			return;													\
@@ -225,6 +229,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
  * 			return-with-no-value. UGH!
  */
 /*{{{ macro: ACCESS_CHECK_RD(address, bits)*/
+// TODO: 32-bit check is broken, problem with 32-bit read straddling 2 pages, if needed, 2nd page PF may not occur
+//       if 1st word faults, 2nd page is never checked for PF? (only an issue when straddling 2 pages)
 #define ACCESS_CHECK_RD(address, bits)								\
 	do {															\
 		bool fault = false;											\
@@ -800,7 +806,9 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_RD(address, 32);
+	ACCESS_CHECK_RD(address, 16);
+	uint32_t addr2 = address + 2;
+	ACCESS_CHECK_RD(addr2, 16);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -808,10 +816,11 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
+		uint32_t newAddr2 = mapAddr(address + 2, false);
 		// Base memory wraps around
 			
 		data = ((ram_read_16(newAddr) << 16) | 
-			ram_read_16(mapAddr(address + 2, false)));
+			 ram_read_16(newAddr2));
 		return (data);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -967,14 +976,19 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_WR(address, 32);
+	ACCESS_CHECK_WR(address, 16);
+	uint32_t addr2 = address + 2;
+	ACCESS_CHECK_WR(addr2, 16);
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
+		uint32_t newAddr2 = mapAddr(address + 2, true);
+
 		ram_write_16(newAddr, (value & 0xffff0000) >> 16);
-		ram_write_16(mapAddr(address + 2, true), (value & 0xffff));
+		ram_write_16(newAddr2, (value & 0xffff));
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
