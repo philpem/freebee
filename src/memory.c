@@ -14,6 +14,10 @@
 //#define EMPTY 0x55555555UL
 //#define EMPTY 0x00000000UL
 
+#define SUPERVISOR_MODE ((m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)==0x2000)
+#define USER_MODE (!SUPERVISOR_MODE)
+#define ZEROPAGE 0x1000
+
 /******************
  * Memory mapping
  ******************/
@@ -92,7 +96,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 	}
 
 	// Are we in Supervisor mode?
-	if (dma || (m68k_get_reg(NULL, M68K_REG_SR) & 0x2000))
+	if (dma || SUPERVISOR_MODE)
 		// Yes. We can do anything we like.
 		return MEM_ALLOWED;
 
@@ -105,7 +109,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// User attempt to access the kernel
 	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
-	if (((addr >> 19) & 0x0F) == 0 && !(!writing && addr <= 0x1000)) {
+	if (((addr >> 19) & 0x0F) == 0 && !(!writing && addr < ZEROPAGE)) {
 		LOGS("Attempt by user code to access kernel space");
 		return MEM_KERNEL;
 	}
@@ -162,22 +166,26 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
  * 			return-with-no-value. UGH!
  */
 /*{{{ macro: ACCESS_CHECK_WR(address, bits)*/
+// TODO: 32-bit check is broken, problem with 32-bit write straddling 2 pages, proper page faults may not occur
+//       if 1st word faults, 2nd page is never checked for PF (only an issue when straddling 2 pages)
 #define ACCESS_CHECK_WR(address, bits)								\
 	do {															\
 		bool fault = false;											\
+		uint32_t faultAddr = address;								\
 		MEM_STATUS st;												\
 		_ACCESS_CHECK_WR_BYTE(address);								\
 		if (!fault && bits == 32									\
-				&& ((address + 3) & ~0xfff) != ((address & ~0xfff))){	\
-			_ACCESS_CHECK_WR_BYTE(address + 3);						\
+				&& ((address + 2) & ~0xfff) != (address & ~0xfff)){	\
+			_ACCESS_CHECK_WR_BYTE(address + 2);						\
+			if (fault) faultAddr = address + 2;						\
 		}															\
 		if (fault) {												\
 			if (bits >= 16)											\
 				state.bsr0 = 0x7C00;								\
 			else													\
-				state.bsr0 = (address & 1) ? 0x7E00 : 0x7D00;		\
-			state.bsr0 |= (address >> 16);							\
-			state.bsr1 = address & 0xffff;							\
+				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			state.bsr0 |= (faultAddr >> 16);							\
+			state.bsr1 = faultAddr & 0xffff;							\
 			LOG("Bus Error while writing, addr %08X, statcode %d", address, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
 			return;													\
@@ -221,6 +229,8 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
  * 			return-with-no-value. UGH!
  */
 /*{{{ macro: ACCESS_CHECK_RD(address, bits)*/
+// TODO: 32-bit check is broken, problem with 32-bit read straddling 2 pages, if needed, 2nd page PF may not occur
+//       if 1st word faults, 2nd page is never checked for PF? (only an issue when straddling 2 pages)
 #define ACCESS_CHECK_RD(address, bits)								\
 	do {															\
 		bool fault = false;											\
@@ -335,7 +345,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 	if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
-			case 0x010000:				// General Status Register
+			case 0x010000:				// General Status Register (RD)
 				if (bits == 16)
 					state.genstat = (data & 0xffff);
 				else if (bits == 8) {
@@ -346,11 +356,11 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				}
 				handled = true;
 				break;
-			case 0x030000:				// Bus Status Register 0
+			case 0x030000:				// Bus Status Register 0 (RD)
 				break;
-			case 0x040000:				// Bus Status Register 1
+			case 0x040000:				// Bus Status Register 1 (RD)
 				break;
-			case 0x050000:				// Phone status
+			case 0x050000:				// Phone status (RD)
 				break;
 			case 0x060000:				// DMA Count
 				ENFORCE_SIZE_W(bits, address, 16, "DMACOUNT");
@@ -374,7 +384,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				state.dma_count++;
 				handled = true;
 				break;
-			case 0x070000:				// Line Printer Status Register
+			case 0x070000:				// Line Printer Status Register (RD)
 				break;
 			case 0x080000:				// Real Time Clock
 				ENFORCE_SIZE_W(bits, address, 16, "RTCWRITE");
@@ -385,7 +395,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				tc8250_write_reg(&state.rtc_ctx, (data & 0x0F00) >> 8);
 				handled = true;
 				break;
-			case 0x090000:				// Phone registers
+			case 0x090000:				// Telephony Control Register
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
@@ -413,7 +423,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						break;
 				}
 				break;
-			case 0x0A0000:				// Miscellaneous Control Register
+			case 0x0A0000:				// Miscellaneous Control Register (WR) high byte, Line Printer Status Register (WR) low byte
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
 				// TODO: handle the ctrl bits properly
 				if (data & 0x8000){
@@ -453,7 +463,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				}
 				handled = true;
 				break;
-			case 0x0E0000:				// Disk Control Register
+			case 0x0E0000:				// Disk Control Register (WR)
 				{
 					uint8_t sdh;
 					bool fd_selected;
@@ -552,9 +562,11 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 								break;
 							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
 								ENFORCE_SIZE_W(bits, address, 16, "L1 MODEM");
+								// modem connected to L1 = ((data & 0x8000) == 0)
 								break;
 							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
 								ENFORCE_SIZE_W(bits, address, 16, "L2 MODEM");
+								// modem connected to L2 = ((data & 0x8000) == 0)
 								break;
 							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
 								ENFORCE_SIZE_W(bits, address, 16, "D/N CONNECT");
@@ -617,17 +629,17 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				ENFORCE_SIZE_R(bits, address, 16, "BSR1");
 				return ((uint32_t)state.bsr1 << 16) + (uint32_t)state.bsr1;
 				break;
-			case 0x050000:				// Phone status
+			case 0x050000:				// Telephony Status Register (RD)
 				ENFORCE_SIZE_R(bits, address, 8 | 16, "PHONE STATUS");
 				return (0);
 				break;
 			case 0x060000:				// DMA Count
-				// TODO: U/OERR- is always inactive (bit set)... or should it be = DMAEN+?
+				// TODO: Bit 15 (U/OERR-) is always inactive (bit set)... or should it be = DMAEN+?
 				// Bit 14 is always unused, so leave it set
 				ENFORCE_SIZE_R(bits, address, 16, "DMACOUNT");
 				return (state.dma_count & 0x3fff) | 0xC000;
 				break;
-			case 0x070000:				// Line Printer Status Register
+			case 0x070000:				// Line Printer Status Register (RD)
 				data = 0x00120012;	// no parity error, no line printer error, no irqs from FDD or HDD
 				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
 				data |= wd2010_get_irq(&state.hdc_ctx) ? 0x00040004 : 0;
@@ -636,7 +648,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 			case 0x080000:				// Real Time Clock
 				printf("READ NOTIMP: Realtime Clock\n");
 				break;
-			case 0x090000:				// Phone registers
+			case 0x090000:				// Telephony Control Register
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
@@ -713,7 +725,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 						break;
 					case 0x030000:		// [ef][3b]xxxx ==> Real Time Clock data bits
 						return (tc8250_read_reg(&state.rtc_ctx));
-					case 0x040000:		// [ef][4c]xxxx ==> General Control Register
+					case 0x040000:		// [ef][4c]xxxx ==> General Control Register (WR)
 						switch (address & 0x077000) {
 							case 0x040000:		// [ef][4c][08]xxx ==> EE
 							case 0x041000:		// [ef][4c][19]xxx ==> PIE
@@ -731,7 +743,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 						break;
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
 						break;
-					case 0x060000:		// [ef][6e]xxxx ==> Control regs
+					case 0x060000:		// [ef][6e]xxxx ==> Control regs (7201 transceiver, modem)
 						switch (address & 0x00F000) {
 							case 0x002000:
 								return (0);
@@ -769,9 +781,9 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 
 static uint16_t ram_read_16(uint32_t address)
 {
-	if (address < 0x1000 && !(m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)){
+	if (address < ZEROPAGE && USER_MODE) {
 		return (0);
-	}else if (address <= 0x1fffff) {
+	} else if (address <= 0x1fffff) {
 		// Base memory wraps around
 		return RD16(state.base_ram, address, state.base_ram_size - 1);
 	} else {
@@ -794,7 +806,9 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_RD(address, 32);
+	ACCESS_CHECK_RD(address, 16);
+	uint32_t addr2 = address + 2;
+	ACCESS_CHECK_RD(addr2, 16);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -802,10 +816,11 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
+		uint32_t newAddr2 = mapAddr(address + 2, false);
 		// Base memory wraps around
 			
 		data = ((ram_read_16(newAddr) << 16) | 
-			ram_read_16(mapAddr(address + 2, false)));
+			 ram_read_16(newAddr2));
 		return (data);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -848,7 +863,8 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-		if (address < 0x1000 && !(m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)){
+		
+		if (address < ZEROPAGE && USER_MODE) {
 			return (0);
 		}else if (newAddr <= 0x1fffff) {
 			// Base memory wraps around
@@ -900,9 +916,10 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-		if (address < 0x1000 && !(m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)){
+		
+		if (address < ZEROPAGE && USER_MODE) {
 			return (0);
-		}else if (newAddr <= 0x1fffff) {
+		} else if (newAddr <= 0x1fffff) {
 			// Base memory wraps around
 			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
@@ -936,10 +953,9 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
 {
 	
-		
-	if (address < 0x1000 && !(m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)){
+	if (address < ZEROPAGE && USER_MODE) {
 		return;
-	}else if (address <= 0x1fffff) {
+	} else if (address <= 0x1fffff) {
 		if (address < state.base_ram_size) {
 			WR16(state.base_ram, address, state.base_ram_size - 1, value);
 		}
@@ -960,14 +976,19 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_WR(address, 32);
+	ACCESS_CHECK_WR(address, 16);
+	uint32_t addr2 = address + 2;
+	ACCESS_CHECK_WR(addr2, 16);
+
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, true);
+		uint32_t newAddr2 = mapAddr(address + 2, true);
+
 		ram_write_16(newAddr, (value & 0xffff0000) >> 16);
-		ram_write_16(mapAddr(address + 2, true), (value & 0xffff));
+		ram_write_16(newAddr2, (value & 0xffff));
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
@@ -999,9 +1020,9 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 16);
 
-	if (address < 0x1000 && !(m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)){
+	if (address < ZEROPAGE && USER_MODE) {
 		return;
-	}else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
@@ -1047,10 +1068,9 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 8);
 
-	
-	if (address < 0x1000 && !(m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)){
+	if (address < ZEROPAGE && USER_MODE) {
 		return;
-	}else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access (read only!)
 	} else if (address <= 0x3FFFFF) {
 		// RAM access

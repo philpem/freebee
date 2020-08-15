@@ -86,7 +86,7 @@ uint8_t get_month(TC8250_CTX *ctx)
 	uint8_t ret;
 	t = time(NULL);
 	gmtime_r(&t, &g);
-	ret = g.tm_mon;
+	ret = g.tm_mon+1;
 	return (ret);
 }
 
