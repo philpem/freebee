@@ -423,7 +423,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						break;
 				}
 				break;
-			case 0x0A0000:				// Miscellaneous Control Register (WR) high byte, Line Printer Status Register (WR) low byte
+			case 0x0A0000:				// Miscellaneous Control Register (WR) high byte
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
 				// TODO: handle the ctrl bits properly
 				if (data & 0x8000){
