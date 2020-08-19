@@ -101,6 +101,9 @@ typedef struct {
 
 	/// Real time clock context
 	TC8250_CTX rtc_ctx;
+
+	/// VIDPAL mod (allows user writing to VRAM)
+	bool vidpal;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't

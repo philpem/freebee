@@ -103,8 +103,13 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 	// If we're here, then we must be in User mode.
 	// Check that the user didn't access memory outside of the RAM area
 	if (addr >= 0x400000) {
-		LOGS("User accessed privileged memory");
-		return MEM_UIE;
+		if (state.vidpal && (addr >= 0x420000) && (addr <= 0x427FFF))
+			return MEM_ALLOWED;
+		else
+		{
+			LOG("User accessed privileged memory: %08X", addr);
+			return MEM_UIE;
+		}
 	}
 
 	// User attempt to access the kernel

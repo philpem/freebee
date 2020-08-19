@@ -26,6 +26,10 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.bsr0 = state.bsr1 = 0;	// FIXME: check this
 	state.timer_enabled = state.timer_asserted = false;
 	state.dma_dev = DMA_DEV_UNDEF;
+	
+	// Enable VIDPAL mod (allows user writing to VRAM)
+	state.vidpal = true;
+	
 	// Allocate Base RAM, making sure the user has specified a valid RAM amount first
 	// Basically: 512KiB minimum, 2MiB maximum, in increments of 512KiB.
 	if ((base_ram_size < 512*1024) || (base_ram_size > 2048*1024) || ((base_ram_size % (512*1024)) != 0))
