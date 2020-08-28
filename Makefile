@@ -329,9 +329,6 @@ versionheader:
 	@sed -e 's/@@datetime@@/$(shell LC_ALL=C date +"%a %d-%b-%Y %T %Z")/g'		\
 		 -e 's/@@date@@/$(shell LC_ALL=C date +"%a %d-%b-%Y")/g'			\
 		 -e 's/@@time@@/$(shell LC_ALL=C date +"%T %Z")/g'		\
-		 -e 's/@@whoami@@/$(shell whoami)/g'				\
-		 -e 's/@@hostname@@/$(shell hostname)/g'			\
-		 -e 's|@@compiler@@|$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -n 1 | sed -e "s;|;/;")|g'	\
 		 -e 's/@@majorver@@/$(VER_MAJOR)/g'					\
 		 -e 's/@@minorver@@/$(VER_MINOR)/g'					\
 		 -e 's/@@extraver@@/$(subst \",,$(VER_EXTRA))/g'	\
@@ -341,7 +338,6 @@ versionheader:
 		 -e 's/@@vcsrev@@/$(VER_VCSREV)/g'					\
 		 -e 's/@@vcsstr@@/$(VER_VCSSTR)/g'					\
 		 -e 's/@@fullverstr@@/$(VER_FULLSTR)/g'				\
-		 -e 's#@@cflags@@#$(CFLAGS)#g'						\
 		 < src/version.h.in > src/version.h
 
 # version.h creation stuff based on code from the Xen makefile
