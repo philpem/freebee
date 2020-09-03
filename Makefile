@@ -193,37 +193,15 @@ endif
 # get the current build number
 VER_BUILDNUM	= $(shell cat .buildnum)
 
-#### --- begin Subversion revision grabber ---
-# there are two ways to get the SVN revision - use svnversion, or use svn info
-# then pipe through awk. which one you use is up to you.
-VER_SVNREV		= $(shell LANG=C svn info 2>/dev/null || echo 'Revision: exported' | awk '/^Revision:/ { print$$2 }' )
-#VER_SVNREV		= $(shell svnversion .)
-
-# if the version string is "exported", then the CSD was not checked out of SVN
-# note that if the CSD is not an SVN checkout, then @@svnrev@@ will be set to
-# zero.
-ifeq ($(VER_SVNREV),exported)
-    VER_VCS		= none
-    VER_VCSREV	= 0
+#### --- begin Git revision grabber ---
+# get the current Git ID
+VER_GITREV=$(shell ((git rev-parse --short HEAD) || echo "NONE") 2>/dev/null)
+ifneq ($(VER_GITREV),NONE)
+   VER_VCS		= git
+   VER_VCSREV	= $(VER_GITREV)
 else
-    VER_VCS		= svn
-    VER_VCSREV	= $(VER_SVNREV)
-endif
-
-#### --- begin Mercurial revision grabber ---
-# If SVN didn't give us a revision, try Mercurial instead
-ifeq ($(VER_VCS),none)
-    # get the current Mercurial changeset number
-	VER_HGREV=$(shell ((hg tip --template "{node|short}") || echo "000000000000") 2>/dev/null)
-    ifneq ($(VER_HGREV),000000000000)
-        # a non-empty repo
-        VER_VCS		= hg
-        VER_VCSREV	= $(VER_HGREV)
-    else
-        # either an empty Hg repo, or no repo at all
-        VER_VCS		= none
-        VER_VCSREV	= 0
-    endif
+   VER_VCS		= none
+   VER_VCSREV	= 0
 endif
 
 #### --- end version grabbers ---
