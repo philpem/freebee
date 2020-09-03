@@ -244,7 +244,7 @@ bool HandleSDLEvents(SDL_Surface *screen)
  * blessed be thy main()...
  ****************************/
 
-int main(void)
+int main(int argc, char **argv)
 {
 	// copyright banner
 	printf("FreeBee: A Quick-and-Dirty AT&T 3B1 Emulator. Version %s, %s mode.\n", VER_FULLSTR, VER_BUILD_TYPE);
