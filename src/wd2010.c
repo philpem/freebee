@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "SDL.h"
 #include "musashi/m68k.h"
 #include "wd2010.h"

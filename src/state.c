@@ -1,6 +1,6 @@
 #define _STATE_C
 #include <stddef.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include "wd279x.h"
 #include "wd2010.h"

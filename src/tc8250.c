@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <time.h>
 #include "tc8250.h"
 
