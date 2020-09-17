@@ -1,32 +1,27 @@
 #include "diskimg.h"
 
-#define DISKIMG_DEBUG
+#define DISKIMD_DEBUG
 
-#ifndef DISKIMG_DEBUG
+#ifndef DISKIMD_DEBUG
 #define NDEBUG
 #endif
 #include "utils.h"
 
-int init_raw(struct disk_image *ctx, FILE *fp, int secsz, int heads, int tracks)
-{
-	int spt;
-	size_t filesize;
-	
-	ctx->fp = fp;
-	ctx->secsz = secsz;
-	
-	// Start by finding out how big the image file is
-	fseek(fp, 0, SEEK_END);
-	filesize = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	
-	// Calculate sectors per track
-	spt = filesize / secsz / heads / tracks;
-	
-	return spt;
-}
+#define IMD_END_OF_COMMENT 0x1A
+#define IMD_HEAD_MASK 0x03
+#define IMD_SDR_DATA 0x01
+#define IMD_SDR_COMPRESSED 0x01
 
-int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int tracks)
+typedef struct
+{
+	uint8_t  data_mode; 		// data mode (5 = 250kbps DD, 4 = 300kbps DD)
+	uint8_t  cyl;  				// cylinder
+	uint8_t  head; 				// head, flags (cylinder map, head map)
+	uint8_t  spt;  				// sectors/track
+	uint8_t  secsz_code;  		// sector size code (secsz = 128 << secsz_code)
+} IMD_TRACK_HEADER;
+
+static int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int tracks)
 {
 	uint8_t sdrType, track_sector_map[10], ch;
     IMD_TRACK_HEADER trackHeader;
@@ -104,13 +99,7 @@ int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int tracks)
 	return spt;
 }
 
-void done_raw(struct disk_image *ctx)
-{
-	ctx->fp = NULL;
-    ctx->secsz = 0;	
-}
-
-void done_imd(struct disk_image *ctx)
+static void done_imd(struct disk_image *ctx)
 {
 	if (ctx->sectorMap) free(ctx->sectorMap);
 	ctx->sectorMap = NULL;
@@ -119,25 +108,7 @@ void done_imd(struct disk_image *ctx)
     ctx->secsz = 0;
 }
 
-size_t read_sector_raw(struct disk_image *ctx, int lba, uint8_t *data)
-{
-	size_t bytes_read;
-	
-	LOG("\tREAD(raw) lba = %i", lba);
-
-	// convert LBA to byte address
-	lba *= ctx->secsz;
-
-	// Read the sector from the file
-	fseek(ctx->fp, lba, SEEK_SET);
-	
-	// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
-	bytes_read = fread(data, 1, ctx->secsz, ctx->fp);
-	LOG("\tREAD(raw) len=%lu, ssz=%d", bytes_read, ctx->secsz);
-	return bytes_read;	
-}
-
-size_t read_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
+static size_t read_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
 {
 	size_t bytes_read;
 	uint8_t sdrType, fill;
@@ -163,17 +134,7 @@ size_t read_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
 	return bytes_read;
 }
 
-void write_sector_raw(struct disk_image *ctx, int lba, uint8_t *data)
-{
-	// convert LBA to byte address
-	lba *= ctx->secsz;
-	
-	fseek(ctx->fp, lba, SEEK_SET);
-	fwrite(data, 1, ctx->secsz, ctx->fp);
-	fflush(ctx->fp);
-}
-
-void write_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
+static void write_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
 {
 	uint8_t sdrType, fill;
 	
@@ -207,5 +168,12 @@ void write_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
 	}
 }
 
-DISK_IMAGE raw_format = { init_raw, done_raw, read_sector_raw, write_sector_raw, NULL, NULL, 512 };
-DISK_IMAGE imd_format = { init_imd, done_imd, read_sector_imd, write_sector_imd, NULL, NULL, 512 };
+DISK_IMAGE imd_format = {
+	.init = init_imd,
+	.done = done_imd,
+	.read_sector = read_sector_imd,
+	.write_sector = write_sector_imd,
+	.fp = NULL,
+	.secsz = 512,
+	.sectorMap = NULL
+};
