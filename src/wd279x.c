@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include "musashi/m68k.h"
 #include "wd279x.h"
+#include "diskimg.h"
+
+//#define WD279X_DEBUG
 
 #ifndef WD279X_DEBUG
 #define NDEBUG
@@ -59,6 +62,7 @@ void wd2797_init(WD2797_CTX *ctx)
 
 	// No disc image loaded
 	ctx->disc_image = NULL;
+	ctx->dif = NULL;
 	ctx->geom_secsz = ctx->geom_spt = ctx->geom_heads = ctx->geom_tracks = 0;
 }
 
@@ -110,27 +114,32 @@ bool wd2797_get_drq(WD2797_CTX *ctx)
 }
 
 
-WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads, int writeable)
+WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int heads, int tracks, int writeable)
 {
-	size_t filesize;
+	uint8_t buf[4];
 
-	// Start by finding out how big the image file is
-	fseek(fp, 0, SEEK_END);
-	filesize = ftell(fp);
+	// Check if it's an ImageDisk
 	fseek(fp, 0, SEEK_SET);
-
-	// Now figure out how many tracks it contains
-	int tracks = filesize / secsz / spt / heads;
-	// Confirm...
-	if (tracks < 1) {
+	if (!fread(buf, 4, 1, fp)) {
 		return WD2797_ERR_BAD_GEOM;
 	}
+	// Assign disk format accordingly
+    if (!memcmp(buf, "IMD ", 4)) {
+        ctx->dif = &imd_format;
+	} else {
+		ctx->dif = &raw_format;
+	}
+
+	// Init disk format, and get spt (IMD's are 8 or 10, MS-DOS is 9)
+    ctx->geom_spt = ctx->dif->init(ctx->dif, fp, secsz, heads, tracks);
+    if (ctx->geom_spt < 1)
+		return WD2797_ERR_BAD_GEOM;
 
 	// Allocate enough memory to store one disc track
 	if (ctx->data) {
 		free(ctx->data);
 	}
-	ctx->data = malloc(secsz * spt);
+	ctx->data = malloc(secsz * ctx->geom_spt);
 	if (!ctx->data)
 		return WD2797_ERR_NO_MEMORY;
 
@@ -139,8 +148,9 @@ WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads,
 	ctx->geom_tracks = tracks;
 	ctx->geom_secsz = secsz;
 	ctx->geom_heads = heads;
-	ctx->geom_spt = spt;
 	ctx->writeable = writeable;
+
+	printf("Floppy image loaded (%s, %i sectors/track).\n", (ctx->dif == &imd_format) ? "ImageDisk" : "raw", ctx->geom_spt);
 	return WD2797_ERR_OK;
 }
 
@@ -155,6 +165,10 @@ void wd2797_unload(WD2797_CTX *ctx)
 
 	// Clear file pointer
 	ctx->disc_image = NULL;
+
+	// Uninit disk format
+	if (ctx->dif) ctx->dif->done(ctx->dif);
+	ctx->dif = NULL;
 
 	// Clear the disc geometry
 	ctx->geom_tracks = ctx->geom_secsz = ctx->geom_spt = ctx->geom_heads = 0;
@@ -406,14 +420,11 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 						// Calculate the LBA address of the required sector
 						// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
 						lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector) + i) - 1;
-						// convert LBA to byte address
-						lba *= ctx->geom_secsz;
 						LOG("\tREAD lba = %lu", lba);
 
 						// Read the sector from the file
-						fseek(ctx->disc_image, lba, SEEK_SET);
-						// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
-						ctx->data_len += fread(&ctx->data[ctx->data_len], 1, ctx->geom_secsz, ctx->disc_image);
+						ctx->data_len += ctx->dif->read_sector(ctx->dif, lba, &ctx->data[ctx->data_len]);
+						// TODO: check read_sector return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
 						LOG("\tREAD len=%lu, pos=%lu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 					}
 
@@ -457,7 +468,7 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 					ctx->data_len = temp * ctx->geom_secsz;
 
 					lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector)) - 1;
-					ctx->write_pos = lba * ctx->geom_secsz;
+					ctx->write_pos = lba;
 
 					ctx->status = 0;
 					// B6 = Write Protect. This would have been set earlier.
@@ -524,9 +535,8 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				// set IRQ and write data if this is the last data byte
 				if (ctx->data_pos == ctx->data_len) {
 					if (!ctx->formatting){
-						fseek(ctx->disc_image, ctx->write_pos, SEEK_SET);
-						fwrite(ctx->data, 1, ctx->data_len, ctx->disc_image);
-						fflush(ctx->disc_image);
+						if (ctx->data_len != 512) fprintf(stderr, "floppy sector write error: sector write size != 512");
+						ctx->dif->write_sector(ctx->dif, ctx->write_pos, ctx->data);
 					}
 					// Set IRQ and reset write pointer
 					ctx->irq = true;

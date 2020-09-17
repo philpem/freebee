@@ -48,7 +48,6 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
   - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
-    * These will need to be converted from Imagedisk to binary format
     * The disk images on unixpc.org don't work: the boot track is missing.
   - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
     * Rename `14C 72-00616.bin` to `14c.bin`.
@@ -59,9 +58,10 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * Note that you need the Enhanced Diagnostics disk to format 16-head hard drives.
   - Install the operating system
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
+    * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `discim` in the Freebee directory.
     * To change disks:
       * Press F11 to release the disk image.
-      * Copy the next disk image as "discim" in the Freebee directory.
+      * Copy the next disk image as `discim` in the Freebee directory.
       * Press F11 to load the disk image.
   - After installation has finished (when the login prompt appears):
     * Log in as `root`
@@ -70,13 +70,15 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * `sed 's/.phinit .modeminit//' rc.old > rc`
     * `reboot`
     * The above commands disable the phone and modem initialisation, which crash due to un-emulated hardware.
+  - Files can be imported using the `msdos` command which allows reading a 360k MS-DOS floppy image.
+    * Use dosbox to copy files to a DOS disk image (`discim`).
 
 
 # Keyboard commands
 
   * F10 -- Grab/Release mouse cursor
-  * F11 -- Load/unload floppy disk
-  * Alt-F12 -- exit
+  * F11 -- Load/Unload floppy disk image
+  * Alt-F12 -- Exit
 
 
 # Useful links

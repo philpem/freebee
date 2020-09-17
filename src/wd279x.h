@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "diskimg.h"
 
 /// WD279x registers
 typedef enum {
@@ -50,6 +51,8 @@ typedef struct {
 	int						write_pos;
 	// True if a format command is in progress
 	int						formatting;
+	// Disc image format i/o
+	DISK_IMAGE				*dif;
 } WD2797_CTX;
 
 /**
@@ -92,11 +95,11 @@ bool wd2797_get_drq(WD2797_CTX *ctx);
  * @param	ctx		WD2797 context.
  * @param	fp		Disc image file, already opened in "r+b" mode.
  * @param	secsz	Sector size: either 128, 256, 512 or 1024.
- * @param	spt		Sectors per track.
  * @param	heads	Number of heads (1 or 2).
+ * @param	tracks	Number of tracks (40).
  * @return	Error code; WD279X_E_OK if everything worked OK.
  */
-WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int spt, int heads, int writeable);
+WD2797_ERR wd2797_load(WD2797_CTX *ctx, FILE *fp, int secsz, int heads, int tracks, int writeable);
 
 /**
  * @brief	Deassign the current image file.

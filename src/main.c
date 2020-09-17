@@ -34,8 +34,7 @@ static int load_fd()
 		state.fdc_disc = NULL;
 		return (0);
 	}else{
-		wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 10, 2, writeable);
-		fprintf(stderr, "Disc image loaded.\n");
+		wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 2, 40, writeable);
 		return (1);
 	}
 }
@@ -50,7 +49,7 @@ static int load_hd()
 		return (0);
 	}else{
 		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 512, 16, 8);
-		fprintf(stderr, "Disc image loaded.\n");
+		printf("Disc image loaded.\n");
 		return (1);
 	}
 }
@@ -190,7 +189,7 @@ bool HandleSDLEvents(SDL_Surface *screen)
 							wd2797_unload(&state.fdc_ctx);
 							fclose(state.fdc_disc);
 							state.fdc_disc = NULL;
-							fprintf(stderr, "Disc image unloaded.\n");
+							printf("Floppy image unloaded.\n");
 						} else {
 							load_fd();
 						}
@@ -267,7 +266,7 @@ int main(int argc, char *argv[])
 
 	// Set up SDL
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == -1) {
-		printf("Could not initialise SDL: %s.\n", SDL_GetError());
+		fprintf(stderr, "Could not initialise SDL: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 
@@ -277,7 +276,7 @@ int main(int argc, char *argv[])
 	// Set up the video display
 	SDL_Surface *screen = NULL;
 	if ((screen = SDL_SetVideoMode(720, 348, 8, SDL_SWSURFACE | SDL_ANYFORMAT)) == NULL) {
-		printf("Could not find a suitable video mode: %s.\n", SDL_GetError());
+		fprintf(stderr, "Could not find a suitable video mode: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", screen->w, screen->h, screen->format->BitsPerPixel);
@@ -290,7 +289,7 @@ int main(int argc, char *argv[])
 
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
-	 * around 60Hz (???), with a 60Hz periodic interrupt.
+	 * 60.821331Hz, with a 60Hz periodic interrupt.
 	 */
 	const uint32_t SYSTEM_CLOCK = 10e6; // Hz
 	const uint32_t TIMESLOT_FREQUENCY = 100;//240;	// Hz
@@ -332,7 +331,7 @@ int main(int argc, char *argv[])
 							break;
 						}
 					}else{
-						printf("ERROR: DMA attempt with no drive selected!\n");
+						fprintf(stderr, "ERROR: DMA attempt with no drive selected!\n");
 					}
 					if (!access_check_dma(state.dma_reading)) {
 						break;

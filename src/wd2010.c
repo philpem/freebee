@@ -5,7 +5,7 @@
 #include "musashi/m68k.h"
 #include "wd2010.h"
 
-#define WD2010_DEBUG
+//#define WD2010_DEBUG
 
 #ifndef WD2010_DEBUG
 #define NDEBUG
