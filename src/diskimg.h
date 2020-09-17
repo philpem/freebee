@@ -9,11 +9,11 @@
 typedef struct disk_image {	
 	int (*const init)(struct disk_image *ctx, FILE *fp, int secsz, int heads, int tracks);
 	void (*const done)(struct disk_image *ctx);
-	size_t (*const read_sector)(struct disk_image *ctx, int lba, uint8_t *data);
-	void (*const write_sector)(struct disk_image *ctx, int lba, uint8_t *data);
+	size_t (*const read_sector)(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data);
+	void (*const write_sector)(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data);
 
 	FILE *fp;
-	int secsz;
+	int secsz, heads, spt;
 
 	// IMD specific
 	uint32_t *sectorMap;  		// sector offset map

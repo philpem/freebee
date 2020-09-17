@@ -25,7 +25,6 @@ static int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int 
 {
 	uint8_t sdrType, track_sector_map[10], ch;
     IMD_TRACK_HEADER trackHeader;
-    int spt;
     size_t filepos;
     
 	// write out and advance past comments
@@ -47,14 +46,15 @@ static int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int 
 		return -1;
 	}
 	fseek(fp, filepos, SEEK_SET);
-	spt = trackHeader.spt;
+	ctx->spt = trackHeader.spt;
 	
     ctx->fp = fp;
     ctx->secsz = secsz;
+    ctx->heads = heads;
 
 	// allocate sectorMap
 	if (ctx->sectorMap) free(ctx->sectorMap);
-	ctx->sectorMap = malloc(tracks*heads*spt*sizeof(uint32_t));
+	ctx->sectorMap = malloc(tracks*heads*ctx->spt*sizeof(uint32_t));
 	if (!ctx->sectorMap) return -1;
     	
 	// tracks start, build sector offset map, check for unexpected SDRs
@@ -66,25 +66,25 @@ static int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int 
 			return -1;
 		}
 		// data mode 4 and 5 supported, secsz = 128 << secsz_code, head map & cylinder map flags unsupported
-		if (!(trackHeader.data_mode == 5 || trackHeader.data_mode == 4) || trackHeader.spt != spt ||
+		if (!(trackHeader.data_mode == 5 || trackHeader.data_mode == 4) || trackHeader.spt != ctx->spt ||
 			  trackHeader.secsz_code != 2 || (trackHeader.head & ~IMD_HEAD_MASK))
 		{
 			fprintf(stderr, "unexpected IMD track header data, track %i\n", track_i+1);
 			return -1;
 		}
-		if (!fread(track_sector_map, spt, 1, fp))
+		if (!fread(track_sector_map, ctx->spt, 1, fp))
 		{
 			fprintf(stderr, "error reading IMD track sector map\n");
 			return -1;
-		}		
+		}
 		
-		for (int sect_i=0;  sect_i < spt; sect_i++)
+		for (int sect_i=0;  sect_i < ctx->spt; sect_i++)
 		{
-			ctx->sectorMap[(track_i*spt) + track_sector_map[sect_i] - 1] = ftell(fp);
+			ctx->sectorMap[(track_i*ctx->spt) + track_sector_map[sect_i] - 1] = ftell(fp);
 			sdrType = fgetc(fp);
 			switch (sdrType) {
 				case IMD_SDR_DATA:
-					fseek(fp, secsz, SEEK_CUR);	
+					fseek(fp, secsz, SEEK_CUR);
 					break;
 				case (IMD_SDR_DATA + IMD_SDR_COMPRESSED):
 					fgetc(fp);  // fill byte
@@ -96,7 +96,7 @@ static int init_imd(struct disk_image *ctx, FILE *fp, int secsz, int heads, int 
 		}
 	}
     LOG("IMD file size: %li", ftell(fp));
-	return spt;
+	return ctx->spt;
 }
 
 static void done_imd(struct disk_image *ctx)
@@ -106,13 +106,20 @@ static void done_imd(struct disk_image *ctx)
 	
 	ctx->fp = NULL;
     ctx->secsz = 0;
+    ctx->heads = 0;
+    ctx->spt = 0;
 }
 
-static size_t read_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
+static size_t read_sector_imd(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data)
 {
 	size_t bytes_read;
 	uint8_t sdrType, fill;
+	int lba;
 	
+	// Calculate the LBA address of the required sector
+	// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
+	lba = (cyl * ctx->heads * ctx->spt) + (head * ctx->spt) + sect - 1;
+
 	LOG("\tREAD(IMD), lba: %i, sectorMap offset: %i", lba, ctx->sectorMap[lba]);
 	fseek(ctx->fp, ctx->sectorMap[lba], SEEK_SET);
 	sdrType = fgetc(ctx->fp);
@@ -134,10 +141,15 @@ static size_t read_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
 	return bytes_read;
 }
 
-static void write_sector_imd(struct disk_image *ctx, int lba, uint8_t *data)
+static void write_sector_imd(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data)
 {
 	uint8_t sdrType, fill;
+	int lba;
 	
+	// Calculate the LBA address of the required sector
+	// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
+	lba = (cyl * ctx->heads * ctx->spt) + (head * ctx->spt) + sect - 1;
+
 	LOG("IMD write sector, lba: %i, sectorMap offset: %i", lba, ctx->sectorMap[lba]);
 	
 	// IMD writes only supported if sector was uncompressed, or write data is also compressable
@@ -174,6 +186,8 @@ DISK_IMAGE imd_format = {
 	.read_sector = read_sector_imd,
 	.write_sector = write_sector_imd,
 	.fp = NULL,
-	.secsz = 512,
+	.secsz = 0,
+	.heads = 0,
+	.spt = 0,
 	.sectorMap = NULL
 };

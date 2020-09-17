@@ -9,11 +9,11 @@
 
 static int init_raw(struct disk_image *ctx, FILE *fp, int secsz, int heads, int tracks)
 {
-	int spt;
 	size_t filesize;
 	
 	ctx->fp = fp;
 	ctx->secsz = secsz;
+	ctx->heads = heads;
 	
 	// Start by finding out how big the image file is
 	fseek(fp, 0, SEEK_END);
@@ -21,22 +21,28 @@ static int init_raw(struct disk_image *ctx, FILE *fp, int secsz, int heads, int 
 	fseek(fp, 0, SEEK_SET);
 	
 	// Calculate sectors per track
-	spt = filesize / secsz / heads / tracks;
+	ctx->spt = filesize / secsz / heads / tracks;
 	
-	return spt;
+	return ctx->spt;
 }
 
 static void done_raw(struct disk_image *ctx)
 {
 	ctx->fp = NULL;
-    ctx->secsz = 0;	
+    ctx->secsz = 0;
+    ctx->heads = 0;
+    ctx->spt = 0;
 }
 
-static size_t read_sector_raw(struct disk_image *ctx, int lba, uint8_t *data)
+static size_t read_sector_raw(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data)
 {
 	size_t bytes_read;
+	int lba;
 	
-	LOG("\tREAD(raw) lba = %i", lba);
+	// Calculate the LBA address of the required sector
+	// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
+	lba = (cyl * ctx->heads * ctx->spt) + (head * ctx->spt) + sect - 1;
+	LOG("\tREAD(raw) lba = %i (C,H,S = %i, %i, %i)", lba, cyl, head, sect);
 
 	// convert LBA to byte address
 	lba *= ctx->secsz;
@@ -50,8 +56,15 @@ static size_t read_sector_raw(struct disk_image *ctx, int lba, uint8_t *data)
 	return bytes_read;	
 }
 
-static void write_sector_raw(struct disk_image *ctx, int lba, uint8_t *data)
+static void write_sector_raw(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data)
 {
+	int lba;
+
+	// Calculate the LBA address of the required sector
+	// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
+	lba = (cyl * ctx->heads * ctx->spt) + (head * ctx->spt) + sect - 1;
+	LOG("\tWRITE(raw) lba = %i (C,H,S = %i, %i, %i)", lba, cyl, head, sect);
+
 	// convert LBA to byte address
 	lba *= ctx->secsz;
 	
@@ -66,6 +79,8 @@ DISK_IMAGE raw_format = {
 	.read_sector = read_sector_raw,
 	.write_sector = write_sector_raw,
 	.fp = NULL,
-	.secsz = 512,
+	.secsz = 0,
+	.heads = 0,
+	.spt = 0,
 	.sectorMap = NULL
 };

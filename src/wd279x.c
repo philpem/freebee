@@ -417,13 +417,10 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 						temp = 1;
 
 					for (int i=0; i<temp; i++) {
-						// Calculate the LBA address of the required sector
-						// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
-						lba = (((ctx->track * ctx->geom_heads * ctx->geom_spt) + (ctx->head * ctx->geom_spt) + ctx->sector) + i) - 1;
-						LOG("\tREAD lba = %lu", lba);
+						LOG("\tREAD C,H,S = %i,%i,%i", ctx->track, ctx->head, ctx->sector+i);
 
 						// Read the sector from the file
-						ctx->data_len += ctx->dif->read_sector(ctx->dif, lba, &ctx->data[ctx->data_len]);
+						ctx->data_len += ctx->dif->read_sector(ctx->dif, ctx->track, ctx->head, ctx->sector+i, &ctx->data[ctx->data_len]);
 						// TODO: check read_sector return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
 						LOG("\tREAD len=%lu, pos=%lu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 					}
@@ -536,7 +533,11 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 				if (ctx->data_pos == ctx->data_len) {
 					if (!ctx->formatting){
 						if (ctx->data_len != 512) fprintf(stderr, "floppy sector write error: sector write size != 512");
-						ctx->dif->write_sector(ctx->dif, ctx->write_pos, ctx->data);
+						// Convert LBA back to CHS
+						int write_cyl = ctx->write_pos / (ctx->geom_heads * ctx->geom_spt);
+						int write_head = (ctx->write_pos / ctx->geom_spt) % ctx->geom_heads;
+						int write_sector = (ctx->write_pos % ctx->geom_spt) + 1;
+						ctx->dif->write_sector(ctx->dif, write_cyl, write_head, write_sector, ctx->data);
 					}
 					// Set IRQ and reset write pointer
 					ctx->irq = true;
