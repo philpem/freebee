@@ -320,7 +320,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 				case CMD_RESTORE:
 					// Restore. Set track to 0 and throw an IRQ.
 					ctx->track = 0;
-					SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)seek_complete, ctx);
+					SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_TimerCallback)seek_complete, ctx);
 					break;
 				case CMD_SCAN_ID:
 					ctx->cylinder_high_reg = (ctx->track >> 8) & CYLH_MASK;
@@ -351,7 +351,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 					ctx->formatting = cmd == CMD_WRITE_FORMAT;
 					switch (cmd){
 						case CMD_SEEK:
-							SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)seek_complete, ctx);
+							SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_TimerCallback)seek_complete, ctx);
 							break;
 						case CMD_READ_SECTOR:
 							/*XXX: does a separate function to set the head have to be added?*/
@@ -401,7 +401,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 							ctx->status = 0;
 							ctx->status |= (ctx->data_pos < ctx->data_len) ? SR_DRQ | SR_COMMAND_IN_PROGRESS | SR_BUSY : 0x00;
-							/*SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)transfer_seek_complete, ctx);*/
+							/*SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_TimerCallback)transfer_seek_complete, ctx);*/
 							ctx->drq = true;
 
 							break;
@@ -444,7 +444,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 							ctx->status = 0;
 							ctx->status |= (ctx->data_pos < ctx->data_len) ? SR_DRQ | SR_COMMAND_IN_PROGRESS | SR_BUSY : 0x00;
-							/*SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_NewTimerCallback)transfer_seek_complete, ctx);*/
+							/*SDL_AddTimer(WD2010_SEEK_DELAY, (SDL_TimerCallback)transfer_seek_complete, ctx);*/
 							ctx->drq = true;
 
 							break;

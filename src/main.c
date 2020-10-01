@@ -105,8 +105,10 @@ void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
 /**
  * @brief	Refresh the screen.
  * @param	surface		SDL surface upon which to draw.
+ * @param	renderer	SDL renderer.
+ * @param	texture		SDL texture to copy surface to.
  */
-void refreshScreen(SDL_Surface *s)
+void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 {
 	// Lock the screen surface (if necessary)
 	if (SDL_MUSTLOCK(s)) {
@@ -148,14 +150,16 @@ void refreshScreen(SDL_Surface *s)
 	}
 
 	// Trigger a refresh -- TODO: partial refresh depending on whether we
-	// refreshed the screen area, status area, both, or none. Use SDL_UpdateRect() for this.
-	SDL_Flip(s);
+	// refreshed the screen area, status area, both, or none.
+	SDL_UpdateTexture(t, NULL, s->pixels, s->pitch);
+	SDL_RenderCopy(r, t, NULL, NULL);
+	SDL_RenderPresent(r);
 }
 
 /**
  * @brief	Handle events posted by SDL.
  */
-bool HandleSDLEvents(SDL_Surface *screen)
+bool HandleSDLEvents(SDL_Window *window)
 {
 	SDL_Event event;
 	static int mouse_grabbed = 0, mouse_buttons = 0;
@@ -175,12 +179,10 @@ bool HandleSDLEvents(SDL_Surface *screen)
 				switch (event.key.keysym.sym) {
 					case SDLK_F10:
 						if (mouse_grabbed){
-							SDL_ShowCursor(1);
-							SDL_WM_GrabInput(SDL_GRAB_OFF);
+							SDL_SetRelativeMouseMode(SDL_FALSE);
 							mouse_grabbed = 0;
 						}else{
-							SDL_ShowCursor(0);
-							SDL_WM_GrabInput(SDL_GRAB_ON);
+							SDL_SetRelativeMouseMode(SDL_TRUE);
 							mouse_grabbed = 1;
 						}
 						break;
@@ -274,13 +276,35 @@ int main(int argc, char *argv[])
 	atexit(SDL_Quit);
 
 	// Set up the video display
-	SDL_Surface *screen = NULL;
-	if ((screen = SDL_SetVideoMode(720, 348, 8, SDL_SWSURFACE | SDL_ANYFORMAT)) == NULL) {
+	SDL_Window *window;
+	if ((window = SDL_CreateWindow("FreeBee 3B1 Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+									720, 348, 0)) == NULL) {
 		fprintf(stderr, "Could not find a suitable video mode: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+	if (!renderer){
+		fprintf(stderr, "Error creating SDL renderer: %s.\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+	SDL_Texture *texture = SDL_CreateTexture(renderer,
+                               SDL_PIXELFORMAT_RGB888,
+                               SDL_TEXTUREACCESS_STREAMING,
+                               720, 348);
+	if (!texture){
+		fprintf(stderr, "Error creating SDL texture: %s.\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+    SDL_Surface *screen = SDL_CreateRGBSurface(0, 720, 348, 32,
+                                        0x00FF0000,
+                                        0x0000FF00,
+                                        0x000000FF,
+                                        0);
+	if (!screen){
+		fprintf(stderr, "Error creating SDL surface: %s.\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", screen->w, screen->h, screen->format->BitsPerPixel);
-	SDL_WM_SetCaption("FreeBee 3B1 emulator", "FreeBee");
 
 	// Load a disc image
 	load_fd();
@@ -419,7 +443,7 @@ int main(int argc, char *argv[])
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
 			// Refresh the screen
-			refreshScreen(screen);
+			refreshScreen(screen, renderer, texture);
 			if (state.timer_enabled){
 				m68k_set_irq(6);
 				state.timer_asserted = true;
@@ -431,7 +455,7 @@ int main(int argc, char *argv[])
 		}
 
 		// handle SDL events -- returns true if we need to exit
-		if (HandleSDLEvents(screen))
+		if (HandleSDLEvents(window))
 			exitEmu = true;
 
 		// make sure frame rate is equal to real time
@@ -458,6 +482,12 @@ int main(int argc, char *argv[])
 	if (state.fdc_disc != NULL) {
 		fclose(state.fdc_disc);
 	}
+
+	// Clean up SDL
+	SDL_FreeSurface(screen);
+	SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
 
 	return 0;
 }

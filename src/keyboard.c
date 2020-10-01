@@ -10,24 +10,24 @@
  * Key map -- a mapping from SDLK_xxx constants to scancodes and vice versa.
  */
 struct {
-	SDLKey			key;			///< SDLK_xxx key code constant
+	SDL_Keycode		key;			///< SDLK_xxx key code constant
 	int				extended;		///< 1 if this is an extended keycode
 	unsigned char	scancode;		///< Keyboard scan code
 } keymap[] = {
 	{ SDLK_UP,				0,	0x01 },	// ROLL/Up		[UpArrow]
-	{ SDLK_KP2,				0,	0x01 },	// ROLL/Up		[Keypad 2]
+	{ SDLK_KP_2,			0,	0x01 },	// ROLL/Up		[Keypad 2]
 //	{ SDLK_,				1,	0x02 },	// Clear Line
 //	{ SDLK_,				1,	0x03 },	// Rstrt / Ref
 	{ SDLK_ESCAPE,				1,	0x04 },	// Exit
-	{ SDLK_KP1,				0,	0x05 },	// PREV			[Keypad 1]
+	{ SDLK_KP_1,			0,	0x05 },	// PREV			[Keypad 1]
 //	{ SDLK_,				1,	0x06 },	// Msg
 	{ SDLK_BACKSPACE,		1,	0x07 },	// Cancl
 	{ SDLK_BACKSPACE,		0,	0x08 },	// Backspace
 	{ SDLK_TAB,				0,	0x09 },	// Tab
 	{ SDLK_RETURN,			1,	0x0a },	// ENTER
 	{ SDLK_DOWN,			0,	0x0b },	// ROLL/Down	[DownArrow]
-	{ SDLK_KP0,				0,	0x0b },	// ROLL/Down	[Keypad 0]
-	{ SDLK_KP3,				0,	0x0c },	// NEXT			[Keypad 3]
+	{ SDLK_KP_0,			0,	0x0b },	// ROLL/Down	[Keypad 0]
+	{ SDLK_KP_3,			0,	0x0c },	// NEXT			[Keypad 3]
 	{ SDLK_RETURN,			0,	0x0d },	// RETURN		[Return]
 	{ SDLK_LEFT,			0,	0x0e },	// <--			[LeftArrow]
 	{ SDLK_KP_MINUS,		0,	0x0e },	// <--			[Keypad -]
@@ -54,7 +54,7 @@ struct {
 //	{ SDLK_,				1,	0x22 },	// Redo
 //	{ SDLK_,				1,	0x23 },	// FIND
 //	{ SDLK_,				1,	0x24 },	// RPLAC
-	{ SDLK_BREAK,			0,	0x25 },	// RESET/BREAK	[Pause/Break]
+	{ SDLK_PAUSE,			0,	0x25 },	// RESET/BREAK	[Pause/Break]
 //	{ SDLK_,				1,	0x26 },	// DleteChar
 	{ SDLK_QUOTE,			0,	0x27 },	// ' (single-quote)
 //	{ SDLK_,				1,	0x28 },	// SLCT/MARK
@@ -82,17 +82,17 @@ struct {
 // Keycodes 3E, 3F, 40 not used
 //	{ SDLK_,				1,	0x41 },	// CMD
 //	{ SDLK_,				1,	0x42 },	// CLOSE/OPEN
-	{ SDLK_KP7,				0,	0x43 },	// PRINT
-	{ SDLK_KP8,				0,	0x44 },	// CLEAR/RFRSH
+	{ SDLK_KP_7,			0,	0x43 },	// PRINT
+	{ SDLK_KP_8,			0,	0x44 },	// CLEAR/RFRSH
 	{ SDLK_CAPSLOCK,		0,	0x45 },	// Caps Lock
-	{ SDLK_KP9,				0,	0x46 },	// PAGE
-	{ SDLK_KP4,				0,	0x47 },	// BEG
+	{ SDLK_KP_9,			0,	0x46 },	// PAGE
+	{ SDLK_KP_4,			0,	0x47 },	// BEG
 	{ SDLK_LSHIFT,			0,	0x48 },	// Left Shift
 	{ SDLK_RSHIFT,			0,	0x49 },	// Right Shift
 	{ SDLK_HOME,			0,	0x4a },	// Home
-	{ SDLK_KP5,				0,	0x4a },	// Home			[Keypad 5]
+	{ SDLK_KP_5,			0,	0x4a },	// Home			[Keypad 5]
 	{ SDLK_END,				0,	0x4b },	// End
-	{ SDLK_KP6,				0,	0x4b },	// End			[Keypad 6]
+	{ SDLK_KP_6,			0,	0x4b },	// End			[Keypad 6]
 	{ SDLK_LCTRL,			0,	0x4c },	// Left Ctrl?	\___ not sure which is left and which is right...
 	{ SDLK_RCTRL,			0,	0x4d },	// Right Ctrl?	/
 // Keycodes 4E thru 5A not used
@@ -128,7 +128,7 @@ struct {
 	{ SDLK_y,				0,	0x79 },	// Y
 	{ SDLK_z,				0,	0x7a },	// Z
 // Keycodes 7B, 7C, 7D not used
-	{ SDLK_NUMLOCK,			0,	0x7e },	// Numlock
+	{ SDLK_NUMLOCKCLEAR,	0,	0x7e },	// Numlock
 	{ SDLK_DELETE,			0,	0x7f }	// Dlete
 };
 
