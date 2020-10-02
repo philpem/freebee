@@ -104,6 +104,9 @@ typedef struct {
 
 	/// VIDPAL mod (allows user writing to VRAM)
 	bool vidpal;
+
+	/// Update screen only when VRAM has been changed
+	bool vram_updated;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't

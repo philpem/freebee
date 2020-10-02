@@ -295,11 +295,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL texture: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-    SDL_Surface *screen = SDL_CreateRGBSurface(0, 720, 348, 32,
-                                        0x00FF0000,
-                                        0x0000FF00,
-                                        0x000000FF,
-                                        0);
+    SDL_Surface *screen = SDL_CreateRGBSurface(0, 720, 348, 32, 0, 0, 0, 0);
 	if (!screen){
 		fprintf(stderr, "Error creating SDL surface: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
@@ -442,8 +438,11 @@ int main(int argc, char *argv[])
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
-			// Refresh the screen
-			refreshScreen(screen, renderer, texture);
+			// Refresh the screen if VRAM has been changed
+			if (state.vram_updated){
+				refreshScreen(screen, renderer, texture);
+				state.vram_updated = false;
+			}
 			if (state.timer_enabled){
 				m68k_set_irq(6);
 				state.timer_asserted = true;
