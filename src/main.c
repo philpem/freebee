@@ -11,6 +11,8 @@
 #include "state.h"
 #include "memory.h"
 
+#include "lightbar.c"
+
 extern int cpu_log_enabled;
 
 void FAIL(char *err)
@@ -142,18 +144,35 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 		}
 	}
 
-	// TODO: blit LEDs and status info
-
 	// Unlock the screen surface
 	if (SDL_MUSTLOCK(s)) {
 		SDL_UnlockSurface(s);
 	}
 
-	// Trigger a refresh -- TODO: partial refresh depending on whether we
-	// refreshed the screen area, status area, both, or none.
+	// Update framebuffer texture
 	SDL_UpdateTexture(t, NULL, s->pixels, s->pitch);
 	SDL_RenderCopy(r, t, NULL, NULL);
-	SDL_RenderPresent(r);
+}
+
+#define LED_SIZE 8
+
+void refreshStatusBar(SDL_Renderer *r, SDL_Texture *lightbar_tex)
+{
+	SDL_Rect red_led = 		{ 0, 				0, LED_SIZE, LED_SIZE };
+	SDL_Rect green_led = 	{ LED_SIZE, 		0, LED_SIZE, LED_SIZE };
+	SDL_Rect yellow_led = 	{ LED_SIZE*2, 		0, LED_SIZE, LED_SIZE };
+	SDL_Rect inactive_led = { LED_SIZE*3, 		0, LED_SIZE, LED_SIZE };
+	SDL_Rect dstrect = 		{ 720-LED_SIZE*4, 348-LED_SIZE, LED_SIZE, LED_SIZE };
+
+	// LED bit values are inverse of documentation (leftmost LED is LSB)
+	// Red user LED (leftmost LED) can be turned on using "syslocal(SYSL_LED, 1)" from sys/syslocal.h
+	SDL_RenderCopy(r, lightbar_tex, (state.leds & 1) ? &red_led : &inactive_led, &dstrect);
+	dstrect.x += LED_SIZE;
+	SDL_RenderCopy(r, lightbar_tex, (state.leds & 2) ? &green_led : &inactive_led, &dstrect);
+	dstrect.x += LED_SIZE;
+	SDL_RenderCopy(r, lightbar_tex, (state.leds & 4) ? &yellow_led : &inactive_led, &dstrect);
+	dstrect.x += LED_SIZE;
+	SDL_RenderCopy(r, lightbar_tex, (state.leds & 8) ? &red_led : &inactive_led, &dstrect);
 }
 
 /**
@@ -279,7 +298,7 @@ int main(int argc, char *argv[])
 	SDL_Window *window;
 	if ((window = SDL_CreateWindow("FreeBee 3B1 Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 									720, 348, 0)) == NULL) {
-		fprintf(stderr, "Could not find a suitable video mode: %s.\n", SDL_GetError());
+		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
@@ -287,19 +306,31 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL renderer: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-	SDL_Texture *texture = SDL_CreateTexture(renderer,
+	SDL_Texture *fbTexture = SDL_CreateTexture(renderer,
                                SDL_PIXELFORMAT_RGB888,
                                SDL_TEXTUREACCESS_STREAMING,
                                720, 348);
-	if (!texture){
-		fprintf(stderr, "Error creating SDL texture: %s.\n", SDL_GetError());
+	if (!fbTexture){
+		fprintf(stderr, "Error creating SDL FB texture: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
     SDL_Surface *screen = SDL_CreateRGBSurface(0, 720, 348, 32, 0, 0, 0, 0);
 	if (!screen){
-		fprintf(stderr, "Error creating SDL surface: %s.\n", SDL_GetError());
+		fprintf(stderr, "Error creating SDL FB surface: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+	// Load in status LED sprites
+    SDL_Surface *surf = SDL_CreateRGBSurfaceFrom((void*)lightbar.pixel_data, lightbar.width, lightbar.height,
+														lightbar.bytes_per_pixel*8, lightbar.bytes_per_pixel*lightbar.width,
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+														0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF
+#else
+														0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000
+#endif
+	);
+	SDL_Texture *lightbarTexture = SDL_CreateTextureFromSurface(renderer, surf);
+	SDL_FreeSurface(surf);
+
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", screen->w, screen->h, screen->format->BitsPerPixel);
 
 	// Load a disc image
@@ -319,6 +350,7 @@ int main(int argc, char *argv[])
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, tmp;
 	bool exitEmu = false;
+	uint8_t last_leds = 255;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
@@ -440,9 +472,15 @@ int main(int argc, char *argv[])
 		if (clock_cycles > CLOCKS_PER_60HZ) {
 			// Refresh the screen if VRAM has been changed
 			if (state.vram_updated){
-				refreshScreen(screen, renderer, texture);
-				state.vram_updated = false;
+				refreshScreen(screen, renderer, fbTexture);
 			}
+			if (state.vram_updated || last_leds != state.leds){
+				refreshStatusBar(renderer, lightbarTexture);
+				last_leds = state.leds;
+			}
+			state.vram_updated = false;
+			SDL_RenderPresent(renderer);
+
 			if (state.timer_enabled){
 				m68k_set_irq(6);
 				state.timer_asserted = true;
@@ -483,8 +521,9 @@ int main(int argc, char *argv[])
 	}
 
 	// Clean up SDL
+	SDL_DestroyTexture(lightbarTexture);
 	SDL_FreeSurface(screen);
-	SDL_DestroyTexture(texture);
+	SDL_DestroyTexture(fbTexture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
 
