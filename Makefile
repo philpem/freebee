@@ -260,8 +260,8 @@ endif
 # SDL support
 ####
 ifeq ($(ENABLE_SDL),yes)
-	LIBLNK		+=	$(shell sdl-config --libs)
-	CFLAGS		+=	$(shell sdl-config --cflags)
+	LIBLNK		+=	$(shell sdl2-config --libs)
+	CFLAGS		+=	$(shell sdl2-config --cflags)
 endif
 
 

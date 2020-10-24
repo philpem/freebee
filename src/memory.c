@@ -1004,6 +1004,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR32 to VideoRAM mirror, addr=0x%08X\n", address);
 				WR32(state.vram, address, 0x7FFF, value);
+				state.vram_updated = true;
 				break;
 			default:
 				IoWrite(address, value, 32);
@@ -1052,6 +1053,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR16 to VideoRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
 				WR16(state.vram, address, 0x7FFF, value);
+				state.vram_updated = true;
 				break;
 			default:
 				IoWrite(address, value, 16);
@@ -1099,6 +1101,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 			case 0x020000:				// Video RAM
 				if (address > 0x427FFF) fprintf(stderr, "NOTE: WR8 to VideoRAM mirror, addr=0x%08X, data=0x%04X\n", address, value);
 				WR8(state.vram, address, 0x7FFF, value);
+				state.vram_updated = true;
 				break;
 			default:
 				IoWrite(address, value, 8);
