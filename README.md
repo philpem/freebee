@@ -39,8 +39,9 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 # Build instructions
 
-  - Install the `libsdl1.2-dev` package
+  - Install the `libsdl2-dev` package
   - Clone a copy of Freebee (remember to check out the submodules too)
+    - `git clone --recurse-submodules https://github.com/philpem/freebee`
   - Build Freebee (run 'make')
 
 
