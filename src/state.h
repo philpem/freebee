@@ -107,6 +107,9 @@ typedef struct {
 
 	/// Update screen only when VRAM has been changed
 	bool vram_updated;
+
+	/// MCR2 mirror bit for P5.1 hardware detection
+	bool mcr2mirror;
 } S_state;
 
 // Global emulator state. Yes, I know global variables are evil, please don't
