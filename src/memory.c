@@ -91,7 +91,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// Check page is present (but only for RAM zone)
 	if ((addr < 0x400000) && ((pagebits & 0x03) == 0)) {
-		LOG("Page not mapped in: addr %08X, page %04X, mapbits %04X", addr, page, MAPRAM(page));
+		LOG("Page fault: addr 0x%06X, page %04X, mapbits %04X", addr, page, MAPRAM(page));
 		return MEM_PAGEFAULT;
 	}
 
@@ -121,7 +121,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// Check page is write enabled
 	if (writing && ((pagebits & 0x04) == 0)) {
-		LOG("Page not write enabled: inaddr %08X, page %04X, mapram %04X [%02X %02X], pagebits %d",
+		LOG("Page not write enabled: inaddr 0x%06X, page %04X, mapram %04X [%02X %02X], pagebits %d",
 				addr, page, MAPRAM(page), state.map[page*2], state.map[(page*2)+1], pagebits);
 		return MEM_PAGE_NO_WE;
 	}
@@ -346,20 +346,12 @@ inline static void ENFORCE_SIZE_W(int bits, uint32_t address, int allowed, char 
 void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 {
 	bool handled = false;
+	static uint16_t dialerReg = 0;
 
 	if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
 			case 0x010000:				// General Status Register (RD)
-				if (bits == 16)
-					state.genstat = (data & 0xffff);
-				else if (bits == 8) {
-					if (address & 0)
-						state.genstat = data;
-					else
-						state.genstat = data << 8;
-				}
-				handled = true;
 				break;
 			case 0x030000:				// Bus Status Register 0 (RD)
 				break;
@@ -404,33 +396,45 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
+						LOG("TCR (%06X) Handset relay set: %s", address, (data & 0x4000) ? "on" : "off");
 						break;
-					case 0x091000:		// Line select 2
+					case 0x091000:		// Line select 2*
 					case 0x099000:
+						LOG("TCR (%06X) Line selected: %s", address, (data & 0x4000) ? "Line 1" : "Line 2");
 						break;
-					case 0x092000:		// Hook relay 1
+					case 0x092000:		// Hook relay 1*
 					case 0x09A000:
+						LOG("TCR (%06X) Hook relay 1 set: %s", address, (data & 0x4000) ? "off" : "on");
 						break;
-					case 0x093000:		// Hook relay 2
+					case 0x093000:		// Hook relay 2*
 					case 0x09B000:
+						LOG("TCR (%06X) Hook relay 2 set: %s", address, (data & 0x4000) ? "off" : "on");
 						break;
 					case 0x094000:		// Line 1 hold
 					case 0x09C000:
+						LOG("TCR (%06X) Line 1 hold set: %s", address, (data & 0x4000) ? "on" : "off");
 						break;
 					case 0x095000:		// Line 2 hold
 					case 0x09D000:
+						LOG("TCR (%06X) Line 2 hold set: %s", address, (data & 0x4000) ? "on" : "off");
 						break;
-					case 0x096000:		// Line 1 A-lead
+					case 0x096000:		// Line 1 A-lead*
 					case 0x09E000:
+						LOG("TCR (%06X) Line 1 A-lead set: %s", address, (data & 0x4000) ? "off" : "on");
 						break;
-					case 0x097000:		// Line 2 A-lead
+					case 0x097000:		// Line 2 A-lead*
 					case 0x09F000:
+						LOG("TCR (%06X) Line 2 A-lead set: %s", address, (data & 0x4000) ? "off" : "on");
+						break;
+					default:
+						LOG("TCR (%06X) write, data: %i)", address, ((data & 0x4000) >> 14));
 						break;
 				}
+				handled = true;
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register (WR) high byte
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
-				// TODO: handle the ctrl bits properly
+				// TODO: handle the ctrl bits properly (bit 13: LP strobe, bit 12: modem clock select (0 = modem clock, 1 = fixed 19.2k))
 				if (data & 0x8000){
 					state.timer_enabled = 1;
 				}else{
@@ -451,11 +455,36 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				handled = true;
 				break;
 			case 0x0B0000:				// TM/DIALWR
+				switch (address & 0x000C00) {
+					case 0x000:
+						// iohw.h: "baud generator for chan A (rs232): lower 3 nibble of the address is the counter value"
+						// baud output TMOUT = [1/(4 x N)] x 1.2288 MHz
+						handled = true;
+						uint8_t baudgenN = address & 0xff; // latch uses A1-A8 address lines
+						// for some reason you have to multiply by another 8 to get the proper baud...
+						LOG("baud gen (%06X) set to %i", address, baudgenN ? 1228800/(4*baudgenN*8) : 0);
+						break;
+					case 0x400:
+						// DIALER TXD lower byte shift reg load
+						dialerReg &= 0xff00;
+						dialerReg |= address & 0xff;
+						LOG("dialer reg low byte (%06X) now: %i", address, dialerReg);
+						handled = true;
+						break;
+					case 0x800:
+						// DIALER TXD upper byte shift reg load
+						// and starts shifting data out of DIALER TXD at 4800 baud
+						dialerReg &= 0xff;
+						dialerReg |= (address & 0xff) << 8;
+						LOG("dialer reg high byte (%06X) now: %i", address, dialerReg);
+						handled = true;
+						break;
+					default:
+						break;
+					}
 				break;
 			case 0x0C0000:				// Clear Status Register
-				state.genstat = 0xFFFF;
-				state.bsr0 = 0xFFFF;
-				state.bsr1 = 0xFFFF;
+				// CSR is used to clear PERR* (main memory parity error), which is currently always returned as 'no parity error'
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -565,28 +594,59 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 							case 0x043000:		// [ef][4c][3B]xxx ==> ROMLMAP
 								ENFORCE_SIZE_W(bits, address, 16, "ROMLMAP");
 								state.romlmap = ((data & 0x8000) == 0x8000);
+								LOG("ROMLMAP (%06X): %i", address, state.romlmap);
 								handled = true;
 								break;
-							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM
+							case 0x044000:		// [ef][4c][4C]xxx ==> L1 MODEM*
 								ENFORCE_SIZE_W(bits, address, 16, "L1 MODEM");
-								// modem connected to L1 = ((data & 0x8000) == 0)
+								LOG("L1 MODEM (%06X): Line 1 %s to modem", address, (data & 0x8000) ? "disconnected" : "connected");
+								handled = true;
 								break;
-							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM
+							case 0x045000:		// [ef][4c][5D]xxx ==> L2 MODEM*
 								ENFORCE_SIZE_W(bits, address, 16, "L2 MODEM");
-								// modem connected to L2 = ((data & 0x8000) == 0)
+								LOG("L2 MODEM (%06X): Line 2 %s to modem", address, (data & 0x8000) ? "disconnected" : "connected");
+								handled = true;
 								break;
-							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT* (L1 connected to 838A dial/network*)
 								ENFORCE_SIZE_W(bits, address, 16, "D/N CONNECT");
+								LOG("Dialer connected to (%06X): %s", address, (data & 0x8000) ? "Line 2" : "Line 1");
+								handled = true;
 								break;
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
 								ENFORCE_SIZE_W(bits, address, 16, "WHOLE SCREEN REVERSE VIDEO");
 								break;
 						}
+						break;
 					case 0x050000:		// [ef][5d]xxxx ==> 8274
 						break;
-					case 0x060000:		// [ef][6e]xxxx ==> Control regs
-						switch (address & 0x07F000) {
+					case 0x060000:		// [ef][6e]xxxx ==> Modem (882A) regs
+						ENFORCE_SIZE_W(bits, address, 16, "MODEM REGS");
+						handled = true;
+						switch (address) {
+							case 0xE60000:
+								LOG("Modem WR0 - Line control (%06X) write: %04X = talk mode: %i, offhook: %i, data mode: %i, DTR: %i, power reset: %i",
+									address, data, ((data & 0x40)==0x40), ((data & 0x20)==0x20), ((data & 0x10)==0x10), ((data & 0x04)==0x04), ((data & 0x01)==0x01));
+								break;
+							case 0xE61000:
+								LOG("Modem WR1 - Loopback test (%06X) write: %04X = 1200 baud: %i, ext clock: %i, voice: %i", address, data, ((data & 0x10)==0x10), ((data & 0x40)==0x40), ((data & 0x20)==0x20));
+								break;
+							case 0xE64000:
+								LOG("Modem WR4 - Async/Sync & handshake options (%06X) write: %04X", address, data);
+								break;
+							case 0xE65000:
+								LOG("Modem WR5 - CCITT & disconnect options (%06X) write: %04X", address, data);
+								break;
+							case 0xE66000:
+								LOG("Modem WR6 - Rx/Tx control & chip test (%06X) write: %04X", address, data);
+								break;
+							case 0xE68000:
+								LOG("Modem WR8 - Transceiver control 1 (%06X) write: %04X", address, data);
+								break;
+							case 0xE69000:
+								LOG("Modem WR9 - Transceiver control 2 (%06X) write: %04X", address, data);
+								break;
 							default:
+								handled = false;
 								break;
 						}
 						break;
@@ -657,7 +717,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				return (state.dma_count & 0x3fff) | 0xC000;
 				break;
 			case 0x070000:				// Line Printer Status Register (RD)
-				data = 0x00120012;	// no parity error, no line printer error, no irqs from FDD or HDD
+				data = 0x00130013;	// no line printer error, no irqs from FDD or HDD, no parity error, no dial tone
 				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
 				data |= wd2010_get_irq(&state.hdc_ctx) ? 0x00040004 : 0;
 				return data;
@@ -665,41 +725,13 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 			case 0x080000:				// Real Time Clock
 				printf("READ NOTIMP: Realtime Clock\n");
 				break;
-			case 0x090000:				// Telephony Control Register
-				switch (address & 0x0FF000) {
-					case 0x090000:		// Handset relay
-					case 0x098000:
-						break;
-					case 0x091000:		// Line select 2
-					case 0x099000:
-						break;
-					case 0x092000:		// Hook relay 1
-					case 0x09A000:
-						break;
-					case 0x093000:		// Hook relay 2
-					case 0x09B000:
-						break;
-					case 0x094000:		// Line 1 hold
-					case 0x09C000:
-						break;
-					case 0x095000:		// Line 2 hold
-					case 0x09D000:
-						break;
-					case 0x096000:		// Line 1 A-lead
-					case 0x09E000:
-						break;
-					case 0x097000:		// Line 2 A-lead
-					case 0x09F000:
-						break;
-				}
+			case 0x090000:				// Telephony Control Register -- write only!
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register -- write only!
-				handled = true;
 				break;
-			case 0x0B0000:				// TM/DIALWR
+			case 0x0B0000:				// TM/DIALWR -- write only!
 				break;
 			case 0x0C0000:				// Clear Status Register -- write only!
-				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;
@@ -758,14 +790,44 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 								break;
 						}
 						break;
-					case 0x050000:		// [ef][5d]xxxx ==> 8274
-						break;
-					case 0x060000:		// [ef][6e]xxxx ==> Control regs (7201 transceiver, modem)
-						switch (address & 0x00F000) {
-							case 0x002000:
-								return (0);
+					case 0x050000:		// [ef][5d]xxxx ==> 8274 regs
+						handled = true;
+						switch (address) {
+							case 0xE50000:
+								LOG("8274 (%06X) rs232 data RD%i", address, bits);
+								break;
+							case 0xE50002:
+								LOG("8274 (%06X) modem data RD%i", address, bits);
+								break;
+							case 0xE50004: //RR0?
+								LOG("8274 (%06X) rs232 status RD%i", address, bits);
+								break;
+							case 0xE50006: //RR0?
+								LOG("8274 (%06X) modem status RD%i", address, bits);
 								break;
 							default:
+								handled = false;
+								break;
+							}
+						break;
+					case 0x060000:		// [ef][6e]xxxx ==> Modem (882A) regs
+						switch (address) {
+							case 0xE62000:  // modem.h: Modem status to terminal interface
+								// 0x80: failed self test, 0x40: test mode, 0x20: data mode (incoming call answered), 0x10: DSR on
+								// 0x04: 1200 baud, 0x02: data valid (set after modem handshake), 0x01: CTS on
+								data = 0x0404; // 1200 baud
+								data |= 0x1010; // DSR ON
+								data |= 0x0101; // CTS ON
+								LOG("Modem RR2 (%06X) - Modem status RD%i returning: 1200 baud, DSR: on, CTS: on", address, bits);
+								return data;
+								break;
+							case 0xE63000: // modem.h: Modem status to lamps and relays
+								LOG("Modem RR3 (%06X) - Modem status to lamps & relays RD%i returning: 0", address, bits);
+								return (0);
+								break;
+							case 0xE6A000: // modem.h: Transceiver status
+								LOG("Modem RR10 (%06X) - Transceiver status RD%i returning: 0", address, bits);
+								return (0);
 								break;
 						}
 						break;
