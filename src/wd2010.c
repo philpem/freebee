@@ -74,7 +74,11 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 	// Now figure out how many tracks it contains
 	unsigned int tracks = filesize / secsz / spt / heads;
 	// Confirm...
-	if (tracks < 1) {
+	if (tracks < 1 || tracks > 1400) {
+		fprintf(stderr, "ERROR loading disc image 'hd.img'.\n");
+		if (tracks > 1400) {
+			fprintf(stderr, "ERROR hard disk cylinders > 1400 unsupported by UNIX.\n");
+		}
 		return WD2010_ERR_BAD_GEOM;
 	}
 
