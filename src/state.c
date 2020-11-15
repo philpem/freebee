@@ -26,6 +26,7 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.bsr0 = state.bsr1 = 0;	// FIXME: check this
 	state.timer_enabled = state.timer_asserted = false;
 	state.dma_dev = DMA_DEV_UNDEF;
+	state.mcr2mirror = 0;
 	
 	// Enable VIDPAL mod (allows user writing to VRAM)
 	state.vidpal = true;

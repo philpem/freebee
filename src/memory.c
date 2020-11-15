@@ -539,6 +539,8 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						handled = true;
 						break;
 					case 0x020000:		// [ef][2a]xxxx ==> Miscellaneous Control Register 2
+						// P5.1 PAL - Save MCR2 bit 4 to mirror to Telephony Status bit 4
+						state.mcr2mirror = ((data & 0x10) == 0x10);
 						// MCR2 - UNIX PC Rev. P5.1 HDD head select b3 and potential HDD#2 select
 						wd2010_write_reg(&state.hdc_ctx, UNIXPC_REG_MCR2, data);
 						handled = true;
@@ -636,7 +638,17 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				break;
 			case 0x050000:				// Telephony Status Register (RD)
 				ENFORCE_SIZE_R(bits, address, 8 | 16, "PHONE STATUS");
-				return (0);
+				// ref manual: b0: offhook*, b1: ring1*, b2: ring2*, b3: msg waiting*
+				// iohw.h: b3=0 offhook, b2=0 ring1, b1=0 ring2, b0=complemented every pulse (msg waiting)
+				data = 0x0f0f;
+				// The P5.1 PAL is detected by a "feedback signal" (bit 4) which mirrors the state of MCR2 bit 4
+				// Observed behaviour: Mirroring MCR2 bit 4 causes detection as "P3..P5", inverting the bit detects as "P5.1"
+				// Therefore mirror the inverse of MCR2 bit 4 as all the telephony status bits are inverted
+				if (!state.mcr2mirror) {
+					data |= 0x1010;
+				}
+				LOG("phone status reg (%06X) RD%i: onhook, not ringing, no msg waiting, MCR2 bit 4 mirror: %i", address, bits, state.mcr2mirror);
+				return data;
 				break;
 			case 0x060000:				// DMA Count
 				// TODO: Bit 15 (U/OERR-) is always inactive (bit set)... or should it be = DMAEN+?
