@@ -137,19 +137,19 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0x8BFF | (state.pie ? 0x0400 : 0);	\
+				state.genstat = 0x8BFF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0x9AFF | (state.pie ? 0x0400 : 0);	\
+				state.genstat = 0x9AFF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
 				/* XXX: is this the correct value? */				\
-				state.genstat = 0x9BFF | (state.pie ? 0x0400 : 0);	\
+				state.genstat = 0x9BFF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 		}															\
@@ -206,19 +206,19 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0xCBFF | (state.pie ? 0x0400 : 0);	\
+				state.genstat = 0xCBFF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0xDAFF | (state.pie ? 0x0400 : 0);	\
+				state.genstat = 0xDAFF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
 				/* XXX: is this the correct value? */				\
-				state.genstat = 0xDBFF | (state.pie ? 0x0400 : 0);	\
+				state.genstat = 0xDBFF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 		}															\
@@ -274,7 +274,7 @@ bool access_check_dma(int reading)
 			// Page fault
 			state.genstat = 0xABFF
 				| (reading ? 0x4000 : 0)
-				| (state.pie ? 0x0400 : 0);
+				| (state.pie ? 0x8400 : 0);
 			access_ok = false;
 			break;
 
@@ -283,7 +283,7 @@ bool access_check_dma(int reading)
 			// FIXME? Shouldn't be possible with DMA... assert this?
 			state.genstat = 0xBAFF
 				| (reading ? 0x4000 : 0)
-				| (state.pie ? 0x0400 : 0);
+				| (state.pie ? 0x8400 : 0);
 			access_ok = false;
 			break;
 
@@ -293,7 +293,7 @@ bool access_check_dma(int reading)
 			/* XXX: is this correct? */
 			state.genstat = 0xBBFF
 				| (reading ? 0x4000 : 0)
-				| (state.pie ? 0x0400 : 0);
+				| (state.pie ? 0x8400 : 0);
 			access_ok = false;
 			break;
 
