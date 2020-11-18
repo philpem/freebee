@@ -8,6 +8,16 @@
 #include "utils.h"
 #include "memory.h"
 
+// Memory access debugging options, to reduce logspam
+#undef MEM_DEBUG_PAGEFAULTS
+#undef MEM_DEBUG_KEYBOARD
+
+#ifdef MEM_DEBUG_PAGEFAULTS
+# define LOG_PF LOG
+#else
+# define LOG_PF(x...)
+#endif
+
 // The value which will be returned if the CPU attempts to read from empty memory
 // TODO (FIXME?) - need to figure out if R/W ops wrap around. This seems to appease the UNIX kernel and P4TEST.
 #define EMPTY 0xFFFFFFFFUL
@@ -91,7 +101,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// Check page is present (but only for RAM zone)
 	if ((addr < 0x400000) && ((pagebits & 0x03) == 0)) {
-		LOG("Page fault: addr 0x%06X, page %04X, mapbits %04X", addr, page, MAPRAM(page));
+		LOG_PF("Page fault: addr 0x%06X, page %04X, mapbits %04X", addr, page, MAPRAM(page));
 		return MEM_PAGEFAULT;
 	}
 
@@ -121,7 +131,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// Check page is write enabled
 	if (writing && ((pagebits & 0x04) == 0)) {
-		LOG("Page not write enabled: inaddr 0x%06X, page %04X, mapram %04X [%02X %02X], pagebits %d",
+		LOG_PF("Page not write enabled: inaddr 0x%06X, page %04X, mapram %04X [%02X %02X], pagebits %d",
 				addr, page, MAPRAM(page), state.map[page*2], state.map[(page*2)+1], pagebits);
 		return MEM_PAGE_NO_WE;
 	}
@@ -191,7 +201,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
 			state.bsr0 |= (faultAddr >> 16);							\
 			state.bsr1 = faultAddr & 0xffff;							\
-			LOG("Bus Error while writing, addr %08X, statcode %d", address, st);		\
+			LOG_PF("Bus Error while writing, addr %08X, statcode %d", address, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
 			return;													\
 		}															\
@@ -255,7 +265,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
 			state.bsr0 |= (faultAddr >> 16);							\
 			state.bsr1 = faultAddr & 0xffff;							\
-			LOG("Bus Error while reading, addr %08X, statcode %d", faultAddr, st);		\
+			LOG_PF("Bus Error while reading, addr %08X, statcode %d", faultAddr, st);		\
 			if (state.ee) m68k_pulse_bus_error();					\
 			if (bits >= 32)											\
 				return EMPTY & 0xFFFFFFFF;									\
@@ -654,11 +664,15 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						// TODO: figure out which sizes are valid (probably just 8 and 16)
 						// ENFORCE_SIZE_W(bits, address, 16, "KEYBOARD CONTROLLER");
 						if (bits == 8) {
+#ifdef MEM_DEBUG_KEYBOARD
 							printf("KBD WR %02X => %02X\n", (address >> 1) & 3, data);
+#endif
 							keyboard_write(&state.kbd, (address >> 1) & 3, data);
 							handled = true;
 						} else if (bits == 16) {
+#ifdef MEM_DEBUG_KEYBOARD
 							printf("KBD WR %02X => %04X\n", (address >> 1) & 3, data);
+#endif
 							keyboard_write(&state.kbd, (address >> 1) & 3, data >> 8);
 							handled = true;
 						}
