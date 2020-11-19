@@ -82,7 +82,7 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 		return WD2010_ERR_BAD_GEOM;
 	}
 
-	LOG("WD2010 initialised, %d cylinders, %d heads, %d sectors per track", tracks, heads, spt);
+	printf("WD2010 initialised: %d cylinders, %d heads, %d sectors per track\n", tracks, heads, spt);
 
 	// Allocate enough memory to store one disc track
 	if (ctx->data) {

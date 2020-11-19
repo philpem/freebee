@@ -15,7 +15,7 @@
 #ifdef MEM_DEBUG_PAGEFAULTS
 # define LOG_PF LOG
 #else
-# define LOG_PF(x...)
+# define LOG_PF(x, ...)
 #endif
 
 // The value which will be returned if the CPU attempts to read from empty memory
@@ -147,19 +147,19 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0x8BFF | (state.pie ? 0x8400 : 0);	\
+				state.genstat = 0x01FF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0x9AFF | (state.pie ? 0x8400 : 0);	\
+				state.genstat = 0x10FF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
 				/* XXX: is this the correct value? */				\
-				state.genstat = 0x9BFF | (state.pie ? 0x8400 : 0);	\
+				state.genstat = 0x11FF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 		}															\
@@ -216,19 +216,19 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				break;												\
 			case MEM_PAGEFAULT:										\
 				/* Page fault */									\
-				state.genstat = 0xCBFF | (state.pie ? 0x8400 : 0);	\
+				state.genstat = 0x41FF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_UIE:											\
 				/* User access to memory above 4MB */				\
-				state.genstat = 0xDAFF | (state.pie ? 0x8400 : 0);	\
+				state.genstat = 0x50FF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 			case MEM_KERNEL:										\
 			case MEM_PAGE_NO_WE:									\
 				/* kernel access or page not write enabled */		\
 				/* XXX: is this the correct value? */				\
-				state.genstat = 0xDBFF | (state.pie ? 0x8400 : 0);	\
+				state.genstat = 0x51FF | (state.pie ? 0x8400 : 0);	\
 				fault = true;										\
 				break;												\
 		}															\
@@ -282,7 +282,7 @@ bool access_check_dma(int reading)
 	switch (checkMemoryAccess(state.dma_address, !reading, true)) {
 		case MEM_PAGEFAULT:
 			// Page fault
-			state.genstat = 0xABFF
+			state.genstat = 0x21FF
 				| (reading ? 0x4000 : 0)
 				| (state.pie ? 0x8400 : 0);
 			access_ok = false;
@@ -291,7 +291,7 @@ bool access_check_dma(int reading)
 		case MEM_UIE:
 			// User access to memory above 4MB
 			// FIXME? Shouldn't be possible with DMA... assert this?
-			state.genstat = 0xBAFF
+			state.genstat = 0x30FF
 				| (reading ? 0x4000 : 0)
 				| (state.pie ? 0x8400 : 0);
 			access_ok = false;
@@ -301,7 +301,7 @@ bool access_check_dma(int reading)
 		case MEM_PAGE_NO_WE:
 			// Kernel access or page not write enabled
 			/* XXX: is this correct? */
-			state.genstat = 0xBBFF
+			state.genstat = 0x31FF
 				| (reading ? 0x4000 : 0)
 				| (state.pie ? 0x8400 : 0);
 			access_ok = false;
@@ -495,6 +495,8 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				break;
 			case 0x0C0000:				// Clear Status Register
 				// CSR is used to clear PERR* (main memory parity error), which is currently always returned as 'no parity error'
+				// clear MMU error in BSR0
+				state.bsr0 |= 0x8000;
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -597,6 +599,12 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 							case 0x041000:		// [ef][4c][19]xxx ==> PIE
 								ENFORCE_SIZE_W(bits, address, 16, "PIE");
 								state.pie = ((data & 0x8000) == 0x8000);
+								// update PIE+ (bit 10) in GSR, and mirror to bit 15 for P3 revlev detection
+								state.genstat &= ~0x8400;
+								if (state.pie) {
+									state.genstat |= 0x8400;
+								}
+								LOG("PIE+ (%06X): %i", address, state.pie);
 								handled = true;
 								break;
 							case 0x042000:		// [ef][4c][2A]xxx ==> BP
@@ -692,14 +700,14 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 	if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
 		switch (address & 0x0F0000) {
-			case 0x010000:				// General Status Register
-				/* ENFORCE_SIZE_R(bits, address, 16, "GENSTAT"); */
-				if (bits == 32) {
-					return ((uint32_t)state.genstat << 16) + (uint32_t)state.genstat;
-				} else if (bits == 16) {
-					return (uint16_t)state.genstat;
+			case 0x010000:				// General Status Register, connected to D8-D15 data bus
+				// bit 11 = no connect, bit 09 = LPINT+, leave both low
+				// bit 10 = PIE+, mirrored to bit 15 for P3 revlev detection
+				ENFORCE_SIZE_R(bits, address, 8 | 16, "GENSTAT");
+				if (bits == 8) {
+					return state.genstat >> 8;
 				} else {
-					return (uint8_t)(state.genstat & 0xff);
+					return state.genstat;
 				}
 				break;
 			case 0x030000:				// Bus Status Register 0
@@ -710,16 +718,14 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				ENFORCE_SIZE_R(bits, address, 16, "BSR1");
 				return ((uint32_t)state.bsr1 << 16) + (uint32_t)state.bsr1;
 				break;
-			case 0x050000:				// Telephony Status Register (RD)
+			case 0x050000:				// Telephony Status Register (RD), connected to D0-D7 data bus
 				ENFORCE_SIZE_R(bits, address, 8 | 16, "PHONE STATUS");
 				// ref manual: b0: offhook*, b1: ring1*, b2: ring2*, b3: msg waiting*
 				// iohw.h: b3=0 offhook, b2=0 ring1, b1=0 ring2, b0=complemented every pulse (msg waiting)
-				data = 0x0f0f;
+				data = 0x0f;
 				// The P5.1 PAL is detected by a "feedback signal" (bit 4) which mirrors the state of MCR2 bit 4
-				// Observed behaviour: Mirroring MCR2 bit 4 causes detection as "P3..P5", inverting the bit detects as "P5.1"
-				// Therefore mirror the inverse of MCR2 bit 4 as all the telephony status bits are inverted
-				if (!state.mcr2mirror) {
-					data |= 0x1010;
+				if (state.mcr2mirror) {
+					data |= 0x10;
 				}
 				LOG("phone status reg (%06X) RD%i: onhook, not ringing, no msg waiting, MCR2 bit 4 mirror: %i", address, bits, state.mcr2mirror);
 				return data;

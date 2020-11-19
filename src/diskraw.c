@@ -1,6 +1,6 @@
 #include "diskimg.h"
 
-#define DISKRAW_DEBUG
+//#define DISKRAW_DEBUG
 
 #ifndef DISKRAW_DEBUG
 #define NDEBUG
