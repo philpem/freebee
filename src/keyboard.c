@@ -268,7 +268,7 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 	if (ks->lastdata_mouse){
 		//Keyboard Data Begins Here (BEGKBD)
-		//This is only supposed to be sent if the last data sent was from the 
+		//This is only supposed to be sent if the last data sent was from the
 		//mouse (sending it otherwise breaks the keyboard)*/
 		ks->buffer[ks->writep] = KEY_BEGIN_KEYBOARD;
 		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
@@ -286,7 +286,11 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 		}
 	}
 	if (nkeys) {
-		ks->buffer[ks->writep - 1] |= 0x80;
+		if (ks->writep == 0) {
+			ks->buffer[KEYBOARD_BUFFER_SIZE-1] |= KEY_LIST_END;
+		} else {
+			ks->buffer[ks->writep - 1] |= KEY_LIST_END;
+		}
 	}else{
 		// If no keys down, then send All Keys Up byte
 		LOG_IFS(kbc_debug, "KBC ALL KEYS UP\n");
