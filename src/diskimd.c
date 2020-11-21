@@ -168,7 +168,7 @@ static void write_sector_imd(struct disk_image *ctx, int cyl, int head, int sect
 			{
 			    if (data[i] != fill)
 			    {
-					fprintf(stderr, "**unsupported IMD sector write**\n");
+					fprintf(stderr, "**unsupported IMD sector write (can't expand compressed sector)**\n");
 					return;
 				}
 			}
