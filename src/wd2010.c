@@ -342,7 +342,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 						ctx->track = new_track;
 					} else {
 						// Seek error. :(
-						fprintf(stderr, "WD2010 ALERT: track %d out of range", new_track);
+						fprintf(stderr, "WD2010 ALERT: track %d out of range\n", new_track);
 						ctx->status = SR_ERROR;
 						ctx->error_reg = ER_ID_NOT_FOUND;
 						ctx->irq = true;
@@ -365,7 +365,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 							// Check to see if the cyl, hd and sec are valid
 							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geom_spt-1))) {
-								fprintf(stderr, "*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d",
+								fprintf(stderr, "*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d\n",
 										ctx->track, ctx->head, ctx->sector,
 										ctx->sector_count,
 										ctx->sector + ctx->sector_count - 1,
@@ -417,7 +417,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 							// Check to see if the cyl, hd and sec are valid
 							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geom_tracks-1)) || (ctx->head > (ctx->geom_heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geom_spt-1))) {
-								fprintf(stderr, "*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d",
+								fprintf(stderr, "*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d\n",
 										ctx->track, ctx->head, ctx->sector,
 										ctx->sector_count,
 										ctx->sector + ctx->sector_count - 1,
