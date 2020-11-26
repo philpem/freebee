@@ -72,13 +72,6 @@ Phil Pemberton -- <philpem@philpem.me.uk>
       `08_Foundation_Set_Ver_3.51_no_phinit.IMD` in the `os-install` directory.
       This will allow the emulated Unix PC to come all the way up to
       a login prompt after the installation.
-  - After installation has finished (when the login prompt appears):
-    * Log in as `root`
-    * `cd /etc`
-    * `cp rc rc.old`
-    * `sed 's/.phinit .modeminit//' rc.old > rc`
-    * `reboot`
-    * The above commands disable the phone and modem initialisation, which crash due to un-emulated hardware.
   - Files can be imported using the `msdos` command which allows reading a 360k MS-DOS floppy image.
     * Use dosbox to copy files to a DOS disk image (`discim`).
 
@@ -103,11 +96,13 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
   * To make an MS-DOS disk under Linux (9 tracks per sector):
 
-	dd if=/dev/zero of=dos.img bs=1k count=360
-	/sbin/mkfs.fat dos.img
-	sudo mount -o loop -t msdos dos.img /mnt
-	... copy files to /mnt ...
-	sudo umount /mnt
+```sh
+dd if=/dev/zero of=dos.img bs=1k count=360
+/sbin/mkfs.fat dos.img
+sudo mount -o loop -t msdos dos.img /mnt
+... copy files to /mnt ...
+sudo umount /mnt
+```
 
   * To make a 10 track per sector disk image, just use `count=400` in the `dd` command and then format the disk under Unix with `iv` and `mkfs`.
 
