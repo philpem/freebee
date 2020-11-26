@@ -92,7 +92,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 # Useful links
 
-  * [AT&T 3B1 Information](unixpc.taronga.com) -- the "Taronga archive".
+  * [AT&T 3B1 Information](http://unixpc.taronga.com) -- the "Taronga archive".
     * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
     * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.  (We have provided a bootable disk in the `enhanced-diag` directory.)
   * [unixpc.org](http://www.unixpc.org/)
