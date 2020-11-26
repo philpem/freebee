@@ -1,7 +1,7 @@
 # Fixed Installation Disk
 
 `08_Foundation_Set_Ver_3.51_no_phinit.IMD.gz` is a replacement for
-`08_Foundation_Set_Ver_3.51.IMD` is a replacement for in the Foundation
+`08_Foundation_Set_Ver_3.51.IMD` in the Foundation
 Software set for the 3B1.  Use `gunzip` to decompress it before using
 it to install the OS.
 
@@ -12,4 +12,4 @@ emulated OS to come fully up to a login prompt at boot.
 Thanks to Jesse Booth for the work!
 
 #### Last Modified:
-Thu Nov 26 10:50:20 IST 2020
+Thu Nov 26 11:59:46 IST 2020
