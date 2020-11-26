@@ -85,6 +85,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 # Keyboard commands
 
+  * F9 -- Send the SUSPEND key
   * F10 -- Grab/Release mouse cursor
   * F11 -- Load/Unload floppy disk image
   * Alt-F12 -- Exit
@@ -109,4 +110,6 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 	sudo umount /mnt
 
   * To make a 10 track per sector disk image, just use `count=400` in the `dd` command and then format the disk under Unix with `iv` and `mkfs`.
+
+  * See this part of the [FAQ](https://stason.org/TULARC/pc/3b1-faq/4-4-How-do-I-get-multiple-login-windows.html) on setting up multiple login windows.
 
