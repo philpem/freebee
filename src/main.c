@@ -50,7 +50,7 @@ static int load_hd()
 		state.hdc_disc0 = NULL;
 		return (0);
 	}else{
-		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 512, 16, 8);
+		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 512, 17, 16);
 		printf("Disc image loaded.\n");
 		return (1);
 	}

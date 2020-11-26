@@ -18,8 +18,8 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * Keyboard and mouse.
   * WD2010 MFM Winchester hard disk controller.
     * Maximum 1400 cylinders (limited by the UNIX OS, see [the UNIX PC FAQ, section 5.6](http://www.unixpc.org/FAQ)).
-    * Heads fixed at 8.
-    * Sectors per track fixed at 16.
+    * Heads fixed at 16.
+    * Sectors per track fixed at 17.
     * Fixed 512 bytes per sector.
   * WD2797 floppy disk controller.
     * Double-sided, 512 bytes per sector, 10 sectors per track, any number of tracks.
@@ -50,13 +50,17 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
     * The disk images on unixpc.org don't work: the boot track is missing.
+    * Use the replacement version of the `08_Foundation_Set_Ver_3.51.IMD` image we have provided in the `os-install` directory instead of the one in the Foundation set.
   - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
     * Rename `14C 72-00616.bin` to `14c.bin`.
     * Rename `15C 72-00617.bin` to `15c.bin`.
   - Create a hard drive image file:
-    * `dd if=/dev/zero of=hd.img bs=512 count=$(expr 16 \* 8 \* 1024)`
-    * This creates a "Miniscribe 64MB" (CHS 1024:8:16, 512 bytes per sector).
+    * `dd if=/dev/zero of=hd.img bs=512 count=$(expr 17 \* 8 \* 1024)`
+    * This creates a "Miniscribe 64MB" (CHS 1024:8:17, 512 bytes per sector).
     * Note that you need the Enhanced Diagnostics disk to format 16-head hard drives.
+  - A bootable copy of the Enhanced Diagnostics disk is supplied in
+    `enhanced_diag/bootable-extended-diag.img.gz`. Uncompress it before
+    using.
   - Install the operating system
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
     * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `discim` in the Freebee directory.
@@ -64,6 +68,10 @@ Phil Pemberton -- <philpem@philpem.me.uk>
       * Press F11 to release the disk image.
       * Copy the next disk image as `discim` in the Freebee directory.
       * Press F11 to load the disk image.
+    * Instead of `08_Foundation_Set_Ver_3.51.IMD` use
+      `08_Foundation_Set_Ver_3.51_no_phinit.IMD` in the `os-install` directory.
+      This will allow the emulated Unix PC to come all the way up to
+      a login prompt after the installation.
   - After installation has finished (when the login prompt appears):
     * Log in as `root`
     * `cd /etc`
@@ -86,7 +94,19 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
   * [AT&T 3B1 Information](unixpc.taronga.com) -- the "Taronga archive".
     * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
-    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.
+    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.  (We have provided a bootable disk in the `enhanced-diag` directory.)
   * [unixpc.org](http://www.unixpc.org/)
   * Bitsavers: [documentation and firmware (ROMs)](http://bitsavers.org/pdf/att/3b1/), [software](http://bitsavers.org/bits/ATT/unixPC/)
+
+# Other Notes
+
+  * To make an MS-DOS disk under Linux (9 tracks per sector):
+
+	dd if=/dev/zero of=dos.img bs=1k count=360
+	/sbin/mkfs.fat dos.img
+	sudo mount -o loop -t msdos dos.img /mnt
+	... copy files to /mnt ...
+	sudo umount /mnt
+
+  * To make a 10 track per sector disk image, just use `count=400` in the `dd` command and then format the disk under Unix with `iv` and `mkfs`.
 

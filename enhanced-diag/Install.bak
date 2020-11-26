@@ -1,0 +1,71 @@
+# Install script for new s4 diagnostics for WD2010 chip and/or P5.1 motherboard
+#
+# Script:
+#
+#	1. formats a blank floppy to 10 sectors/track
+#	2. makes a mountable file system on the formatted floppy
+#	3. mounts the newly formatted floppy
+#	4. copies the new s4diag program to the formatted floppy
+#	5. ln's s4diag to unix on the formatted floppy
+#	6. checksums (method 1) the s4diag program
+#	7. checksums (method 2) the s4diag program
+#	8. assures owner, group and protections are set properly
+#	9. unmounts the formatted floppy
+#
+# Use:
+#
+#	1. su (as root)
+#	2. put a blank floppy disk into the floppy drive
+#	3. be sure the new s4diag exists in the directory from which you're
+#	   running this script
+#	4. sh Install   (i.e. execute this Install script file)
+#	5. be SURE the checksums agree with the accompanying documentation
+#	6. put write protect tab over the disk's cutout
+#	6. use the new diagnostic software as required.
+#
+# This script by Thad Floryan, 1-July-1989, with thanks to the MANY people
+# who offered "improvements" to the technique I used in my recently-posted
+# "kshpr" regarding determining whether one is su'd root or not.
+#
+if test ! -r "./s4diag"
+then
+	echo "Missing 's4diag'; script aborted."
+	exit 1
+fi
+#
+set `id`
+if test "$1" != "uid=0(root)"
+then
+	echo "You must 'su' because of the ch{own|grp|mod} at the end."
+	echo "Script aborted."
+	exit 1
+fi
+#
+echo "Insert a blank floppy disk and press the RETURN key: \c"
+read DUMMY
+#
+echo "Starting the floppy format."
+iv -i /dev/rfp020 /usr/lib/iv/FD10nl
+#
+echo "Ignore the 'It is safe to remove the floppy diskette.' message."
+mkfs /dev/rfp021; dismount -f
+#
+echo "Mounting floppy filesystem."
+mount /dev/fp021 /mnt
+#
+echo "Copying s4diag to floppy."
+cp ./s4diag /mnt/
+#
+echo "Linking s4diag to unix."
+ln /mnt/s4diag /mnt/unix
+#
+echo "Checksums of s4diag on floppy:"
+sum /mnt/s4diag
+sum -r /mnt/s4diag
+#
+echo "Setting owner, group and protections."
+chown root /mnt/s4diag; chgrp root /mnt/s4diag; chmod 555 /mnt/s4diag
+#
+umount /dev/fp021
+echo "Remove the floppy disk and affix a write-protect tab."
+exit 0

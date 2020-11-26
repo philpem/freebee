@@ -1,0 +1,10 @@
+Sun Nov 22 20:28:50 IST 2020
+============================
+
+These are the files for the enhanced diagnostic disk. The "Install"
+script has been changed to add the verbose loader to the floppy so
+that it can be booted without a formatted hard disk. Thanks to Jesse B
+for this tip.
+
+Arnold Robbins
+arnold@skeeve.com

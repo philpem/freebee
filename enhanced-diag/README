@@ -1,0 +1,97 @@
+From email correspondence, it's clear a lot of people need (or at least want)
+the new s4diag diagnostics disk software for use with either the WD2010 and/or
+the P5.1 motherboard upgrade on the UNIXPC/7300/3B1.
+
+Having not seen the software on any published list of archive sites, the
+suggestion given me by several correspondents was to post it.  Since I don't
+have mass disk-duplicating capability, the posting suggestion seems reasonable
+to me, so here it is in two parts.
+
+This posting comprises:
+
+	README		This file
+
+	Install		An install script to be executed on your UNIXPC system.
+			Read the comments at the head of the file to see what
+			it's doing and what you should do.  Look at the
+			included sample output to see how it executes.
+
+	s4diag		The uuencoded compressed s4diag program in 2 pieces.
+			After unwrapping the shars, concatenate the 2 parts
+			of s4diag and decode per:
+
+			$ cat s4diag.Z.uue.1 s4diag.Z.uue.2 > s4diag.Z.uue
+			$ uudecode s4diag.Z.uue
+			$ uncompress s4diag
+
+To provide a safety check against the vagaries of file transmission, be SURE
+to check the checksums of the uudecoded s4diag program against those shown in
+the following examples (the first example is that of the "stock" diag disk
+which accompanied the 3.51 software release, the second example is that of
+what you should have after executing the enclosed Install script):
+
+"stock" 3.51 diagnostic disk:
+
+	$ mount /dev/fp021 /mnt -r
+	$ ls -l /mnt
+	total 588
+	-rwxr-xr-x  2 root    root     150186 Apr 20  1987 s4diag
+	-rwxr-xr-x  2 root    root     150186 Apr 20  1987 unix
+	$ sum /mnt/s4diag
+	7490 147 /mnt/s4diag
+	$ sum -r /mnt/s4diag
+	54332   147 /mnt/s4diag
+	$ umount /dev/fp021
+	$ 
+
+"new" diagnostic disk:
+
+	$ mount /dev/fp021 /mnt -r
+	$ ls -l /mnt
+	total 588
+	-r-xr-xr-x  2 root    root     150478 May 29 13:58 s4diag
+	-r-xr-xr-x  2 root    root     150478 May 29 13:58 unix
+	$ sum /mnt/s4diag
+	64342 147 /mnt/s4diag
+	$ sum -r /mnt/s4diag
+	06158   147 /mnt/s4diag
+	$ umount /dev/fp021
+	$ 
+
+A sample run of the Install script:
+
+	$ sh Install
+	You must 'su' because of the ch{own|grp|mod} at the end.
+	Script aborted.
+	$ su
+	Password:
+	# sh Install
+	Insert a blank floppy disk and press the RETURN key: 
+	Starting the floppy format.
+	Ignore the 'It is safe to remove the floppy diskette.' message.
+	slice 1
+	bytes per logical block = 1024
+	total logical blocks = 395
+	total inodes = 96
+	gap (physical blocks) = 2
+	cylinder size (physical blocks) = 20 
+	It is safe to remove the floppy diskette.
+	Mounting floppy filesystem.
+	Copying s4diag to floppy.
+	Linking s4diag to unix.
+	Checksums of s4diag on floppy:
+	64342 147 /mnt/s4diag
+	06158   147 /mnt/s4diag
+	Setting owner, group and protections.
+	Remove the floppy disk and affix a write-protect tab.
+	#
+
+DISCLAIMER: the new s4diag works for me on all my 7300 and 3B1 systems.  I
+do NOT know its genesis; I uucp'd my copy from Kevin O'Gorman since I was
+in a hurry to test the WD2010 chip.  If the checksums of the s4diag program
+on your system match the ones listed above, then everything should be fine.
+But I CANNOT make any warranties or guarantees with regards to this software;
+I have to say: "USE AT YOUR OWN RISK."  If you are uncomfortable with this
+arrangement, then don't use the software.
+
+Thad Floryan [ thad@cup.portal.com (OR) ..!sun!portal!cup.portal.com!thad ]
