@@ -58,9 +58,9 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * `dd if=/dev/zero of=hd.img bs=512 count=$(expr 17 \* 8 \* 1024)`
     * This creates a "Miniscribe 64MB" (CHS 1024:8:17, 512 bytes per sector).
     * Note that you need the Enhanced Diagnostics disk to format 16-head hard drives.
-  - A bootable copy of the Enhanced Diagnostics disk is supplied in
-    `enhanced_diag/bootable-extended-diag.img.gz`. Uncompress it before
-    using.
+  - A bootable copy of the Enhanced Diagnostics disk is
+  available [here](https://www.skeeve.com/3b1/enhanced-diag/index.html).
+  Uncompress it before using.
   - Install the operating system
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
     * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `discim` in the Freebee directory.

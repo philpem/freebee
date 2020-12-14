@@ -1,6 +1,9 @@
+#include <stdio.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include "SDL.h"
 #include "musashi/m68k.h"
 #include "wd2010.h"
@@ -47,6 +50,9 @@
 #endif
 
 extern int cpu_log_enabled;
+static int wd2010_default_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads);
+static int wd2010_disk_label_init(WD2010_CTX *ctx, FILE *fp);
+static int wd2010_pre_label_init(WD2010_CTX *ctx, FILE *fp);
 
 /// WD2010 command constants
 enum {
@@ -60,11 +66,10 @@ enum {
 	CMD_SEEK				= 0x70,		///< Seek to given track
 };
 
-int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
+
+static int wd2010_default_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 {
 	size_t filesize;
-
-	wd2010_reset(ctx);
 
 	// Start by finding out how big the image file is
 	fseek(fp, 0, SEEK_END);
@@ -82,7 +87,106 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 		return WD2010_ERR_BAD_GEOM;
 	}
 
-	printf("WD2010 initialised: %d cylinders, %d heads, %d sectors per track\n", tracks, heads, spt);
+	// Load the geometry data
+	ctx->geom_tracks = tracks;
+	ctx->geom_secsz = secsz;
+	ctx->geom_heads = heads;
+	ctx->geom_spt = spt;
+
+	return WD2010_ERR_OK;
+}
+
+static int wd2010_disk_label_init(WD2010_CTX *ctx, FILE *fp)
+{
+	ssize_t count;
+	/*
+	 * As seen in the s4 utils, the UNIX PC was ahead of most of its
+	 * contemporaries, sporting a disk label describing the disk's geometry.
+	 * We read that label and pull the interestings bits out of it.
+	 */
+	struct s4_dswprt {
+		char     magic[4];	/* magic number */
+		int32_t	 checksum;
+		char 	 name[6];	/* name, sort of */
+		uint16_t cyls;		/* the number of cylinders for this disk */
+		uint16_t heads;		/* number of heads per cylinder */
+		uint16_t psectrk;	/* number of physical sectors per track */
+		uint16_t pseccyl;	/* number of physical sectors per cylinder */
+		char	 flags;		/* floppy density and high tech drive flags */
+		char	 step;		/* stepper motor rate to controller */
+		uint16_t sectorsz;	/* physical sector size in bytes */
+	}  __attribute__((__packed__));
+	struct s4_dswprt disk_label;
+
+	(void) fseek(fp, 0L, SEEK_SET);
+	if ((count = fread(& disk_label, sizeof(disk_label), 1, fp)) != sizeof(disk_label)) {
+		fprintf(stderr, "I/O error reading disk image: %s\n", strerror(errno));
+		return WD2010_ERR_IO_ERROR;
+	}
+	(void) fseek(fp, 0L, SEEK_SET);
+
+	// convert big endian data to native data
+	ctx->geom_tracks = ntohs(disk_label.cyls);
+	ctx->geom_secsz = ntohs(disk_label.sectorsz);
+	ctx->geom_heads = ntohs(disk_label.heads);
+	ctx->geom_spt = ntohs(disk_label.psectrk);
+
+	return WD2010_ERR_OK;
+}
+
+static int wd2010_pre_label_init(WD2010_CTX *ctx, FILE *fp)
+{
+	int numheads, numcyls, blocks_per_track, block_size;
+	int count;
+	char buffer[BUFSIZ];
+
+	(void) fseek(fp, 0L, SEEK_SET);
+	(void) fgets(buffer, sizeof(buffer), fp);	// skip magic
+
+	if (fgets(buffer, sizeof(buffer), fp) == NULL)
+		return WD2010_ERR_IO_ERROR;
+
+	count = sscanf(buffer, "heads: %d cyls: %d bpt: %d blksiz: %d",
+			& numheads, & numcyls, & blocks_per_track, & block_size);
+	if (count != 4)
+		return WD2010_ERR_BAD_GEOM;
+
+	(void) fseek(fp, 0L, SEEK_SET);
+
+	ctx->geom_tracks = numcyls;
+	ctx->geom_secsz = block_size;
+	ctx->geom_heads = numheads;
+	ctx->geom_spt = blocks_per_track;
+
+	return WD2010_ERR_OK;
+}
+
+
+int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
+{
+	int result;
+	char magic[4];
+
+	wd2010_reset(ctx);
+
+	// read first 4 bytes
+	// if UNIX PC magic, get real geometry
+	// else if early magic, get user-specified geometry
+	// else do default settings
+	(void) fseek(fp, 0L, SEEK_SET);
+	if (fread(magic, 1, 4, fp) != 4)
+		return WD2010_ERR_IO_ERROR;
+
+	if (strncmp(magic, "UQVQ", 4) == 0) {
+		result = wd2010_disk_label_init(ctx, fp);
+	} else if (strncmp(magic, "free", 4) == 0) {
+		result = wd2010_pre_label_init(ctx, fp);
+	} else {
+		result = wd2010_default_init(ctx, fp, secsz, spt, heads);
+	}
+
+	printf("WD2010 initialised: %d cylinders, %d heads, %d sectors per track\n",
+			ctx->geom_tracks, ctx->geom_heads, ctx->geom_spt);
 
 	// Allocate enough memory to store one disc track
 	if (ctx->data) {
@@ -92,15 +196,12 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads)
 	if (!ctx->data)
 		return WD2010_ERR_NO_MEMORY;
 
-	// Load the image and the geometry data
+	(void) fseek(fp, 0L, SEEK_SET);
 	ctx->disc_image = fp;
-	ctx->geom_tracks = tracks;
-	ctx->geom_secsz = secsz;
-	ctx->geom_heads = heads;
-	ctx->geom_spt = spt;
 
-	return WD2010_ERR_OK;
+	return result;
 }
+
 
 void wd2010_reset(WD2010_CTX *ctx)
 {

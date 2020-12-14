@@ -24,7 +24,8 @@ typedef enum {
 typedef enum {
 	WD2010_ERR_OK			= 0,		///< Operation succeeded
 	WD2010_ERR_BAD_GEOM		= -1,		///< Bad geometry, or image file too small
-	WD2010_ERR_NO_MEMORY	= -2		///< Out of memory
+	WD2010_ERR_NO_MEMORY	= -2,		///< Out of memory
+	WD2010_ERR_IO_ERROR	= -3		///< I/O problem
 } WD2010_ERR;
 
 typedef struct {
