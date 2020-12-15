@@ -1,0 +1,62 @@
+.TH MAKEHDIMG 1 "Dec 13 2020" "" "Freebee Emulator Tools"
+.SH NAME
+makehdimg \- create an initial hard disk image file for the freebee emulator
+.SH SYNOPSIS
+.B makehdimg
+.RB [ \-H ]
+.BI \-h " numheads"
+.BI \-c " numcyls"
+.BI \-b " blocks_per_track"
+[\fB\-o\fP \fIimage\fR]
+.SH DESCRIPTION
+.I Makehdimg
+creates hard disk image files for the
+.I freebee
+AT&T UNIX PC / 3B1 emulator.
+It writes sizing information at the head of the file which
+the emulator uses to initialize the (emulated) WD2010 controller.
+You can then use the diagnostics disk to fully initialize the disk
+image, by selecting ``Other'' and entering the same sizing information
+as used to create the file.
+.PP
+The default image file is named
+.IR hd.img .
+You can change this with the
+.B \-o
+option.
+.SH OPTIONS
+.PP
+.I Makehdimg
+accepts the following options.
+.TP
+.B \-H
+Print a usage message and exit.
+.TP
+.BI \-h " numheads"
+Specify the number of heads.
+.TP
+.BI \-c " numcyls"
+Specify the number of cylinders.
+The UNIX PC operating system doesn't support more than 1,400
+cylinders, so you may not specify more than that.
+.TP
+.BI \-b " blocks_per_track"
+Specify the number of blocks per track.
+This should be either 16 or 17.
+.TP
+.BI \-o " image"
+Specify the name of the image file to write.
+.SH EXIT STATUS
+.I Makehdimg
+exits with zero if there were no problems.
+Otherwise it prints a descriptive error message and
+exits with a value of one.
+.SH BUGS
+None known.
+.SH SEE ALSO
+.BR https://github.com/philpem/freebee :
+The freebee 3B1 emulator.
+.SH AUTHOR
+Arnold Robbins
+.br
+.B arnold@skeeve.com
