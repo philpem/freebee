@@ -18,8 +18,8 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * Keyboard and mouse.
   * WD2010 MFM Winchester hard disk controller.
     * Maximum 1400 cylinders (limited by the UNIX OS, see [the UNIX PC FAQ, section 5.6](http://www.unixpc.org/FAQ)).
-    * Heads fixed at 16.
-    * Sectors per track fixed at 17.
+    * Heads fixed at 8.
+    * Sectors per track fixed at 16.
     * Fixed 512 bytes per sector.
     * Those numbers are the default configuration; see below for more information.
   * WD2797 floppy disk controller.
@@ -90,7 +90,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
   * [AT&T 3B1 Information](http://unixpc.taronga.com) -- the "Taronga archive".
     * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
-    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.
+    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads.
   * [unixpc.org](http://www.unixpc.org/)
   * Bitsavers: [documentation and firmware (ROMs)](http://bitsavers.org/pdf/att/3b1/), [software](http://bitsavers.org/bits/ATT/unixPC/)
 
