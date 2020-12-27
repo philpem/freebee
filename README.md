@@ -36,7 +36,6 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * Printer port
   * Modem
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
-  * Second hard drive (WD2010 driver stores the drive-select state, but doesn't use it)
 
 
 # Build instructions
