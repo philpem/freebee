@@ -17,6 +17,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * This is the maximum allowed by the memory mapper.
   * Keyboard and mouse.
   * WD2010 MFM Winchester hard disk controller.
+    * Two separate drives.
     * Maximum 1400 cylinders (limited by the UNIX OS, see [the UNIX PC FAQ, section 5.6](http://www.unixpc.org/FAQ)).
     * Heads fixed at 8.
     * Sectors per track fixed at 16.
@@ -59,6 +60,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * Use the `makehdimg` program supplied in the `tools` directory to create an initial `hd.img` file with the number of cylinders, heads and sectors per track that you want.  Limits: 1400 cylinders, 16 heads, 17 sectors per track.
     * When using the diagnostics disk to initialize the hard disk, select "Other" and supply the correct values that correspond to the numbers used with `makehdimg`.
     * You can use `dd if=/dev/zero of=hd.img bs=512 count=$(expr 17 \* 8 \* 1024)` to create a disk matching the compiled-in defaults.  You still need to initialize the disk using the "Miniscribe 64MB" (CHS 1024:8:17, 512 bytes per sector) choice.
+    * The second hard drive file is optional. If present, it should be called `hd2.img`.  You can copy an existing `hd.img` to `hd2.img` as a quick way to get a disk with a filesystem already on it. When Unix is up and running, use `mount /dev/fp012 /mnt` to mount the second drive. You may want to run `fsck` on it first, just to be safe.
   - You can also use the ICUS Enhanced Diagnostics disk. A bootable copy is
   available [here](https://www.skeeve.com/3b1/enhanced-diag/index.html).
   Uncompress it before using.

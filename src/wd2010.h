@@ -32,7 +32,9 @@ typedef struct {
 	// Current track, head and sector
 	int						track, head, sector;
 	// Geometry of current disc
-	int						geom_secsz, geom_spt, geom_heads, geom_tracks;
+	struct geom {
+		int	geom_secsz, geom_spt, geom_heads, geom_tracks;
+	} geometry[2];
 	// IRQ status
 	bool					irq;
 	// Status of last command
@@ -54,10 +56,10 @@ typedef struct {
 	// Current write is a format?
 	bool					formatting;
 	// Data buffer, current DRQ pointer and length
-	uint8_t					*data;
+	uint8_t					*data[2];
 	size_t					data_pos, data_len;
 	// Current disc image file
-	FILE					*disc_image;
+	FILE					*disc_image[2];
 	// LBA at which to start writing
 	int						write_pos;
 	// Flag to allow delaying DRQ
@@ -70,7 +72,7 @@ typedef struct {
  *
  * This must be run once when the context is created.
  */
-int wd2010_init(WD2010_CTX *ctx, FILE *fp, int secsz, int spt, int heads);
+int wd2010_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int heads);
 
 /**
  * @brief	Reset a WD2010 context.
