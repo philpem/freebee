@@ -50,7 +50,7 @@ static int load_hd()
 		fprintf(stderr, "ERROR loading disc image 'hd.img'.\n");
 		state.hdc_disc0 = NULL;
 		return (0);
-	}else{
+	} else {
 		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, 512, 16, 8);
 		printf("Disc image 'hd.img' loaded.\n");
 		ret = 1;
@@ -61,7 +61,7 @@ static int load_hd()
 		fprintf(stderr, "ERROR loading disc image 'hd2.img'.\n");
 		state.hdc_disc1 = NULL;
 		return ret;
-	}else{
+	} else {
 		wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, 512, 16, 8);
 		printf("Disc image 'hd2.img' loaded.\n");
 		return (1);
