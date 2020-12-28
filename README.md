@@ -51,7 +51,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
     * The disk images on unixpc.org don't work: the boot track is missing.
-    * Use the replacement version of the `08_Foundation_Set_Ver_3.51.IMD` image we have provided in the `os-install` directory instead of the one in the Foundation set.
+    * Use the replacement version of the `08_Foundation_Set_Ver_3.51.IMD` image which is available [here](https://www.skeeve.com/3b1/os-install/index.html).
   - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
     * Rename `14C 72-00616.bin` to `14c.bin`.
     * Rename `15C 72-00617.bin` to `15c.bin`.
@@ -70,8 +70,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
       * Press F11 to release the disk image.
       * Copy the next disk image as `discim` in the Freebee directory.
       * Press F11 to load the disk image.
-    * Instead of `08_Foundation_Set_Ver_3.51.IMD` use
-      `08_Foundation_Set_Ver_3.51_no_phinit.IMD` in the `os-install` directory.
+    * Instead of `08_Foundation_Set_Ver_3.51.IMD` use `08_Foundation_Set_Ver_3.51_no_phinit.IMD` from [here](https://www.skeeve.com/3b1/os-install/index.html).
       This will allow the emulated Unix PC to come all the way up to
       a login prompt after the installation.
   - Files can be imported using the `msdos` command which allows reading a 360k MS-DOS floppy image.
@@ -91,7 +90,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
   * [AT&T 3B1 Information](http://unixpc.taronga.com) -- the "Taronga archive".
     * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
-    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads.
+    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which provides more options formatting hard drives.
   * [unixpc.org](http://www.unixpc.org/)
   * Bitsavers: [documentation and firmware (ROMs)](http://bitsavers.org/pdf/att/3b1/), [software](http://bitsavers.org/bits/ATT/unixPC/)
 
