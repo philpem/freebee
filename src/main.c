@@ -43,15 +43,27 @@ static int load_fd()
 
 static int load_hd()
 {
+	int ret = 0;
 
 	state.hdc_disc0 = fopen("hd.img", "r+b");
 	if (!state.hdc_disc0){
 		fprintf(stderr, "ERROR loading disc image 'hd.img'.\n");
 		state.hdc_disc0 = NULL;
 		return (0);
-	}else{
-		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 512, 16, 8);
-		printf("Disc image loaded.\n");
+	} else {
+		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, 512, 16, 8);
+		printf("Disc image 'hd.img' loaded.\n");
+		ret = 1;
+	}
+
+	state.hdc_disc1 = fopen("hd2.img", "r+b");
+	if (!state.hdc_disc1){
+		fprintf(stderr, "ERROR loading disc image 'hd2.img'.\n");
+		state.hdc_disc1 = NULL;
+		return ret;
+	} else {
+		wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, 512, 16, 8);
+		printf("Disc image 'hd2.img' loaded.\n");
 		return (1);
 	}
 }

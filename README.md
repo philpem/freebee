@@ -17,10 +17,12 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * This is the maximum allowed by the memory mapper.
   * Keyboard and mouse.
   * WD2010 MFM Winchester hard disk controller.
+    * Two separate drives.
     * Maximum 1400 cylinders (limited by the UNIX OS, see [the UNIX PC FAQ, section 5.6](http://www.unixpc.org/FAQ)).
     * Heads fixed at 8.
     * Sectors per track fixed at 16.
     * Fixed 512 bytes per sector.
+    * Those numbers are the default configuration; see below for more information.
   * WD2797 floppy disk controller.
     * Double-sided, 512 bytes per sector, 10 sectors per track, any number of tracks.
   * Realtime clock.
@@ -34,7 +36,6 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * Printer port
   * Modem
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
-  * Second hard drive (WD2010 driver stores the drive-select state, but doesn't use it)
 
 
 # Build instructions
@@ -50,33 +51,36 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
     * The disk images on unixpc.org don't work: the boot track is missing.
+    * Use the replacement version of the `08_Foundation_Set_Ver_3.51.IMD` image which is available [here](https://www.skeeve.com/3b1/os-install/index.html).
   - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
     * Rename `14C 72-00616.bin` to `14c.bin`.
     * Rename `15C 72-00617.bin` to `15c.bin`.
   - Create a hard drive image file:
-    * `dd if=/dev/zero of=hd.img bs=512 count=$(expr 16 \* 8 \* 1024)`
-    * This creates a "Miniscribe 64MB" (CHS 1024:8:16, 512 bytes per sector).
-    * Note that you need the Enhanced Diagnostics disk to format 16-head hard drives.
-  - Install the operating system
+    * Use the `makehdimg` program supplied in the `tools` directory to create an initial `hd.img` file with the number of cylinders, heads and sectors per track that you want.  Limits: 1400 cylinders, 16 heads, 17 sectors per track.
+    * When using the diagnostics disk to initialize the hard disk, select "Other" and supply the correct values that correspond to the numbers used with `makehdimg`.
+    * You can use `dd if=/dev/zero of=hd.img bs=512 count=$(expr 17 \* 8 \* 1024)` to create a disk matching the compiled-in defaults.  You still need to initialize the disk using the "Miniscribe 64MB" (CHS 1024:8:17, 512 bytes per sector) choice.
+    * The second hard drive file is optional. If present, it should be called `hd2.img`.  You can copy an existing `hd.img` to `hd2.img` as a quick way to get a disk with a filesystem already on it. When Unix is up and running, use `mount /dev/fp012 /mnt` to mount the second drive. You may want to run `fsck` on it first, just to be safe.
+  - You can also use the ICUS Enhanced Diagnostics disk. A bootable copy is
+  available [here](https://www.skeeve.com/3b1/enhanced-diag/index.html).
+  Uncompress it before using.
+  - Install the operating system:
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
     * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `discim` in the Freebee directory.
     * To change disks:
       * Press F11 to release the disk image.
       * Copy the next disk image as `discim` in the Freebee directory.
       * Press F11 to load the disk image.
-  - After installation has finished (when the login prompt appears):
-    * Log in as `root`
-    * `cd /etc`
-    * `cp rc rc.old`
-    * `sed 's/.phinit .modeminit//' rc.old > rc`
-    * `reboot`
-    * The above commands disable the phone and modem initialisation, which crash due to un-emulated hardware.
+    * Instead of `08_Foundation_Set_Ver_3.51.IMD` use `08_Foundation_Set_Ver_3.51_no_phinit.IMD` from [here](https://www.skeeve.com/3b1/os-install/index.html).
+      This will allow the emulated Unix PC to come all the way up to
+      a login prompt after the installation.
   - Files can be imported using the `msdos` command which allows reading a 360k MS-DOS floppy image.
     * Use dosbox to copy files to a DOS disk image (`discim`).
+  - Another option is to use the tools [here](https://github.com/arnoldrobbins/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the image as a usable filesystem under Linux.
 
 
 # Keyboard commands
 
+  * F9 -- Send the SUSPEND key
   * F10 -- Grab/Release mouse cursor
   * F11 -- Load/Unload floppy disk image
   * Alt-F12 -- Exit
@@ -84,9 +88,24 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 # Useful links
 
-  * [AT&T 3B1 Information](unixpc.taronga.com) -- the "Taronga archive".
+  * [AT&T 3B1 Information](http://unixpc.taronga.com) -- the "Taronga archive".
     * Includes the STORE, comp.sources.3b1, XINU and a very easy to read HTML version of the 3B1 FAQ.
-    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which allows formatting hard drives with more than 8 heads or 1024 cylinders.
+    * Also includes (under "Kernel Related") tools to build an Enhanced Diagnostics disk which provides more options formatting hard drives.
   * [unixpc.org](http://www.unixpc.org/)
   * Bitsavers: [documentation and firmware (ROMs)](http://bitsavers.org/pdf/att/3b1/), [software](http://bitsavers.org/bits/ATT/unixPC/)
 
+# Other Notes
+
+  * To make an MS-DOS disk under Linux (9 tracks per sector):
+
+```sh
+dd if=/dev/zero of=dos.img bs=1k count=360
+/sbin/mkfs.fat dos.img
+sudo mount -o loop -t msdos dos.img /mnt
+... copy files to /mnt ...
+sudo umount /mnt
+```
+
+  * To make a 10 track per sector disk image, just use `count=400` in the `dd` command and then format the disk under Unix with `iv` and `mkfs`.
+
+  * See this part of the [FAQ](https://stason.org/TULARC/pc/3b1-faq/4-4-How-do-I-get-multiple-login-windows.html) on setting up multiple login windows.

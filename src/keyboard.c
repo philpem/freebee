@@ -47,7 +47,7 @@ struct {
 	{ SDLK_ESCAPE,			0,	0x1b },	// ESC/DEL		[Escape]
 	{ SDLK_F7,				0,	0x1c },	// F7
 	{ SDLK_F8,				0,	0x1d },	// F8
-//	{ SDLK_,				1,	0x1e },	// Suspd
+	{ SDLK_F9,				0,	0x1e },	// Suspd
 //	{ SDLK_,				1,	0x1f },	// Rsume
 	{ SDLK_SPACE,			0,	0x20 },	// SPACE		[Spacebar]
 //	{ SDLK_,				1,	0x21 },	// Undo
