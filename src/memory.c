@@ -164,7 +164,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				break;												\
 		}															\
 	}while (0)
-	
+
 
 
 /********************************************************
@@ -232,7 +232,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				fault = true;										\
 				break;												\
 		}															\
-	} while (0)	
+	} while (0)
 
 /**
  * @brief Check memory access permissions for a read operation.
@@ -406,7 +406,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				switch (address & 0x0FF000) {
 					case 0x090000:		// Handset relay
 					case 0x098000:
-						LOG("TCR (%06X) Handset relay set: %s", address, (data & 0x4000) ? "on" : "off");
+						LOG("TCR (%06X) Handset: %s", address, (data & 0x4000) ? "enabled" : "disabled");
 						break;
 					case 0x091000:		// Line select 2*
 					case 0x099000:
@@ -464,7 +464,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				}
 				handled = true;
 				break;
-			case 0x0B0000:				// TM/DIALWR
+			case 0x0B0000:				// TM/DIALWR (838A)
 				switch (address & 0x000C00) {
 					case 0x000:
 						// iohw.h: "baud generator for chan A (rs232): lower 3 nibble of the address is the counter value"
@@ -594,6 +594,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 								// Error Enable. If =0, Level7 intrs and bus errors are masked.
 								ENFORCE_SIZE_W(bits, address, 16, "EE");
 								state.ee = ((data & 0x8000) == 0x8000);
+								LOG("EE+ (%06X): %i", address, state.ee);
 								handled = true;
 								break;
 							case 0x041000:		// [ef][4c][19]xxx ==> PIE
@@ -625,7 +626,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 								LOG("L2 MODEM (%06X): Line 2 %s to modem", address, (data & 0x8000) ? "disconnected" : "connected");
 								handled = true;
 								break;
-							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT* (L1 connected to 838A dial/network*)
+							case 0x046000:		// [ef][4c][6E]xxx ==> D/N CONNECT* (L1 connected to dial/network*)
 								ENFORCE_SIZE_W(bits, address, 16, "D/N CONNECT");
 								LOG("Dialer connected to (%06X): %s", address, (data & 0x8000) ? "Line 2" : "Line 1");
 								handled = true;
@@ -640,27 +641,27 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					case 0x060000:		// [ef][6e]xxxx ==> Modem (882A) regs
 						ENFORCE_SIZE_W(bits, address, 16, "MODEM REGS");
 						handled = true;
-						switch (address) {
-							case 0xE60000:
+						switch (address & 0x00F000) {
+							case 0x0000:
 								LOG("Modem WR0 - Line control (%06X) write: %04X = talk mode: %i, offhook: %i, data mode: %i, DTR: %i, power reset: %i",
 									address, data, ((data & 0x40)==0x40), ((data & 0x20)==0x20), ((data & 0x10)==0x10), ((data & 0x04)==0x04), ((data & 0x01)==0x01));
 								break;
-							case 0xE61000:
+							case 0x1000:
 								LOG("Modem WR1 - Loopback test (%06X) write: %04X = 1200 baud: %i, ext clock: %i, voice: %i", address, data, ((data & 0x10)==0x10), ((data & 0x40)==0x40), ((data & 0x20)==0x20));
 								break;
-							case 0xE64000:
+							case 0x4000:
 								LOG("Modem WR4 - Async/Sync & handshake options (%06X) write: %04X", address, data);
 								break;
-							case 0xE65000:
+							case 0x5000:
 								LOG("Modem WR5 - CCITT & disconnect options (%06X) write: %04X", address, data);
 								break;
-							case 0xE66000:
+							case 0x6000:
 								LOG("Modem WR6 - Rx/Tx control & chip test (%06X) write: %04X", address, data);
 								break;
-							case 0xE68000:
+							case 0x8000:
 								LOG("Modem WR8 - Transceiver control 1 (%06X) write: %04X", address, data);
 								break;
-							case 0xE69000:
+							case 0x9000:
 								LOG("Modem WR9 - Transceiver control 2 (%06X) write: %04X", address, data);
 								break;
 							default:
@@ -668,12 +669,12 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 								break;
 						}
 						break;
-					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller, connected to D8-D15 data bus
 						// TODO: figure out which sizes are valid (probably just 8 and 16)
 						// ENFORCE_SIZE_W(bits, address, 16, "KEYBOARD CONTROLLER");
 						if (bits == 8) {
 #ifdef MEM_DEBUG_KEYBOARD
-							printf("KBD WR %02X => %02X\n", (address >> 1) & 3, data);
+							printf("KBD WR8 %02X => %04X\n", (address >> 1) & 3, data);
 #endif
 							keyboard_write(&state.kbd, (address >> 1) & 3, data);
 							handled = true;
@@ -720,8 +721,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				break;
 			case 0x050000:				// Telephony Status Register (RD), connected to D0-D7 data bus
 				ENFORCE_SIZE_R(bits, address, 8 | 16, "PHONE STATUS");
-				// ref manual: b0: offhook*, b1: ring1*, b2: ring2*, b3: msg waiting*
-				// iohw.h: b3=0 offhook, b2=0 ring1, b1=0 ring2, b0=complemented every pulse (msg waiting)
+				// b3: msg waiting*, b2: ring2*, b1: ring1*, b0: offhook*
 				data = 0x0f;
 				// The P5.1 PAL is detected by a "feedback signal" (bit 4) which mirrors the state of MCR2 bit 4
 				if (state.mcr2mirror) {
@@ -737,7 +737,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				return (state.dma_count & 0x3fff) | 0xC000;
 				break;
 			case 0x070000:				// Line Printer Status Register (RD)
-				data = 0x00130013;	// no line printer error, no irqs from FDD or HDD, no parity error, no dial tone
+				data = 0x00120012;	// no line printer error, no irqs from FDD or HDD, no parity error, dial tone
 				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
 				data |= wd2010_get_irq(&state.hdc_ctx) ? 0x00040004 : 0;
 				return data;
@@ -784,7 +784,6 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				switch (address & 0x070000) {
 					case 0x000000:		// [ef][08]xxxx ==> WD1010 hard disc controller
 						return (wd2010_read_reg(&state.hdc_ctx, (address >> 1) & 7));
-
 						break;
 					case 0x010000:		// [ef][19]xxxx ==> WD2797 floppy disc controller
 						/*ENFORCE_SIZE_R(bits, address, 16, "FDC REGISTERS");*/
@@ -831,8 +830,8 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 							}
 						break;
 					case 0x060000:		// [ef][6e]xxxx ==> Modem (882A) regs
-						switch (address) {
-							case 0xE62000:  // modem.h: Modem status to terminal interface
+						switch (address & 0x00F000) {
+							case 0x2000:  // modem.h: Modem status to terminal interface
 								// 0x80: failed self test, 0x40: test mode, 0x20: data mode (incoming call answered), 0x10: DSR on
 								// 0x04: 1200 baud, 0x02: data valid (set after modem handshake), 0x01: CTS on
 								data = 0x0404; // 1200 baud
@@ -841,26 +840,23 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 								LOG("Modem RR2 (%06X) - Modem status RD%i returning: 1200 baud, DSR: on, CTS: on", address, bits);
 								return data;
 								break;
-							case 0xE63000: // modem.h: Modem status to lamps and relays
+							case 0x3000: // modem.h: Modem status to lamps and relays
 								LOG("Modem RR3 (%06X) - Modem status to lamps & relays RD%i returning: 0", address, bits);
 								return (0);
 								break;
-							case 0xE6A000: // modem.h: Transceiver status
+							case 0xA000: // modem.h: Transceiver status
 								LOG("Modem RR10 (%06X) - Transceiver status RD%i returning: 0", address, bits);
 								return (0);
 								break;
 						}
 						break;
-					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller
+					case 0x070000:		// [ef][7f]xxxx ==> 6850 Keyboard Controller, connected to D8-D15 data bus
 						// TODO: figure out which sizes are valid (probably just 8 and 16)
 						//ENFORCE_SIZE_R(bits, address, 16, "KEYBOARD CONTROLLER");
-						{
-							if (bits == 8) {
-								return keyboard_read(&state.kbd, (address >> 1) & 3);
-							} else {
-								return keyboard_read(&state.kbd, (address >> 1) & 3) << 8;
-							}
-							return data;
+						if (bits == 8) {
+							return keyboard_read(&state.kbd, (address >> 1) & 3);
+						} else {
+							return keyboard_read(&state.kbd, (address >> 1) & 3) << 8;
 						}
 						break;
 				}
@@ -882,13 +878,14 @@ static uint16_t ram_read_16(uint32_t address)
 {
 	if (address < ZEROPAGE && USER_MODE) {
 		return (0);
-	} else if (address <= 0x1fffff) {
+	}
+	if (address <= 0x1fffff) {
 		// Base memory wraps around
 		return RD16(state.base_ram, address, state.base_ram_size - 1);
 	} else {
-		if ((address <= (state.exp_ram_size + 0x200000 - 1)) && (address >= 0x200000)){
+		if (address <= (state.exp_ram_size + 0x200000 - 1))
 			return RD16(state.exp_ram, address - 0x200000, state.exp_ram_size - 1);
-		}else
+		else
 			return EMPTY & 0xffff;
 	}
 }
@@ -917,9 +914,9 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 		uint32_t newAddr = mapAddr(address, false);
 		uint32_t newAddr2 = mapAddr(address + 2, false);
 		// Base memory wraps around
-			
-		data = ((ram_read_16(newAddr) << 16) | 
-			 ram_read_16(newAddr2));
+
+		data = (((uint32_t)ram_read_16(newAddr) << 16) |
+			 (uint32_t)ram_read_16(newAddr2));
 		return (data);
 	} else if ((address >= 0x400000) && (address <= 0x7FFFFF)) {
 		// I/O register space, zone A
@@ -962,14 +959,15 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-		
+
 		if (address < ZEROPAGE && USER_MODE) {
 			return (0);
-		}else if (newAddr <= 0x1fffff) {
+		}
+		if (newAddr <= 0x1fffff) {
 			// Base memory wraps around
 			return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
 				return RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
 				return EMPTY & 0xffff;
@@ -1015,14 +1013,15 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 	} else if (address <= 0x3fffff) {
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
-		
+
 		if (address < ZEROPAGE && USER_MODE) {
 			return (0);
-		} else if (newAddr <= 0x1fffff) {
+		}
+		if (newAddr <= 0x1fffff) {
 			// Base memory wraps around
 			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
 				return RD8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
 				return EMPTY & 0xff;
@@ -1051,7 +1050,6 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 
 static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
 {
-	
 	if (address < ZEROPAGE && USER_MODE) {
 		return;
 	} else if (address <= 0x1fffff) {
@@ -1213,7 +1211,7 @@ uint32_t m68k_read_disassembler_32(uint32_t addr)
 		uint32_t newAddrHigh, newAddrLow;
 		newAddrHigh = map_address_debug(addr);
 		newAddrLow = map_address_debug(addr + 2);
-		return ((ram_read_16(newAddrHigh) << 16) | 
+		return ((ram_read_16(newAddrHigh) << 16) |
 			ram_read_16(newAddrLow));
 
 	} else {
@@ -1234,7 +1232,7 @@ uint32_t m68k_read_disassembler_16(uint32_t addr)
 			else
 				return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
 				return RD16(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
 				return EMPTY & 0xffff;
@@ -1257,7 +1255,7 @@ uint32_t m68k_read_disassembler_8 (uint32_t addr)
 			else
 				return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
 		} else {
-			if ((newAddr <= (state.exp_ram_size + 0x200000 - 1)) && (newAddr >= 0x200000))
+			if (newAddr <= (state.exp_ram_size + 0x200000 - 1))
 				return RD8(state.exp_ram, newAddr - 0x200000, state.exp_ram_size - 1);
 			else
 				return EMPTY & 0xff;

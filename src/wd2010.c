@@ -89,10 +89,10 @@ static int wd2010_default_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secs
 
 	drivenum = drivenum ? 1 : 0;	// force to 1 or 0
 	// Load the geometry data
-	ctx->geometry[drivenum].geom_tracks = tracks;
-	ctx->geometry[drivenum].geom_secsz = secsz;
-	ctx->geometry[drivenum].geom_heads = heads;
-	ctx->geometry[drivenum].geom_spt = spt;
+	ctx->geometry[drivenum].tracks = tracks;
+	ctx->geometry[drivenum].secsz = secsz;
+	ctx->geometry[drivenum].heads = heads;
+	ctx->geometry[drivenum].spt = spt;
 
 	return WD2010_ERR_OK;
 }
@@ -128,10 +128,10 @@ static int wd2010_disk_label_init(WD2010_CTX *ctx, FILE *fp, int drivenum)
 
 	drivenum = drivenum ? 1 : 0;	// force to 1 or 0
 	// convert big endian data to native data
-	ctx->geometry[drivenum].geom_tracks = ntohs(disk_label.cyls);
-	ctx->geometry[drivenum].geom_secsz = ntohs(disk_label.sectorsz);
-	ctx->geometry[drivenum].geom_heads = ntohs(disk_label.heads);
-	ctx->geometry[drivenum].geom_spt = ntohs(disk_label.psectrk);
+	ctx->geometry[drivenum].tracks = ntohs(disk_label.cyls);
+	ctx->geometry[drivenum].secsz = ntohs(disk_label.sectorsz);
+	ctx->geometry[drivenum].heads = ntohs(disk_label.heads);
+	ctx->geometry[drivenum].spt = ntohs(disk_label.psectrk);
 
 	return WD2010_ERR_OK;
 }
@@ -156,10 +156,10 @@ static int wd2010_pre_label_init(WD2010_CTX *ctx, FILE *fp, int drivenum)
 	(void) fseek(fp, 0L, SEEK_SET);
 
 	drivenum = drivenum ? 1 : 0;	// force to 1 or 0
-	ctx->geometry[drivenum].geom_tracks = numcyls;
-	ctx->geometry[drivenum].geom_secsz = block_size;
-	ctx->geometry[drivenum].geom_heads = numheads;
-	ctx->geometry[drivenum].geom_spt = blocks_per_track;
+	ctx->geometry[drivenum].tracks = numcyls;
+	ctx->geometry[drivenum].secsz = block_size;
+	ctx->geometry[drivenum].heads = numheads;
+	ctx->geometry[drivenum].spt = blocks_per_track;
 
 	return WD2010_ERR_OK;
 }
@@ -190,14 +190,14 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int
 
 	drivenum = drivenum ? 1 : 0;	// force to 1 or 0
 	printf("WD2010 initialised: %d cylinders, %d heads, %d sectors per track\n",
-			ctx->geometry[drivenum].geom_tracks, ctx->geometry[drivenum].geom_heads,
-			ctx->geometry[drivenum].geom_spt);
+			ctx->geometry[drivenum].tracks, ctx->geometry[drivenum].heads,
+			ctx->geometry[drivenum].spt);
 
 	// Allocate enough memory to store one disc track
 	if (ctx->data[drivenum]) {
 		free(ctx->data[drivenum]);
 	}
-	ctx->data[drivenum] = malloc(secsz * spt);
+	ctx->data[drivenum] = malloc(ctx->geometry[drivenum].secsz * ctx->geometry[drivenum].spt);
 	if (!ctx->data[drivenum])
 		return WD2010_ERR_NO_MEMORY;
 
@@ -270,7 +270,7 @@ uint8_t wd2010_read_data(WD2010_CTX *ctx)
 {
 	// If there's data in the buffer, return it. Otherwise return 0xFF.
 	if (ctx->data_pos < ctx->data_len) {
-		if (ctx->multi_sector && (ctx->data_pos > 0) && ((ctx->data_pos % ctx->geometry[ctx->mcr2_ddrive1].geom_secsz) == 0)){
+		if (ctx->multi_sector && (ctx->data_pos > 0) && ((ctx->data_pos % ctx->geometry[ctx->mcr2_ddrive1].secsz) == 0)){
 			ctx->sector_count--;
 			ctx->sector_number++;
 		}
@@ -297,7 +297,7 @@ void wd2010_write_data(WD2010_CTX *ctx, uint8_t val)
 	// buffer, allow the write.
 	if (ctx->write_pos >= 0 && ctx->data_pos < ctx->data_len) {
 		// store data byte and increment pointer
-		if (ctx->multi_sector && (ctx->data_pos > 0) && ((ctx->data_pos % ctx->geometry[ctx->mcr2_ddrive1].geom_secsz) == 0)){
+		if (ctx->multi_sector && (ctx->data_pos > 0) && ((ctx->data_pos % ctx->geometry[ctx->mcr2_ddrive1].secsz) == 0)){
 			ctx->sector_count--;
 			ctx->sector_number++;
 		}
@@ -448,7 +448,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 					// Seek. Seek to the track specced in the cylinder
 					// registers.
 					new_track = (ctx->cylinder_high_reg << 8) | ctx->cylinder_low_reg;
-					if (new_track < ctx->geometry[ctx->mcr2_ddrive1].geom_tracks) {
+					if (new_track < ctx->geometry[ctx->mcr2_ddrive1].tracks) {
 						ctx->track = new_track;
 					} else {
 						// Seek error. :(
@@ -474,12 +474,12 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 							// Read Sector
 
 							// Check to see if the cyl, hd and sec are valid
-							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geometry[ctx->mcr2_ddrive1].geom_tracks-1)) || (ctx->head > (ctx->geometry[ctx->mcr2_ddrive1].geom_heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geometry[ctx->mcr2_ddrive1].geom_spt-1))) {
+							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geometry[ctx->mcr2_ddrive1].tracks-1)) || (ctx->head > (ctx->geometry[ctx->mcr2_ddrive1].heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geometry[ctx->mcr2_ddrive1].spt-1))) {
 								fprintf(stderr, "*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d\n",
 										ctx->track, ctx->head, ctx->sector,
 										ctx->sector_count,
 										ctx->sector + ctx->sector_count - 1,
-										ctx->geometry[ctx->mcr2_ddrive1].geom_tracks-1, ctx->geometry[ctx->mcr2_ddrive1].geom_heads-1, ctx->geometry[ctx->mcr2_ddrive1].geom_spt);
+										ctx->geometry[ctx->mcr2_ddrive1].tracks-1, ctx->geometry[ctx->mcr2_ddrive1].heads-1, ctx->geometry[ctx->mcr2_ddrive1].spt);
 								// CHS parameters exceed limits
 								ctx->status = SR_ERROR;
 								ctx->error_reg = ER_ID_NOT_FOUND;
@@ -501,16 +501,16 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 							for (int i=0; i<sector_count; i++) {
 								// Calculate the LBA address of the required sector
 								// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
-								lba = (((ctx->track * ctx->geometry[ctx->mcr2_ddrive1].geom_heads * ctx->geometry[ctx->mcr2_ddrive1].geom_spt) + (ctx->head * ctx->geometry[ctx->mcr2_ddrive1].geom_spt) + ctx->sector) + i);
+								lba = (((ctx->track * ctx->geometry[ctx->mcr2_ddrive1].heads * ctx->geometry[ctx->mcr2_ddrive1].spt) + (ctx->head * ctx->geometry[ctx->mcr2_ddrive1].spt) + ctx->sector) + i);
 								// convert LBA to byte address
-								lba *= ctx->geometry[ctx->mcr2_ddrive1].geom_secsz;
+								lba *= ctx->geometry[ctx->mcr2_ddrive1].secsz;
 								LOG("\tREAD lba = %zu", lba);
 
 								// Read the sector from the file
 								fseek(ctx->disc_image[ctx->mcr2_ddrive1], lba, SEEK_SET);
 								// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
-								ctx->data_len += fread(&ctx->data[ctx->mcr2_ddrive1][ctx->data_len], 1, ctx->geometry[ctx->mcr2_ddrive1].geom_secsz, ctx->disc_image[ctx->mcr2_ddrive1]);
-								LOG("\tREAD len=%zu, pos=%zu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geometry[ctx->mcr2_ddrive1].geom_secsz);
+								ctx->data_len += fread(&ctx->data[ctx->mcr2_ddrive1][ctx->data_len], 1, ctx->geometry[ctx->mcr2_ddrive1].secsz, ctx->disc_image[ctx->mcr2_ddrive1]);
+								LOG("\tREAD len=%zu, pos=%zu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geometry[ctx->mcr2_ddrive1].secsz);
 							}
 
 							ctx->status = 0;
@@ -526,12 +526,12 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 							// Write Sector
 
 							// Check to see if the cyl, hd and sec are valid
-							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geometry[ctx->mcr2_ddrive1].geom_tracks-1)) || (ctx->head > (ctx->geometry[ctx->mcr2_ddrive1].geom_heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geometry[ctx->mcr2_ddrive1].geom_spt-1))) {
+							if (cmd != CMD_WRITE_FORMAT && ((ctx->track > (ctx->geometry[ctx->mcr2_ddrive1].tracks-1)) || (ctx->head > (ctx->geometry[ctx->mcr2_ddrive1].heads-1)) || ((ctx->sector + ctx->sector_count - 1) > ctx->geometry[ctx->mcr2_ddrive1].spt-1))) {
 								fprintf(stderr, "*** WD2010 ALERT: CHS parameter limit exceeded! CHS=%d:%d:%d, nSecs=%d, endSec=%d maxCHS=%d:%d:%d\n",
 										ctx->track, ctx->head, ctx->sector,
 										ctx->sector_count,
 										ctx->sector + ctx->sector_count - 1,
-										ctx->geometry[ctx->mcr2_ddrive1].geom_tracks-1, ctx->geometry[ctx->mcr2_ddrive1].geom_heads-1, ctx->geometry[ctx->mcr2_ddrive1].geom_spt);
+										ctx->geometry[ctx->mcr2_ddrive1].tracks-1, ctx->geometry[ctx->mcr2_ddrive1].heads-1, ctx->geometry[ctx->mcr2_ddrive1].spt);
 								// CHS parameters exceed limits
 								ctx->status = SR_ERROR;
 								ctx->error_reg = ER_ID_NOT_FOUND;
@@ -550,10 +550,10 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 								ctx->multi_sector = 0;
 								sector_count = 1;
 							}
-							ctx->data_len = ctx->geometry[ctx->mcr2_ddrive1].geom_secsz * sector_count;
-							lba = (((ctx->track * ctx->geometry[ctx->mcr2_ddrive1].geom_heads * ctx->geometry[ctx->mcr2_ddrive1].geom_spt) + (ctx->head * ctx->geometry[ctx->mcr2_ddrive1].geom_spt) + ctx->sector));
+							ctx->data_len = ctx->geometry[ctx->mcr2_ddrive1].secsz * sector_count;
+							lba = (((ctx->track * ctx->geometry[ctx->mcr2_ddrive1].heads * ctx->geometry[ctx->mcr2_ddrive1].spt) + (ctx->head * ctx->geometry[ctx->mcr2_ddrive1].spt) + ctx->sector));
 							// convert LBA to byte address
-							ctx->write_pos = (lba *= ctx->geometry[ctx->mcr2_ddrive1].geom_secsz);
+							ctx->write_pos = (lba *= ctx->geometry[ctx->mcr2_ddrive1].secsz);
 							LOG("\tWRITE lba = %zu", lba);
 
 							ctx->status = 0;

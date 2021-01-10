@@ -33,7 +33,7 @@ typedef struct {
 	int						track, head, sector;
 	// Geometry of current disc
 	struct geom {
-		int	geom_secsz, geom_spt, geom_heads, geom_tracks;
+		int	secsz, spt, heads, tracks;
 	} geometry[2];
 	// IRQ status
 	bool					irq;

@@ -22,6 +22,9 @@ src/version.h
 freebee
 3b1emu
 
+# tools
+makehdimg
+
 # ignore ROMs and techref
 roms
 TRM
