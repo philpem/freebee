@@ -470,9 +470,8 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						// iohw.h: "baud generator for chan A (rs232): lower 3 nibble of the address is the counter value"
 						// baud output TMOUT = [1/(4 x N)] x 1.2288 MHz
 						handled = true;
-						uint8_t baudgenN = address & 0xff; // latch uses A1-A8 address lines
-						// for some reason you have to multiply by another 8 to get the proper baud...
-						LOG("baud gen (%06X) set to %i", address, baudgenN ? 1228800/(4*baudgenN*8) : 0);
+						uint16_t baudgenN = (address & 0x1ff) << 3; // latch uses A1-A8 address lines, need to shift up 3 bits to get correct baud
+						LOG("RS-232 baud (%06X) set to %i", address, baudgenN ? 1228800/(4*baudgenN) : 0);
 						break;
 					case 0x400:
 						// DIALER TXD lower byte shift reg load
@@ -562,7 +561,10 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					case 0xD40000:		// Expansion slot 5
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
-						fprintf(stderr, "NOTE: WR%d to expansion card space, addr=0x%08X, data=0x%08X\n", bits, address, data);
+						if ((address & 0x3FFF8) == 0x3FFF8)	// Software reset
+							LOG("Expansion slot %i: Reset", ((address >> 18) & 7));
+						else
+							fprintf(stderr, "NOTE: WR%d to expansion card space, addr=0x%08X, data=0x%08X\n", bits, address, data);
 						handled = true;
 						break;
 				}
@@ -774,6 +776,9 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 					case 0xD40000:		// Expansion slot 5
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
+						// 0x3FFFB: Board ID MSB, 0X3FFF9: Board ID LSB
+						// 0x3FFFF: Two's complement of ID MSB, 0x3FFFD: Two's complement of ID LSB
+						// low byte of 0x3FFFB + 0x3FFFF and 0x3FFF9 + 0x3FFFD should equal 0
 						fprintf(stderr, "NOTE: RD%d from expansion card space, addr=0x%08X\n", bits, address);
 						handled = true;
 						break;
@@ -834,10 +839,8 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 							case 0x2000:  // modem.h: Modem status to terminal interface
 								// 0x80: failed self test, 0x40: test mode, 0x20: data mode (incoming call answered), 0x10: DSR on
 								// 0x04: 1200 baud, 0x02: data valid (set after modem handshake), 0x01: CTS on
-								data = 0x0404; // 1200 baud
-								data |= 0x1010; // DSR ON
-								data |= 0x0101; // CTS ON
-								LOG("Modem RR2 (%06X) - Modem status RD%i returning: 1200 baud, DSR: on, CTS: on", address, bits);
+								data = 0xFF; 	// FF interpreted as "no modem"
+								LOG("Modem RR2 (%06X) - Modem status RD%i returning: no modem", address, bits);
 								return data;
 								break;
 							case 0x3000: // modem.h: Modem status to lamps and relays
