@@ -41,7 +41,7 @@ uint8_t get_second(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_sec;
 	return (ret);
 }
@@ -52,7 +52,7 @@ uint8_t get_minute(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_min;
 	return (ret);
 }
@@ -63,7 +63,7 @@ uint8_t get_hour(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_hour;
 	return (ret);
 }
@@ -74,7 +74,7 @@ uint8_t get_day(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_mday;
 	return (ret);
 }
@@ -85,7 +85,7 @@ uint8_t get_month(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_mon+1;
 	return (ret);
 }
@@ -96,7 +96,7 @@ uint8_t get_year(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_year;
 	return (ret);*/
 	return (87);
@@ -108,7 +108,7 @@ uint8_t get_weekday(TC8250_CTX *ctx)
 	struct tm g;
 	uint8_t ret;
 	t = time(NULL);
-	gmtime_r(&t, &g);
+	localtime_r(&t, &g);
 	ret = g.tm_wday;
 	return (ret);
 }
