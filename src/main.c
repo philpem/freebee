@@ -1,8 +1,10 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "SDL.h"
 
@@ -271,6 +273,11 @@ bool HandleSDLEvents(SDL_Window *window)
 	return false;
 }
 
+static void usage()
+{
+	fprintf(stderr, "usage: freebee [-s xscale:yscale]\n");
+	exit(EXIT_FAILURE);
+}
 
 /****************************
  * blessed be thy main()...
@@ -278,6 +285,28 @@ bool HandleSDLEvents(SDL_Window *window)
 
 int main(int argc, char *argv[])
 {
+	int c;
+	float scalex = 1, scaley = 1;
+	while ((c = getopt(argc, argv, "s:")) >= 0) {
+		switch (c) {
+		case 's':
+			// scaling proportional to 2:3 will approximate 3b1 pixel aspect ratio with modern square pixels
+			if (sscanf(optarg, "%f:%f", &scalex, &scaley) != 2)
+				usage();
+			if (scalex <= 0 || scalex > 45 || scaley <= 0 || scaley > 45) {
+				// 45 chosen as max because 45 * 720 < INT16_MAX
+				fprintf(stderr, "scale factors must be positive and no larger than 45\n");
+				exit(EXIT_FAILURE);
+			}
+			break;
+		default:
+			usage();
+			break;
+		}
+	}
+	if (optind != argc)
+		usage();
+
 	// copyright banner
 	printf("FreeBee: A Quick-and-Dirty AT&T 3B1 Emulator. Version %s, %s mode.\n", VER_FULLSTR, VER_BUILD_TYPE);
 	printf("Copyright (C) 2010 P. A. Pemberton. All rights reserved.\nLicensed under the Apache License Version 2.0.\n");
@@ -309,11 +338,12 @@ int main(int argc, char *argv[])
 	// Set up the video display
 	SDL_Window *window;
 	if ((window = SDL_CreateWindow("FreeBee 3B1 Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-									720, 348, 0)) == NULL) {
+									(int) ceilf(720*scalex), (int) ceilf(348*scaley), 0)) == NULL) {
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+	SDL_RenderSetScale(renderer, scalex, scaley);
 	if (!renderer){
 		fprintf(stderr, "Error creating SDL renderer: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
