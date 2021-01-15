@@ -142,7 +142,7 @@ uint8_t tc8250_read_reg(TC8250_CTX *ctx)
 		case TEN_YR_DIGT:
 			return (get_year(ctx) / 10);
 		case WEEK_DAY:
-			return (get_weekday(ctx) / 10);
+			return (get_weekday(ctx));
 		case TOUT_CONTROL:
 			return (0);
 		case PROTECT_KEY:
