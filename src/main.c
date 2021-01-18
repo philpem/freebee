@@ -137,8 +137,8 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 	// Map the foreground and background colours
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xC1, 0x06);	// amber foreground
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xFF, 0xFF);	// white foreground
-//	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
-	Uint32 fg = SDL_MapRGB(s->format, 0x50, 0xFF, 2*0x50);	// minty foreground (rough approximation for 3b1 screen: Blue = 2*Red)
+//	Uint32 fg = SDL_MapRGB(s->format, 0x50, 0xFF, 0xA0);	// minty foreground (possibly closer to actual color?)
+	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
 	Uint32 bg = SDL_MapRGB(s->format, 0x00, 0x00, 0x00);	// black background
 
 	// Refresh the 3B1 screen area first. TODO: only do this if VRAM has actually changed!
