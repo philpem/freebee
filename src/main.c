@@ -135,9 +135,10 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 	}
 
 	// Map the foreground and background colours
-	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xC1, 0x06);	// amber foreground
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xFF, 0xFF);	// white foreground
+//	Uint32 fg = SDL_MapRGB(s->format, 0x50, 0xFF, 0xA0);	// minty foreground (possibly closer to actual color?)
+	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
 	Uint32 bg = SDL_MapRGB(s->format, 0x00, 0x00, 0x00);	// black background
 
 	// Refresh the 3B1 screen area first. TODO: only do this if VRAM has actually changed!
@@ -373,7 +374,7 @@ int main(int argc, char *argv[])
 	SDL_Texture *lightbarTexture = SDL_CreateTextureFromSurface(renderer, surf);
 	SDL_FreeSurface(surf);
 
-	printf("Set %dx%d at %d bits-per-pixel mode\n\n", screen->w, screen->h, screen->format->BitsPerPixel);
+	printf("Set %dx%d at %d bits-per-pixel mode\n\n", (int) ceilf(720*scalex), (int) ceilf(348*scaley), screen->format->BitsPerPixel);
 
 	// Load a disc image
 	load_fd();
@@ -412,7 +413,7 @@ int main(int argc, char *argv[])
 
 					// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
 					if (num > (1e6/TIMESLOT_FREQUENCY)) break;
-	
+
 					// Evidently we have more words to copy. Copy them.
 					if (state.dma_dev == DMA_DEV_FD){
 						if (!wd2797_get_drq(&state.fdc_ctx)) {
@@ -433,7 +434,7 @@ int main(int argc, char *argv[])
 					uint32_t newAddr;
 					// Map logical address to a physical RAM address
 					newAddr = mapAddr(state.dma_address, !state.dma_reading);
-	
+
 					if (!state.dma_reading) {
 						// Data available. Get it from the FDC or HDC.
 						if (state.dma_dev == DMA_DEV_FD) {
@@ -462,7 +463,7 @@ int main(int argc, char *argv[])
 							else
 								d = 0xffff;
 						}
-	
+
 						// Send the data to the FDD or HDD
 						if (state.dma_dev == DMA_DEV_FD){
 							wd2797_write_reg(&state.fdc_ctx, WD2797_REG_DATA, (d >> 8));
