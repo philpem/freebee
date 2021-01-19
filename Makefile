@@ -164,7 +164,6 @@ endif
 ####
 # Tool setup
 ####
-MAKE	=	make
 CC		=	gcc
 CXX		=	g++
 CFLAGS	=	-O -Wall -pedantic -std=gnu99 $(EXT_CFLAGS)
