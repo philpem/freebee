@@ -411,6 +411,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 			ctx->sector_count = val;
 			break;
 		case WD2010_REG_SECTOR_NUMBER:
+			// HDSEL3 is also in bit 5 of sector number
 			ctx->sector_number = val & 0x1f;
 			break;
 		case WD2010_REG_CYLINDER_HIGH:		// High byte of cylinder
