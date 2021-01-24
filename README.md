@@ -28,11 +28,13 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   * Realtime clock.
     * Reading the RTC reads the date and time from the host.
     * Year is fixed at 1987 due to Y2K issues in the UNIX PC Kernel.
+  * Serial port.
+    * Linux only: file 'serial-pty' is symlinked to PTY that can be used to access tty000
+
 
 
 ## Things which aren't emulated fully (or at all)
 
-  * Serial ports (or Combo Card)
   * Printer port
   * Modem
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.

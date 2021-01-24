@@ -8,6 +8,7 @@
 #include "wd2010.h"
 #include "keyboard.h"
 #include "tc8250.h"
+#include "i8274.h"
 
 
 // Maximum size of the Boot PROMs. Must be a binary power of two.
@@ -101,6 +102,9 @@ typedef struct {
 
 	/// Real time clock context
 	TC8250_CTX rtc_ctx;
+
+	/// Serial controller context
+	I8274_CTX	serial_ctx;
 
 	/// VIDPAL mod (allows user writing to VRAM)
 	bool vidpal;
