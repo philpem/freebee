@@ -66,6 +66,8 @@ Phil Pemberton -- <philpem@philpem.me.uk>
   - Install the operating system:
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
     * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `discim` in the Freebee directory.
+    * If you wish to increase the swap space size, do so with the diagnostics
+      disk before installing the OS. See these [instructions](https://groups.google.com/g/comp.sys.att/c/8XLILI3K8-Y/m/VxVMJNdt9NQJ).
     * To change disks:
       * Press F11 to release the disk image.
       * Copy the next disk image as `discim` in the Freebee directory.
@@ -75,7 +77,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
       a login prompt after the installation.
   - Files can be imported using the `msdos` command which allows reading a 360k MS-DOS floppy image.
     * Use dosbox to copy files to a DOS disk image (`discim`).
-  - Another option is to use the tools [here](https://github.com/arnoldrobbins/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the image as a usable filesystem under Linux.
+  - Another option is to use the tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the image as a usable filesystem under Linux.
 
 
 # Keyboard commands
