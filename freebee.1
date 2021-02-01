@@ -1,0 +1,91 @@
+.TH FREEBEE 1 "Feb 1 2021" "" "AT&T 3B1 Emulation"
+.SH NAME
+freebee \- emulate an AT&T 3B1 personal computer
+.SH SYNOPSIS
+.B freebee
+[
+.BI "\-s " x-scale\^ : y-scale
+]
+.SH DESCRIPTION
+.I freebee
+is an emulator for the AT&T 3B1 personal Unix computer.
+There were two models of this system: The Unix PC (also known
+as the PC 7300) and the 3B1. The two models differed primarily
+in the amount of main memory and disk that the various systems
+had; from a software standpoint they were identical.
+.PP
+.I freebee
+provides a system with an MC 68010 processor, 4 megabytes of RAM,
+a floppy drive, and up to two hard drives, each of which may be
+up to 175 megabytes in size.
+.PP
+The original software for the 3B1 is available.
+It includes the OS, software development tools, document preparation
+tools, and advanced editors (notably
+.IR vi (1)).
+Links to the software are
+provided on
+.IR freebee\^ 's
+home page.
+.PP
+Considerable third party software is available, some in source form,
+some in binary form, from archives that are also linked to from
+.IR freebee\^ 's
+home page.
+.PP
+The system more-or-less represents the state of the art in the
+Unix world as of about 1987.  The Unix PC and 3B1 were the first
+.I personal
+Unix systems that were affordable by individuals, as opposed to higher-end
+workstations from companies like Sun, DEC, IBM, Tektronix, and Silicon Graphics.
+.PP
+The kernel is approximately System V Release 2 vintage, with a few
+System V Release 3 user-land components.  In particular, the modern-day
+user will have to deal with both short filenames (14 characters maximum),
+and the lack of job control.
+.SH OPTIONS
+.TP
+.BI "\-s " x-scale\^ : y-scale
+Scale the display by
+.I x-scale
+in the X direction, and by
+.I y-scale
+in the Y direction.
+This option is useful on high resolution displays, where the
+emulated screen ends up being small and difficult to read.
+.SH FILES
+All files are relative to the current directory in which
+.I freebee
+is run.
+.TP
+.I roms/*
+The ROM image files. Links to them are provided on the
+.I freebee
+home page.
+.TP
+.I discim
+An optional image of a floppy disk.  By default,
+.I freebee
+attaches this file when it starts up. Use F11 to unload and
+load this file while running (``change the floppy'').
+.TP
+.I hd.img
+An image for the first hard disk.  This disk is mounted at / (the root).
+Pre-built images are available from the Internet, or you can
+create and install such a disk from scratch.
+.TP
+.I hd2.img
+An optional image for the second hard disk.
+This disk is not mounted when the system boots; you can use it
+for whatever you want.
+.SH AUTHORS
+Phil Pemberton, with contributions from several others.
+.SH BUG REPORTS
+Please open an issue on the Github project,
+\f(CWhttps://github.com/philpem/freebee\fP.
+.SH BUGS
+The original 3B1 serial port(s) and modem are not emulated.
+.PP
+To avoid Y2K bugs in the OS, the year in the running system is always 1987.
+.PP
+A configuration file mechanism would make things much easier to use.
