@@ -301,7 +301,8 @@ static void usage()
 int main(int argc, char *argv[])
 {
 	int c;
-	float scalex = 1, scaley = 1;
+	float scalex = fbc_get_double("display", "x_scale");
+	float scaley = fbc_get_double("display", "y_scale");
 	while ((c = getopt(argc, argv, "s:")) >= 0) {
 		switch (c) {
 		case 's':
