@@ -1,4 +1,4 @@
-.TH FREEBEE 1 "Feb 1 2021" "" "AT&T 3B1 Emulation"
+.TH FREEBEE 1 "Feb 5 2021" "" "AT&T 3B1 Emulation"
 .SH NAME
 freebee \- emulate an AT&T 3B1 personal computer
 .SH SYNOPSIS
@@ -53,8 +53,31 @@ in the X direction, and by
 in the Y direction.
 This option is useful on high resolution displays, where the
 emulated screen ends up being small and difficult to read.
+.PP
+This option overrides any values found in
+.IR freebee\^ 's
+configuration file.
+.SH CONFIGURATION
+.I freebee
+can be configured by creating a file in TOML format containing
+appropriate values.
+.I freebee
+looks first for
+.I .freebee.toml
+in the current directory, and then
+.IR $HOME/.freebee.toml ,
+reading the first one it can open and then stopping.
+See the file
+.I sample.freebee.toml
+in the source code for the options that are configurable.
 .SH FILES
-All files are relative to the current directory in which
+The following list of files are the defaults
+.I freebee
+uses if the filenames are not overridden by a configuration
+file (see the earlier section
+.BR CONFIGURATION ).
+.PP
+Files are assumed to live in the current directory in which
 .I freebee
 is run.
 .TP
@@ -87,5 +110,3 @@ Please open an issue on the Github project,
 The original 3B1 serial port(s) and modem are not emulated.
 .PP
 To avoid Y2K bugs in the OS, the year in the running system is always 1987.
-.PP
-A configuration file mechanism would make things much easier to use.
