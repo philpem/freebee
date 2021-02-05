@@ -30,6 +30,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * Year is fixed at 1987 due to Y2K issues in the UNIX PC Kernel.
   * Serial port.
     * Linux only: file 'serial-pty' is symlinked to PTY that can be used to access tty000
+    * Usage instructions: [README.serial.md](README.serial.md)
 
 
 
