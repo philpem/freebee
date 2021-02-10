@@ -7,15 +7,23 @@
 #include "state.h"
 #include "utils.h"
 #include "memory.h"
+#include "i8274.h"
 
 // Memory access debugging options, to reduce logspam
 #undef MEM_DEBUG_PAGEFAULTS
 #undef MEM_DEBUG_KEYBOARD
+#undef MEM_DEBUG_SERIAL
 
 #ifdef MEM_DEBUG_PAGEFAULTS
 # define LOG_PF LOG
 #else
 # define LOG_PF(x, ...)
+#endif
+
+#ifdef MEM_DEBUG_SERIAL
+# define LOG_SERIAL LOG
+#else
+# define LOG_SERIAL(x, ...)
 #endif
 
 // The value which will be returned if the CPU attempts to read from empty memory
@@ -444,7 +452,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				break;
 			case 0x0A0000:				// Miscellaneous Control Register (WR) high byte
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
-				// TODO: handle the ctrl bits properly (bit 13: LP strobe, bit 12: modem clock select (0 = modem clock, 1 = fixed 19.2k))
+				// TODO: handle the ctrl bits properly (bit 13: LP strobe, bit 12: Chan B clock select (0 = modem clock [baud gen?], 1 = fixed 19.2k [uses 8274 16x divider for 1200baud, 64x divider for 300baud])
 				if (data & 0x8000){
 					state.timer_enabled = 1;
 				}else{
@@ -638,7 +646,30 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 								break;
 						}
 						break;
-					case 0x050000:		// [ef][5d]xxxx ==> 8274
+					case 0x050000:		// [ef][5d]xxxx ==> 8274 regs (chan A = rs232, chan B = modem), connected to D0-D7 data bus
+						data &= 0xFF;
+						switch (address & 0x6) {
+							case 0x0:
+								LOG_SERIAL("8274 (%06X) rs232 data WR%i: %X", address, bits, data);
+								i8274_data_out(&state.serial_ctx, CHAN_A, data);
+								handled = true;
+								break;
+							case 0x2:
+								LOG_SERIAL("8274 (%06X) modem data WR%i: %X", address, bits, data);
+								i8274_data_out(&state.serial_ctx, CHAN_B, data);
+								handled = true;
+								break;
+							case 0x4:
+								LOG_SERIAL("8274 (%06X) rs232 ctrl WR%i: %X", address, bits, data);
+								i8274_control_write(&state.serial_ctx, CHAN_A, data);
+								handled = true;
+								break;
+							case 0x6:
+								LOG_SERIAL("8274 (%06X) modem ctrl WR%i: %X", address, bits, data);
+								i8274_control_write(&state.serial_ctx, CHAN_B, data);
+								handled = true;
+								break;
+						}
 						break;
 					case 0x060000:		// [ef][6e]xxxx ==> Modem (882A) regs
 						ENFORCE_SIZE_W(bits, address, 16, "MODEM REGS");
@@ -814,23 +845,29 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 								break;
 						}
 						break;
-					case 0x050000:		// [ef][5d]xxxx ==> 8274 regs
-						handled = true;
-						switch (address) {
-							case 0xE50000:
-								LOG("8274 (%06X) rs232 data RD%i", address, bits);
+					case 0x050000:		// [ef][5d]xxxx ==> 8274 regs, connected to D0-D7 data bus
+						switch (address & 0x6) {
+							case 0x0:
+								LOG_SERIAL("8274 (%06X) rs232 data RD%i", address, bits);
+								data = i8274_data_in(&state.serial_ctx, CHAN_A);
+								return data;
 								break;
-							case 0xE50002:
-								LOG("8274 (%06X) modem data RD%i", address, bits);
+							case 0x2:
+								LOG_SERIAL("8274 (%06X) modem data RD%i", address, bits);
+								data = i8274_data_in(&state.serial_ctx, CHAN_B);
+								return data;
 								break;
-							case 0xE50004: //RR0?
-								LOG("8274 (%06X) rs232 status RD%i", address, bits);
+							case 0x4:
+								LOG_SERIAL("8274 (%06X) rs232 status RD%i", address, bits);
+								data = i8274_status_read(&state.serial_ctx, CHAN_A);
+								return data;
 								break;
-							case 0xE50006: //RR0?
-								LOG("8274 (%06X) modem status RD%i", address, bits);
+							case 0x6:
+								LOG_SERIAL("8274 (%06X) modem status RD%i", address, bits);
+								data = i8274_status_read(&state.serial_ctx, CHAN_B);
+								return data;
 								break;
 							default:
-								handled = false;
 								break;
 							}
 						break;
