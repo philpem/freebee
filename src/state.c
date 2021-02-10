@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "state.h"
 #include "i8274.h"
+#include "fbconfig.h"
 
 int state_init(size_t base_ram_size, size_t exp_ram_size)
 {
@@ -51,13 +52,15 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.exp_ram_size = exp_ram_size;
 
 	// Load ROMs
+	const char *rom14c = fbc_get_string("roms", "rom_14c");
+	const char *rom15c = fbc_get_string("roms", "rom_15c");
 	FILE *r14c, *r15c;
-	r14c = fopen("roms/14c.bin", "rb");
+	r14c = fopen(rom14c, "rb");
 	if (r14c == NULL) {
 		fprintf(stderr, "[state] Error loading roms/14c.bin.\n");
 		return -3;
 	}
-	r15c = fopen("roms/15c.bin", "rb");
+	r15c = fopen(rom15c, "rb");
 	if (r15c == NULL) {
 		fprintf(stderr, "[state] Error loading roms/15c.bin.\n");
 		return -3;

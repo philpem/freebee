@@ -12,6 +12,7 @@
 #include "version.h"
 #include "state.h"
 #include "memory.h"
+#include "fbconfig.h"
 
 #include "lightbar.c"
 #include "i8274.h"
@@ -27,12 +28,13 @@ void FAIL(char *err)
 
 static int load_fd()
 {
-
 	int writeable = 1;
-	state.fdc_disc = fopen("discim", "r+b");
+
+	const char *discim = fbc_get_string("floppy", "disk");
+	state.fdc_disc = fopen(discim, "r+b");
 	if (!state.fdc_disc){
 		writeable = 0;
-		state.fdc_disc = fopen("discim", "rb");
+		state.fdc_disc = fopen(discim, "rb");
 	}
 	if (!state.fdc_disc){
 		fprintf(stderr, "ERROR loading disc image 'discim'.\n");
@@ -47,26 +49,28 @@ static int load_fd()
 static int load_hd()
 {
 	int ret = 0;
+	const char *disk1 = fbc_get_string("hard_disk", "disk1");
+	const char *disk2 = fbc_get_string("hard_disk", "disk2");
 
-	state.hdc_disc0 = fopen("hd.img", "r+b");
+	state.hdc_disc0 = fopen(disk1, "r+b");
 	if (!state.hdc_disc0){
-		fprintf(stderr, "ERROR loading disc image 'hd.img'.\n");
+		fprintf(stderr, "ERROR loading disc image '%s'.\n", disk1);
 		state.hdc_disc0 = NULL;
 		return (0);
 	} else {
 		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, 512, 16, 8);
-		printf("Disc image 'hd.img' loaded.\n");
+		printf("Disc image '%s' loaded.\n", disk1);
 		ret = 1;
 	}
 
-	state.hdc_disc1 = fopen("hd2.img", "r+b");
+	state.hdc_disc1 = fopen(disk2, "r+b");
 	if (!state.hdc_disc1){
-		fprintf(stderr, "ERROR loading disc image 'hd2.img'.\n");
+		fprintf(stderr, "ERROR loading disc image '%s'.\n", disk2);
 		state.hdc_disc1 = NULL;
 		return ret;
 	} else {
 		wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, 512, 16, 8);
-		printf("Disc image 'hd2.img' loaded.\n");
+		printf("Disc image '%s' loaded.\n", disk2);
 		return (1);
 	}
 }
@@ -135,11 +139,21 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 		}
 	}
 
+	static int red, green, blue;
+	static bool inited = false;
+	if (! inited) {
+		inited = true;
+		red = fbc_get_int("display", "red");
+		green = fbc_get_int("display", "green");
+		blue = fbc_get_int("display", "blue");
+	}
+
 	// Map the foreground and background colours
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xC1, 0x06);	// amber foreground
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xFF, 0xFF);	// white foreground
 //	Uint32 fg = SDL_MapRGB(s->format, 0x50, 0xFF, 0xA0);	// minty foreground (possibly closer to actual color?)
-	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
+//	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
+	Uint32 fg = SDL_MapRGB(s->format, red, green, blue);
 	Uint32 bg = SDL_MapRGB(s->format, 0x00, 0x00, 0x00);	// black background
 
 	// Refresh the 3B1 screen area first. TODO: only do this if VRAM has actually changed!
@@ -288,7 +302,8 @@ static void usage()
 int main(int argc, char *argv[])
 {
 	int c;
-	float scalex = 1, scaley = 1;
+	float scalex = fbc_get_double("display", "x_scale");
+	float scaley = fbc_get_double("display", "y_scale");
 	while ((c = getopt(argc, argv, "s:")) >= 0) {
 		switch (c) {
 		case 's':
