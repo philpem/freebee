@@ -14,6 +14,7 @@
 #include "memory.h"
 
 #include "lightbar.c"
+#include "i8274.h"
 
 extern int cpu_log_enabled;
 
@@ -501,10 +502,12 @@ int main(int argc, char *argv[])
 				}
 			}
 */
-			if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
-				m68k_set_irq(2);
-			}else if (keyboard_get_irq(&state.kbd)) {
+			if (i8274_get_irq(&state.serial_ctx)) {
+				m68k_set_irq(4);
+			} else if (keyboard_get_irq(&state.kbd)) {
 				m68k_set_irq(3);
+			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
+				m68k_set_irq(2);
 			} else {
 //				if (!state.timer_asserted){
 					m68k_set_irq(0);
@@ -530,6 +533,8 @@ int main(int argc, char *argv[])
 			}
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
+			// scan the serial pty for new data
+			i8274_scan_incoming(&state.serial_ctx, CHAN_A);
 			// decrement clock cycle counter, we've handled the intr.
 			clock_cycles -= CLOCKS_PER_60HZ;
 		}

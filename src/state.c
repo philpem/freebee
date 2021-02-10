@@ -6,6 +6,7 @@
 #include "wd2010.h"
 #include "keyboard.h"
 #include "state.h"
+#include "i8274.h"
 
 int state_init(size_t base_ram_size, size_t exp_ram_size)
 {
@@ -27,10 +28,10 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.timer_enabled = state.timer_asserted = false;
 	state.dma_dev = DMA_DEV_UNDEF;
 	state.mcr2mirror = 0;
-	
+
 	// Enable VIDPAL mod (allows user writing to VRAM)
 	state.vidpal = true;
-	
+
 	// Allocate Base RAM, making sure the user has specified a valid RAM amount first
 	// Basically: 512KiB minimum, 2MiB maximum, in increments of 512KiB.
 	if ((base_ram_size < 512*1024) || (base_ram_size > 2048*1024) || ((base_ram_size % (512*1024)) != 0))
@@ -109,6 +110,8 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	wd2797_init(&state.fdc_ctx);
 	// Initialise the keyboard controller
 	keyboard_init(&state.kbd);
+	// Initialise the serial controller
+	i8274_init(&state.serial_ctx);
 
 	return 0;
 }
@@ -128,6 +131,8 @@ void state_done()
 	// Deinitialise the disc controller
 	wd2797_done(&state.fdc_ctx);
 	wd2010_done(&state.hdc_ctx);
+	// Deinitialise the serial controller
+	i8274_done(&state.serial_ctx);
 }
 
 
