@@ -65,6 +65,7 @@ get_default_string(const char *heading, const char *item)
 		{ "hard_disk", "disk2", "hd2.img" },
 		{ "roms", "rom_14c", "roms/14c.bin" },
 		{ "roms", "rom_15c", "roms/15c.bin" },
+		{ "serial", "symlink", "serial-pty" },
 		{ NULL, NULL, NULL }
 	};
 
