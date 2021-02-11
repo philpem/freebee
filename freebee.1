@@ -1,4 +1,4 @@
-.TH FREEBEE 1 "Feb 5 2021" "" "AT&T 3B1 Emulation"
+.TH FREEBEE 1 "Feb 10 2021" "" "AT&T 3B1 Emulation"
 .SH NAME
 freebee \- emulate an AT&T 3B1 personal computer
 .SH SYNOPSIS
@@ -101,12 +101,22 @@ create and install such a disk from scratch.
 An optional image for the second hard disk.
 This disk is not mounted when the system boots; you can use it
 for whatever you want.
+.TP
+.I serial-pty
+A symbolic link to the pseudo-terminal file
+.RI ( /dev/pts/? )
+which can be used to connect to the 3B1's serial port for user login to
+the 3B1, dial-out from it,
+or for file transfer. See the file
+.I README.serial.md
+in the source code directory for more information and concise
+instructions on how to use the serial port.
 .SH AUTHORS
 Phil Pemberton, with contributions from several others.
 .SH BUG REPORTS
 Please open an issue on the Github project,
 \f(CWhttps://github.com/philpem/freebee\fP.
 .SH BUGS
-The original 3B1 serial port(s) and modem are not emulated.
+The original 3B1 modem is not emulated.
 .PP
 To avoid Y2K bugs in the OS, the year in the running system is always 1987.

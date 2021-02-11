@@ -41,6 +41,7 @@
 #define NDEBUG
 #endif
 #include "utils.h"
+#include "fbconfig.h"
 
 #ifdef __linux__
 // needed for PTY functions, unlink, symlink
@@ -52,8 +53,6 @@
 #include <termios.h>
 #include <unistd.h>
 #endif
-
-#define SERIAL_PTY_FILENAME 		"serial-pty"
 
 #define WR1_EXT_INT_ENABLE			0x01	// Ext/Status Int Enable
 #define WR1_TX_INT_ENABLE			0x02	// TxInt Enable
@@ -89,6 +88,8 @@ enum i8274_IRQ_PRIORITY_ORDER {
 	IRQ_EXTA,	IRQ_EXTB,
 	IRQ_TOTAL
 };
+
+static const char* serial_pty_filename;
 
 static bool fifo_empty(struct fifo *f) { return f->count == 0; }
 static bool fifo_full(struct fifo *f) { return f->count == FIFOSIZE; }
@@ -664,12 +665,13 @@ static void ttySetRaw(int fd)
 static void pty_init(I8274_CTX *ctx)
 {
 #ifdef __linux__	
+	serial_pty_filename = fbc_get_string("serial", "symlink");
 	ctx->ptyfd = open("/dev/ptmx", O_RDWR | O_NONBLOCK);
 	(void)grantpt(ctx->ptyfd);
 	(void)unlockpt(ctx->ptyfd);
 	ttySetRaw(ctx->ptyfd);
-	unlink(SERIAL_PTY_FILENAME);
-	if (symlink(ptsname(ctx->ptyfd), SERIAL_PTY_FILENAME) == 0)
+	unlink(serial_pty_filename);
+	if (symlink(ptsname(ctx->ptyfd), serial_pty_filename) == 0)
 		printf("Serial port (tty000) on pty %s\n", ptsname(ctx->ptyfd));
 	else
 		fprintf(stderr, "Error symlinking to pty: %s\n", strerror(errno));
@@ -680,7 +682,7 @@ static void pty_done(I8274_CTX *ctx)
 {
 #ifdef __linux__
 	close(ctx->ptyfd);
-	unlink(SERIAL_PTY_FILENAME);
+	unlink(serial_pty_filename);
 #endif	
 }
 

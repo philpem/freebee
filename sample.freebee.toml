@@ -21,3 +21,6 @@
 [roms]
 	rom_14c = "/path/to/roms/14c.bin"	# Odd locations
 	rom_15c = "/path/to/roms/15c.bin"	# Even locations
+
+[serial]
+	symlink = "serial-pty"

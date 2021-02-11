@@ -587,8 +587,11 @@ int main(int argc, char *argv[])
 	SDL_DestroyTexture(lightbarTexture);
 	SDL_FreeSurface(screen);
 	SDL_DestroyTexture(fbTexture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+
+    	// clean up all hardware state
+	state_done();
 
 	return 0;
 }
