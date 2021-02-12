@@ -1,11 +1,8 @@
-.TH FREEBEE 1 "Feb 10 2021" "" "AT&T 3B1 Emulation"
+.TH FREEBEE 1 "Feb 11 2021" "" "AT&T 3B1 Emulation"
 .SH NAME
 freebee \- emulate an AT&T 3B1 personal computer
 .SH SYNOPSIS
 .B freebee
-[
-.BI "\-s " x-scale\^ : y-scale
-]
 .SH DESCRIPTION
 .I freebee
 is an emulator for the AT&T 3B1 personal Unix computer.
@@ -43,20 +40,6 @@ The kernel is approximately System V Release 2 vintage, with a few
 System V Release 3 user-land components.  In particular, the modern-day
 user will have to deal with both short filenames (14 characters maximum),
 and the lack of job control.
-.SH OPTIONS
-.TP
-.BI "\-s " x-scale\^ : y-scale
-Scale the display by
-.I x-scale
-in the X direction, and by
-.I y-scale
-in the Y direction.
-This option is useful on high resolution displays, where the
-emulated screen ends up being small and difficult to read.
-.PP
-This option overrides any values found in
-.IR freebee\^ 's
-configuration file.
 .SH CONFIGURATION
 .I freebee
 can be configured by creating a file in TOML format containing

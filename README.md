@@ -60,7 +60,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 ## Option 1: Use an existing drive image
   - Arnold Robbins created a drive image installed with all sorts of tools: [here](https://www.skeeve.com/3b1/)
   - David Gesswein created a drive image for the VCF Museum: [here](http://www.pdp8online.com/3b1/demos.shtml)
-  - Uncompress either of these images in the Freebee directory and rename the image to `hd.img`
+  - Uncompress either of these images in the Freebee directory and rename the image to `hd.img`, or create a `.freebee.toml` file pointing to the image. (See the CONFIGURATION section of the man page.)
 
 ## Option 2: Do a fresh install
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
