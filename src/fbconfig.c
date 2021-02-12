@@ -60,7 +60,7 @@ get_default_string(const char *heading, const char *item)
 		const char *item;
 		const char *value;
 	} defaults[] = {
-		{ "floppy", "disk", "discim" },
+		{ "floppy", "disk", "floppy.img" },
 		{ "hard_disk", "disk1", "hd.img" },
 		{ "hard_disk", "disk2", "hd2.img" },
 		{ "roms", "rom_14c", "roms/14c.bin" },

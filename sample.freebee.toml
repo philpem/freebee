@@ -8,8 +8,8 @@
 	disk = "/path/to/floppy.img"	# Floppy disk is optional
 
 [hard_disk]
-	disk1 = "/path/to/disk1.img"
-	disk2 = "/path/to/disk2.img"	# Second disk is optional
+	disk1 = "/path/to/hd.img"
+	disk2 = "/path/to/hd2.img"	# Second disk is optional
 
 [display]
 	x_scale = 1.0			# How much to scale in X dimension

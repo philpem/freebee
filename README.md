@@ -20,7 +20,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * Two separate drives.
     * Maximum 1400 cylinders (limited by the UNIX OS, see [the UNIX PC FAQ, section 5.6](http://www.unixpc.org/FAQ)).
     * Heads fixed at 8.
-    * Sectors per track fixed at 16.
+    * Sectors per track fixed at 17.
     * Fixed 512 bytes per sector.
     * Those numbers are the default configuration; see below for more information.
   * WD2797 floppy disk controller.
@@ -51,43 +51,55 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 # Running Freebee
 
+## Initial Setup
   - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
+  - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
+    * Rename `14C 72-00616.bin` to `14c.bin`
+    * Rename `15C 72-00617.bin` to `15c.bin`
+
+## Option 1: Use an existing drive image
+  - Arnold Robbins created a drive image installed with all sorts of tools: [here](https://www.skeeve.com/3b1/)
+  - David Gesswein created a drive image for the VCF Museum: [here](http://www.pdp8online.com/3b1/demos.shtml)
+  - Uncompress either of these images in the Freebee directory and rename the image to `hd.img`
+
+## Option 2: Do a fresh install
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
     * The disk images on unixpc.org don't work: the boot track is missing.
     * Use the replacement version of the `08_Foundation_Set_Ver_3.51.IMD` image which is available [here](https://www.skeeve.com/3b1/os-install/index.html).
-  - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
-    * Rename `14C 72-00616.bin` to `14c.bin`.
-    * Rename `15C 72-00617.bin` to `15c.bin`.
   - Create a hard drive image file:
     * Use the `makehdimg` program supplied in the `tools` directory to create an initial `hd.img` file with the number of cylinders, heads and sectors per track that you want.  Limits: 1400 cylinders, 16 heads, 17 sectors per track.
     * When using the diagnostics disk to initialize the hard disk, select "Other" and supply the correct values that correspond to the numbers used with `makehdimg`.
-    * You can use `dd if=/dev/zero of=hd.img bs=512 count=$(expr 17 \* 8 \* 1024)` to create a disk matching the compiled-in defaults.  You still need to initialize the disk using the "Miniscribe 64MB" (CHS 1024:8:17, 512 bytes per sector) choice.
+    * Alternatively, you can use `dd if=/dev/zero of=hd.img bs=512 count=$(expr 17 \* 8 \* 1024)` to create a disk matching the compiled-in defaults. Initialize the disk using the "Miniscribe 64MB" (CHS 1024:8:17, 512 bytes per sector) choice.
     * The second hard drive file is optional. If present, it should be called `hd2.img`.  You can copy an existing `hd.img` to `hd2.img` as a quick way to get a disk with a filesystem already on it. When Unix is up and running, use `mount /dev/fp012 /mnt` to mount the second drive. You may want to run `fsck` on it first, just to be safe.
   - You can also use the ICUS Enhanced Diagnostics disk. A bootable copy is
   available [here](https://www.skeeve.com/3b1/enhanced-diag/index.html).
   Uncompress it before using.
   - Install the operating system:
     * Follow the instructions in the [3B1 Software Installation Guide](http://bitsavers.org/pdf/att/3b1/999-801-025IS_ATT_UNIX_PC_System_Software_Installation_Guide_1987.pdf) to install UNIX.
-    * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `discim` in the Freebee directory.
+    * Copy `01_Diagnostic_Disk_Ver_3.51.IMD` to `floppy.img` in the Freebee directory.
     * If you wish to increase the swap space size, do so with the diagnostics
       disk before installing the OS. See these [instructions](https://groups.google.com/g/comp.sys.att/c/8XLILI3K8-Y/m/VxVMJNdt9NQJ).
     * To change disks:
       * Press F11 to release the disk image.
-      * Copy the next disk image as `discim` in the Freebee directory.
+      * Copy the next disk image to `floppy.img` in the Freebee directory.
       * Press F11 to load the disk image.
     * Instead of `08_Foundation_Set_Ver_3.51.IMD` use `08_Foundation_Set_Ver_3.51_no_phinit.IMD` from [here](https://www.skeeve.com/3b1/os-install/index.html).
       This will allow the emulated Unix PC to come all the way up to
       a login prompt after the installation.
-  - Files can be imported using the `msdos` command which allows reading a 360k MS-DOS floppy image.
-    * Use dosbox to copy files to a DOS disk image (`discim`).
-  - Another option is to use the tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the image as a usable filesystem under Linux.
+
+## Importing files
+  - Files can be imported using the 3b1 `msdos` command which allows reading a 360k MS-DOS floppy image.
+    * Use dosbox to copy files to a DOS disk image named `floppy.img`. This image must be in the same directory as the Freebee executable (or path specified in the .freebee.toml config file).
+    * If the floppy.img file wasn't present on boot or was updated, hit F11 to load/unload the floppy image.
+    * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
+  - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
 
 
 # Keyboard commands
 
   * F9 -- Send the SUSPEND key
   * F10 -- Grab/Release mouse cursor
-  * F11 -- Load/Unload floppy disk image
+  * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
 
 
