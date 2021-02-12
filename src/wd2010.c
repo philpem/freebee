@@ -80,9 +80,8 @@ static int wd2010_default_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secs
 	unsigned int tracks = filesize / secsz / spt / heads;
 	// Confirm...
 	if (tracks < 1 || tracks > 1400) {
-		fprintf(stderr, "ERROR loading disc image 'hd.img'.\n");
 		if (tracks > 1400) {
-			fprintf(stderr, "ERROR hard disk cylinders > 1400 unsupported by UNIX.\n");
+			fprintf(stderr, "ERROR hard disk %d: cylinders > 1400 unsupported by UNIX.\n", drivenum);
 		}
 		return WD2010_ERR_BAD_GEOM;
 	}
@@ -188,8 +187,10 @@ int wd2010_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int
 		result = wd2010_default_init(ctx, fp, drivenum, secsz, spt, heads);
 	}
 
+	if (result != WD2010_ERR_OK) return result;
+
 	drivenum = drivenum ? 1 : 0;	// force to 1 or 0
-	printf("WD2010 initialised: %d cylinders, %d heads, %d sectors per track\n",
+	printf("Drive %d initialised: %d cylinders, %d heads, %d sectors per track\n", drivenum,
 			ctx->geometry[drivenum].tracks, ctx->geometry[drivenum].heads,
 			ctx->geometry[drivenum].spt);
 

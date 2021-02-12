@@ -37,7 +37,7 @@ static int load_fd()
 		state.fdc_disc = fopen(discim, "rb");
 	}
 	if (!state.fdc_disc){
-		fprintf(stderr, "ERROR loading disc image 'discim'.\n");
+		fprintf(stderr, "ERROR loading floppy image '%s'.\n", discim);
 		state.fdc_disc = NULL;
 		return (0);
 	}else{
@@ -54,25 +54,31 @@ static int load_hd()
 
 	state.hdc_disc0 = fopen(disk1, "r+b");
 	if (!state.hdc_disc0){
-		fprintf(stderr, "ERROR loading disc image '%s'.\n", disk1);
+		fprintf(stderr, "Drive 0: ERROR loading disc image '%s'.\n", disk1);
 		state.hdc_disc0 = NULL;
 		return (0);
 	} else {
-		wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, 512, 16, 8);
-		printf("Disc image '%s' loaded.\n", disk1);
-		ret = 1;
+		if (wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, 512, 17, 8) == WD2010_ERR_OK) {
+			printf("Drive 0: Disc image '%s' loaded.\n", disk1);
+			ret = 1;
+		} else {
+			fprintf(stderr, "Drive 0: ERROR loading disc image '%s'.\n", disk1);
+			ret = 0;
+		}
 	}
 
 	state.hdc_disc1 = fopen(disk2, "r+b");
 	if (!state.hdc_disc1){
-		fprintf(stderr, "ERROR loading disc image '%s'.\n", disk2);
+		fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
 		state.hdc_disc1 = NULL;
-		return ret;
 	} else {
-		wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, 512, 16, 8);
-		printf("Disc image '%s' loaded.\n", disk2);
-		return (1);
+		if (wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, 512, 17, 8) == WD2010_ERR_OK) {
+			printf("Drive 1: Disc image '%s' loaded.\n", disk2);
+		} else {
+			fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
+		}
 	}
+	return ret;
 }
 
 
