@@ -295,25 +295,18 @@ bool HandleSDLEvents(SDL_Window *window)
 	return false;
 }
 
-static void usage()
-{
-	fprintf(stderr, "usage: freebee [-s xscale:yscale]\n");
-	exit(EXIT_FAILURE);
-}
-
 /****************************
  * blessed be thy main()...
  ****************************/
 
 int main(int argc, char *argv[])
 {
-	int c;
 	float scalex = fbc_get_double("display", "x_scale");
 	float scaley = fbc_get_double("display", "y_scale");
 
 	if (scalex <= 0 || scalex > 45 || scaley <= 0 || scaley > 45) {
 		// 45 chosen as max because 45 * 720 < INT16_MAX
-		fprintf(stderr, "scale factors must be positive and no larger than 45\n");
+		fprintf(stderr, "scale factors must be greater than zero and less than or equal to 45\n");
 		exit(EXIT_FAILURE);
 	}
 

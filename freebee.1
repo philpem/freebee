@@ -1,4 +1,4 @@
-.TH FREEBEE 1 "Feb 12 2021" "" "AT&T 3B1 Emulation"
+.TH FREEBEE 1 "Feb 13 2021" "" "AT&T 3B1 Emulation"
 .SH NAME
 freebee \- emulate an AT&T 3B1 personal computer
 .SH SYNOPSIS
@@ -94,6 +94,12 @@ or for file transfer. See the file
 .I README.serial.md
 in the source code directory for more information and concise
 instructions on how to use the serial port.
+.SH SCALING THE DISPLAY
+You can scale the display by setting scale factors in the
+.I .freebee.toml
+file.
+Scale values must be greater than zero and less than or equal to 45. This
+facility is useful on large displays.
 .SH AUTHORS
 Phil Pemberton, with contributions from several others.
 .SH BUG REPORTS
