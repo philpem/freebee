@@ -12,8 +12,8 @@
 	disk2 = "/path/to/hd2.img"	# Second disk is optional
 
 [display]
-	x_scale = 1.0			# How much to scale in X dimension
-	y_scale = 1.0			# How much to scale in Y dimension
+	x_scale = 1.0			# Scale in X dimension, 0 < n <= 45
+	y_scale = 1.0			# Scale in Y dimension, 0 < n <= 45
 	red = 0x00			# foreground colors
 	green = 0xFF
 	blue = 0x00

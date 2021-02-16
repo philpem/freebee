@@ -1,7 +1,7 @@
 # freebee
 FreeBee - AT&amp;T 3B1 emulator
 
-FreeBee is an emulator for the AT&T 3B1. It's a work-in-progress, but currently works well enough to boot the operating system.
+FreeBee is an emulator for the AT&T 3B1. It's a work-in-progress, but currently works well enough to boot the operating system and to compile programs with the standard C compiler.
 
 
 ## Maintained by
@@ -60,7 +60,7 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 ## Option 1: Use an existing drive image
   - Arnold Robbins created a drive image installed with all sorts of tools: [here](https://www.skeeve.com/3b1/)
   - David Gesswein created a drive image for the VCF Museum: [here](http://www.pdp8online.com/3b1/demos.shtml)
-  - Uncompress either of these images in the Freebee directory and rename the image to `hd.img`
+  - Uncompress either of these images in the Freebee directory and rename the image to `hd.img`, or create a `.freebee.toml` file pointing to the image. (See the CONFIGURATION section of the man page.)
 
 ## Option 2: Do a fresh install
   - Download the 3B1 Foundation disk set from Bitsavers: [here](http://bitsavers.org/bits/ATT/unixPC/system_software_3.51/)
@@ -94,6 +94,11 @@ Phil Pemberton -- <philpem@philpem.me.uk>
     * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
   - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
 
+## Scaling the display
+
+You can scale the display by setting scale factors in the `.freebee.toml` file.
+Scale values must be greater than zero and less than or equal to 45. This
+facility is useful on large displays.
 
 # Keyboard commands
 
@@ -115,13 +120,11 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
   * To make an MS-DOS disk under Linux (9 tracks per sector):
 
-```sh
-dd if=/dev/zero of=dos.img bs=1k count=360
-/sbin/mkfs.fat dos.img
-sudo mount -o loop -t msdos dos.img /mnt
-... copy files to /mnt ...
-sudo umount /mnt
-```
+	<code>dd if=/dev/zero of=dos.img bs=1k count=360<br/>
+	/sbin/mkfs.fat dos.img<br/>
+	sudo mount -o loop -t msdos dos.img /mnt<br/>
+	... copy files to /mnt ...<br/>
+	sudo umount /mnt<br/></code>
 
   * To make a 10 track per sector disk image, just use `count=400` in the `dd` command and then format the disk under Unix with `iv` and `mkfs`.
 
