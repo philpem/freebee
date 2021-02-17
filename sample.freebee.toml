@@ -10,6 +10,10 @@
 [hard_disk]
 	disk1 = "/path/to/hd.img"
 	disk2 = "/path/to/hd2.img"	# Second disk is optional
+	# Default disk parameters. Overridden by disk label in
+	# the hard disk image.
+	cylinders = 8
+	sectors_per_track = 17
 
 [display]
 	x_scale = 1.0			# Scale in X dimension, 0 < n <= 45
@@ -24,3 +28,10 @@
 
 [serial]
 	symlink = "serial-pty"
+
+[vidpal]
+	installed = true
+
+[memory]
+	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
+	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.

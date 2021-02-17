@@ -30,8 +30,8 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.dma_dev = DMA_DEV_UNDEF;
 	state.mcr2mirror = 0;
 
-	// Enable VIDPAL mod (allows user writing to VRAM)
-	state.vidpal = true;
+	// Enable VIDPAL mod (allows user writing to VRAM), per config setting
+	state.vidpal = fbc_get_bool("vidpal", "installed");
 
 	// Allocate Base RAM, making sure the user has specified a valid RAM amount first
 	// Basically: 512KiB minimum, 2MiB maximum, in increments of 512KiB.
