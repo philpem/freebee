@@ -12,7 +12,7 @@
 	disk2 = "/path/to/hd2.img"	# Second disk is optional
 	# Default disk parameters. Overridden by disk label in
 	# the hard disk image.
-	cylinders = 8
+	heads = 8
 	sectors_per_track = 17
 
 [display]
