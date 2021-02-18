@@ -331,13 +331,13 @@ void validate_memory(int base_memory, int extended_memory)
 	}
 
 	if (! base_ok) {
-		fprintf(stderr, "base_memory size %dK is invalid\n",
+		fprintf(stderr, "Motherboard memory size %dK is invalid; it must be a multiple of 512K.\n",
 				base_memory);
 		exit(EXIT_FAILURE);
 	}
 
 	if (! extended_ok) {
-		fprintf(stderr, "extended_memory size %dK is invalid\n",
+		fprintf(stderr, "Extension memory size %dK is invalid; it must be a multiple of 512K.\n",
 				extended_memory);
 		exit(EXIT_FAILURE);
 	}
