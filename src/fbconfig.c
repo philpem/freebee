@@ -125,7 +125,7 @@ get_default_bool(const char *heading, const char *item)
 		}
 	}
 
-	return 0;
+	return false;
 }
 
 /* get_default_int --- get an int value from the configuration */
