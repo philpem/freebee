@@ -141,7 +141,7 @@ get_default_int(const char *heading, const char *item)
 		{ "display", "red", 0x00 },
 		{ "display", "green", 0xFF },
 		{ "display", "blue", 0x00 },
-		{ "hard_disk", "cylinders", 8 },
+		{ "hard_disk", "heads", 8 },
 		{ "hard_disk", "sectors_per_track", 17 },
 		{ "memory", "base_memory", 2048 },
 		{ "memory", "extended_memory", 2048 },
