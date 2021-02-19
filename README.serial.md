@@ -8,14 +8,18 @@ A pseudoterminal (pty) will be created on launch of FreeBee. The file `serial-pt
   * Linux: Run terminal emulator pointed at our pty
     * Install package "minicom", "picocom", "putty", or "screen" (minicom recommended)
     * Then run:
-      * Minicom: `minicom -D ./serial-pty` (Ctrl-A + Q to quit)
-      * Picocom: `picocom --omap delbs --send-cmd "sx -vv" --receive-cmd "rx -vv" ./serial-pty` (Ctrl-A + Ctrl-Q to quit)
-      * Putty: `putty -serial ./serial-pty` (use Shift-Backspace to backspace, or configure to send ^H)
-      * Screen: `screen ./serial-pty` (Ctrl-A + \\ to quit)
+      * Minicom: `minicom -D ./serial-pty`
+        * To quit: Ctrl-A + Q
+      * Picocom: `picocom --omap delbs --send-cmd "sx -vv" --receive-cmd "rx -vv" ./serial-pty`
+        * To quit: Ctrl-A + Ctrl-Q
+      * Putty: `putty -serial ./serial-pty`
+        * To backspace: use Shift-Backspace (or configure to send ^H)
+      * Screen: `screen ./serial-pty`
+        * To quit: Ctrl-A + \\
 
 ## Transferring files via Xmodem
   * Once a serial connection has been made, files can be transferred via Xmodem
-  * If using Picocom, "rzsz" (or "lrzsz") package must be installed and "--send-cmd" and "--receive-cmd" parameters specified on cmd line
+  * If using Picocom, "rzsz" (or "lrzsz") package must be installed and "--send-cmd" and "--receive-cmd" parameters specified on cmd line (see above)
   * Sending a local file to 3b1
     * Initiate receive on 3b1 with: `umodem -rb <filename>`
     * Then quickly select file to send:
@@ -38,3 +42,17 @@ A pseudoterminal (pty) will be created on launch of FreeBee. The file `serial-pt
     * Login to your Linux machine - when done, exiting your Linux shell should also end the agetty
     * If you'd like to login again, run the agetty command again
     * When done with cu, enter `~.` + Enter to exit cu
+
+## Transferring files via Kermit
+  * 3b1: Make sure getty is **NOT** running on tty000
+    * Boot FreeBee and run `setgetty 000 0` as root
+  * 3b1:
+    * Download kermit binary if not already present on your system
+    * Run `kermit -l /dev/tty000`
+    * At `C-Kermit>` prompt:
+      * Receive file with `receive`
+      * Send file with `send <filename>`
+  * Linux:
+    * Install package "gkermit"
+    * Send file with `gkermit -s <filename> > ./serial-pty < ./serial-pty`
+    * Receive file with `gkermit -r > ./serial-pty < ./serial-pty`
