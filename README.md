@@ -102,11 +102,22 @@ facility is useful on large displays.
 
 # Keyboard commands
 
-  * F9 -- Send the SUSPEND key
   * F10 -- Grab/Release mouse cursor
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
 
+# 3b1-specific key mappings
+
+  * F1-F8 -- "soft keys" at bottom of screen
+  * F9 -- SUSPD key (brings up list of windows)
+  * Alt-Esc -- EXIT key
+  * Alt-Backspace -- CANCL key
+  * Page Up -- HELP key
+  * Page Down -- PAGE key
+  * Insert -- CMD key
+  * Enter -- RETURN key
+  * Alt-Enter -- ENTER key
+  * Pause Break -- RESET BREAK key
 
 # Useful links
 

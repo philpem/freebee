@@ -18,7 +18,7 @@ struct {
 	{ SDLK_KP_2,			0,	0x01 },	// ROLL/Up		[Keypad 2]
 //	{ SDLK_,				1,	0x02 },	// Clear Line
 //	{ SDLK_,				1,	0x03 },	// Rstrt / Ref
-	{ SDLK_ESCAPE,				1,	0x04 },	// Exit
+	{ SDLK_ESCAPE,			1,	0x04 },	// Exit
 	{ SDLK_KP_1,			0,	0x05 },	// PREV			[Keypad 1]
 //	{ SDLK_,				1,	0x06 },	// Msg
 	{ SDLK_BACKSPACE,		1,	0x07 },	// Cancl
@@ -59,7 +59,7 @@ struct {
 	{ SDLK_QUOTE,			0,	0x27 },	// ' (single-quote)
 //	{ SDLK_,				1,	0x28 },	// SLCT/MARK
 //	{ SDLK_,				1,	0x29 },	// INPUT/MODE
-//	{ SDLK_,				1,	0x2a },	// HELP
+	{ SDLK_PAGEUP,			0,	0x2a },	// HELP
 //	Keycode 2B not used
 	{ SDLK_COMMA,			0,	0x2c },	// ,			[Comma]
 	{ SDLK_MINUS,			0,	0x2d },	// -			[Dash]
@@ -80,11 +80,12 @@ struct {
 // Keycode 3C not used
 	{ SDLK_EQUALS,			0,	0x3d },	// =			[Equals]
 // Keycodes 3E, 3F, 40 not used
-//	{ SDLK_,				1,	0x41 },	// CMD
+	{ SDLK_INSERT,			0,	0x41 },	// CMD
 //	{ SDLK_,				1,	0x42 },	// CLOSE/OPEN
 	{ SDLK_KP_7,			0,	0x43 },	// PRINT
 	{ SDLK_KP_8,			0,	0x44 },	// CLEAR/RFRSH
 	{ SDLK_CAPSLOCK,		0,	0x45 },	// Caps Lock
+	{ SDLK_PAGEDOWN,		0,	0x46 },	// PAGE
 	{ SDLK_KP_9,			0,	0x46 },	// PAGE
 	{ SDLK_KP_4,			0,	0x47 },	// BEG
 	{ SDLK_LSHIFT,			0,	0x48 },	// Left Shift
