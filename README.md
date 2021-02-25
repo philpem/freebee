@@ -8,6 +8,14 @@ FreeBee is an emulator for the AT&T 3B1. It's a work-in-progress, but currently 
 
 Phil Pemberton -- <philpem@philpem.me.uk>
 
+## Limitations
+
+There are a number of known instability issues with the Apple Mac OS. I'm bored of trying to work around these issues, for a platform I don't use.
+
+If you have an issue on OSX, first try to reproduce it under a Windows or Linux build. If you can, report it as an issue under one of those platforms.
+
+**I will not accept pull requests or issues which have been reported solely on an Apple system or Mac OS.**
+
 
 ## Things which are emulated...
 
