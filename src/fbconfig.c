@@ -104,7 +104,31 @@ get_default_double(const char *heading, const char *item)
 	return 0.0;
 }
 
-/* get_default_int --- get a int value from the configuration */
+/* get_default_bool --- get a bool value from the configuration */
+
+static bool
+get_default_bool(const char *heading, const char *item)
+{
+	static struct default_doubles {
+		const char *heading;
+		const char *item;
+		bool value;
+	} defaults[] = {
+		{ "vidpal", "installed", true },
+		{ NULL, NULL, false }
+	};
+
+	int i;
+	for (i = 0; defaults[i].heading != NULL; i++) {
+		if (strcmp(defaults[i].heading, heading) == 0 && strcmp(defaults[i].item, item) == 0) {
+			return defaults[i].value;
+		}
+	}
+
+	return false;
+}
+
+/* get_default_int --- get an int value from the configuration */
 
 static int
 get_default_int(const char *heading, const char *item)
@@ -117,6 +141,10 @@ get_default_int(const char *heading, const char *item)
 		{ "display", "red", 0x00 },
 		{ "display", "green", 0xFF },
 		{ "display", "blue", 0x00 },
+		{ "hard_disk", "heads", 8 },
+		{ "hard_disk", "sectors_per_track", 17 },
+		{ "memory", "base_memory", 2048 },
+		{ "memory", "extended_memory", 2048 },
 		{ NULL, NULL, 0 }
 	};
 
@@ -183,7 +211,18 @@ fbc_get_bool(const char *heading, const char *item)
 	if (! inited)
 		initialize();
 
-	return false;	// no bools defined at the moment
+	if (have_toml) {
+		toml_table_t* category = toml_table_in(table_config, heading);
+		if (category != NULL) {
+			toml_datum_t value = toml_bool_in(category, item);
+			if (value.ok) {
+				return value.u.b;
+			}
+		}
+	}
+
+
+	return get_default_bool(heading, item);
 }
 
 /* fbc_get_int --- get a int value from the configuration */

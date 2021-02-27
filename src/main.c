@@ -51,6 +51,11 @@ static int load_hd()
 	int ret = 0;
 	const char *disk1 = fbc_get_string("hard_disk", "disk1");
 	const char *disk2 = fbc_get_string("hard_disk", "disk2");
+	int sectors_per_track = fbc_get_int("hard_disk", "sectors_per_track");
+	int heads = fbc_get_int("hard_disk", "heads");
+	// bytes per sector is fixed at 512, not configurable, all hard drives of the 3B1
+	// era used 512-byte sectors.
+	const int bytes_per_sector = 512;
 
 	state.hdc_disc0 = fopen(disk1, "r+b");
 	if (!state.hdc_disc0){
@@ -58,7 +63,7 @@ static int load_hd()
 		state.hdc_disc0 = NULL;
 		return (0);
 	} else {
-		if (wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, 512, 17, 8) == WD2010_ERR_OK) {
+		if (wd2010_init(&state.hdc_ctx, state.hdc_disc0, 0, bytes_per_sector, sectors_per_track, heads) == WD2010_ERR_OK) {
 			printf("Drive 0: Disc image '%s' loaded.\n", disk1);
 			ret = 1;
 		} else {
@@ -72,7 +77,7 @@ static int load_hd()
 		fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
 		state.hdc_disc1 = NULL;
 	} else {
-		if (wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, 512, 17, 8) == WD2010_ERR_OK) {
+		if (wd2010_init(&state.hdc_ctx, state.hdc_disc1, 1, bytes_per_sector, sectors_per_track, heads) == WD2010_ERR_OK) {
 			printf("Drive 1: Disc image '%s' loaded.\n", disk2);
 		} else {
 			fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
@@ -295,6 +300,49 @@ bool HandleSDLEvents(SDL_Window *window)
 	return false;
 }
 
+
+/**
+ * @brief	Validate the memory amounts requested.
+ */
+
+void validate_memory(int base_memory, int extended_memory)
+{
+	static const int memsizes_allowed[] = {
+		512, 1024, 1536, 2048
+	};
+	bool base_ok = false;
+	bool extended_ok = false;
+
+	int i;
+	int j = sizeof(memsizes_allowed) / sizeof(const int);
+
+	for (i = 0; i < j; i++) {
+		if (base_memory == memsizes_allowed[i]) {
+			 base_ok = true;
+			 break;
+		}
+	}
+
+	for (i = 0; i < j; i++) {
+		if (extended_memory == memsizes_allowed[i]) {
+			 extended_ok = true;
+			 break;
+		}
+	}
+
+	if (! base_ok) {
+		fprintf(stderr, "Motherboard memory size %dK is invalid; it must be a multiple of 512K.\n",
+				base_memory);
+		exit(EXIT_FAILURE);
+	}
+
+	if (! extended_ok) {
+		fprintf(stderr, "Extension memory size %dK is invalid; it must be a multiple of 512K.\n",
+				extended_memory);
+		exit(EXIT_FAILURE);
+	}
+}
+
 /****************************
  * blessed be thy main()...
  ****************************/
@@ -317,9 +365,16 @@ int main(int argc, char *argv[])
 	printf("\n");
 
 	// set up system state
-	// 512K of RAM
+	// RAM sizes come from config, default 2 Meg for each kind of memory
 	int i;
-	if ((i = state_init(2048*1024, 2048*1024)) != STATE_E_OK) {
+	int base_memory = fbc_get_int("memory", "base_memory");
+	int extended_memory = fbc_get_int("memory", "extended_memory");
+
+	validate_memory(base_memory, extended_memory);	// exits if problem
+
+	base_memory *= 1024;
+	extended_memory *= 1024;
+	if ((i = state_init(base_memory, extended_memory)) != STATE_E_OK) {
 		fprintf(stderr, "ERROR: Emulator initialisation failed. Error code %d.\n", i);
 		return i;
 	}
