@@ -474,7 +474,7 @@ int main(int argc, char *argv[])
 					uint16_t d = 0;
 
 					// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
-					if (num > (1e6/TIMESLOT_FREQUENCY)) break;
+					if (num > (1e6/TIMESLOT_FREQUENCY / NUM_CPU_TIMESLOTS)) break;
 
 					// Evidently we have more words to copy. Copy them.
 					if (state.dma_dev == DMA_DEV_FD){
