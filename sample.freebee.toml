@@ -18,6 +18,7 @@
 [display]
 	x_scale = 1.0			# Scale in X dimension, 0 < n <= 45
 	y_scale = 1.0			# Scale in Y dimension, 0 < n <= 45
+	scale_quality = "nearest"	# "nearest" (default), "linear", or "best"
 	red = 0x00			# foreground colors
 	green = 0xFF
 	blue = 0x00

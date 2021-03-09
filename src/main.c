@@ -400,6 +400,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, fbc_get_string("display", "scale_quality"));  // "nearest" (default), "linear", or "best"
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 	SDL_RenderSetScale(renderer, scalex, scaley);
 	if (!renderer){
