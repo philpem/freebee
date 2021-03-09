@@ -1098,9 +1098,7 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 
 static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
 {
-	if (address < ZEROPAGE && USER_MODE) {
-		return;
-	} else if (address <= 0x1fffff) {
+	if (address <= 0x1fffff) {
 		if (address < state.base_ram_size) {
 			WR16(state.base_ram, address, state.base_ram_size - 1, value);
 		}
@@ -1166,9 +1164,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 16);
 
-	if (address < ZEROPAGE && USER_MODE) {
-		return;
-	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
@@ -1215,9 +1211,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 8);
 
-	if (address < ZEROPAGE && USER_MODE) {
-		return;
-	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access (read only!)
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
