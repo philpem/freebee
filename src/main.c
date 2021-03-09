@@ -13,6 +13,7 @@
 #include "state.h"
 #include "memory.h"
 #include "fbconfig.h"
+#include "utils.h"
 
 #include "lightbar.c"
 #include "i8274.h"
@@ -307,31 +308,34 @@ bool HandleSDLEvents(SDL_Window *window)
 
 void validate_memory(int base_memory, int extended_memory)
 {
-	static const int memsizes_allowed[] = {
-		512, 1024, 1536, 2048
+	static const int base_memsizes_allowed[] = {
+		512, 1024, 2048
 	};
+	static const int extended_memsizes_allowed[] = {
+		0, 512, 1024, 1536, 2048
+	};
+
 	bool base_ok = false;
 	bool extended_ok = false;
 
 	int i;
-	int j = sizeof(memsizes_allowed) / sizeof(const int);
 
-	for (i = 0; i < j; i++) {
-		if (base_memory == memsizes_allowed[i]) {
+	for (i = 0; i < NELEMS(base_memsizes_allowed); i++) {
+		if (base_memory == base_memsizes_allowed[i]) {
 			 base_ok = true;
 			 break;
 		}
 	}
 
-	for (i = 0; i < j; i++) {
-		if (extended_memory == memsizes_allowed[i]) {
+	for (i = 0; i < NELEMS(extended_memsizes_allowed); i++) {
+		if (extended_memory == extended_memsizes_allowed[i]) {
 			 extended_ok = true;
 			 break;
 		}
 	}
 
 	if (! base_ok) {
-		fprintf(stderr, "Motherboard memory size %dK is invalid; it must be a multiple of 512K.\n",
+		fprintf(stderr, "Motherboard memory size %dK is invalid; it must be 512, 1024, or 2048.\n",
 				base_memory);
 		exit(EXIT_FAILURE);
 	}
