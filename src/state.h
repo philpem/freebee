@@ -80,7 +80,6 @@ typedef struct {
 	bool		idmarw;
 	/// DMA enable
 	bool		dmaen;
-	bool		dmaenb;
 
 	/// DMA device selection flags
 	bool		fd_selected;
