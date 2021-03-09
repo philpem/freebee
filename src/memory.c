@@ -1040,6 +1040,12 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 {
 	uint8_t data = EMPTY & 0xFF;
 
+	// Musashi m68ki_exception_bus_error() check
+	// If this read occurs, pulse_bus_error() was called when we were already processing
+	//   a bus error, address error, or reset, this is a catastrophic failure
+	// This occurs during Diagnostics:Processor:Page Protection Tests #2 (12,2) and #4 (12,4)
+	assert(address != 0xFFFF01);
+
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
