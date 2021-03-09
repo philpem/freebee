@@ -97,7 +97,7 @@ static int load_hd()
  * @param	y			Y co-ordinate
  * @param	pixel		Pixel value (from SDL_MapRGB)
  */
-void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
+static inline void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
 {
 	int bpp = surface->format->BytesPerPixel;
 	/* Here p is the address to the pixel we want to set */
