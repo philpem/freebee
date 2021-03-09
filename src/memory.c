@@ -207,6 +207,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				state.bsr0 = 0x7C00;								\
 			else													\
 				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			if (st==MEM_UIE) state.bsr0 |= 0x8000; 					\
 			state.bsr0 |= (faultAddr >> 16);							\
 			state.bsr1 = faultAddr & 0xffff;							\
 			LOG_PF("Bus Error while writing, addr %08X, statcode %d", address, st);		\
@@ -271,6 +272,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				state.bsr0 = 0x7C00;								\
 			else													\
 				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			if (st==MEM_UIE) state.bsr0 |= 0x8000;					\
 			state.bsr0 |= (faultAddr >> 16);							\
 			state.bsr1 = faultAddr & 0xffff;							\
 			LOG_PF("Bus Error while reading, addr %08X, statcode %d", faultAddr, st);		\
