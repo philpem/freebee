@@ -103,13 +103,22 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 {
 	// Get the page bits for this page.
 	uint16_t page = (addr >> 12) & 0x3FF;
-	uint8_t pagebits = (MAPRAM(page) >> 13) & 0x07;
+	uint8_t pagebits = state.map[page*2] >> 5;
 
 	// Check page is present (but only for RAM zone)
-	if ((addr < 0x400000) && ((pagebits & 0x03) == 0)) {
-		LOG_PF("Page fault: addr 0x%06X, page %03X -> phys page %03X, pagebits %d",
-				addr, page, MAPRAM(page) & 0x3FF, pagebits);
-		return MEM_PAGEFAULT;
+	if (addr < 0x400000) {
+		if ((pagebits & 0x03) == 0)
+		{
+			LOG_PF("Page fault: addr 0x%06X, page %03X -> phys page %03X, pagebits %d",
+					addr, page, MAPRAM(page) & 0x3FF, pagebits);
+			return MEM_PAGEFAULT;
+		}
+		// early out valid user reads, and writes to write enabled pages,
+		// not in kernel space, to avoid call to "expensive" supervisor mode check
+		if (addr >= 0x080000 && (!writing || (pagebits & 0x04)))
+		{
+			return MEM_ALLOWED;
+		}
 	}
 
 	// Are we in Supervisor mode?
