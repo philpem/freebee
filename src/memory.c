@@ -515,8 +515,11 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				break;
 			case 0x0C0000:				// Clear Status Register
 				// CSR is used to clear PERR* (main memory parity error), which is currently always returned as 'no parity error'
+				// "If the current cycle causes a parity error, MMU error, or processor bus error, GSR is not updated at the following cycles until CSR"
 				// clear MMU error in BSR0
 				state.bsr0 |= 0x8000;
+				// also disable PF- and UIE- in GSR
+				state.genstat |= 0x1100;
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
