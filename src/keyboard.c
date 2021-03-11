@@ -94,8 +94,8 @@ struct {
 	{ SDLK_KP_5,			0,	0x4a },	// Home			[Keypad 5]
 	{ SDLK_END,				0,	0x4b },	// End
 	{ SDLK_KP_6,			0,	0x4b },	// End			[Keypad 6]
-	{ SDLK_LCTRL,			0,	0x4c },	// Left Ctrl?	\___ not sure which is left and which is right...
-	{ SDLK_RCTRL,			0,	0x4d },	// Right Ctrl?	/
+	{ SDLK_LCTRL,			0,	0x4c },	// Left Ctrl
+	{ SDLK_RCTRL,			0,	0x4d },	// Right Ctrl
 // Keycodes 4E thru 5A not used
 	{ SDLK_LEFTBRACKET,		0,	0x5b },	// [
 	{ SDLK_BACKSLASH,		0,	0x5c },	// \ (backslash)
