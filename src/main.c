@@ -450,21 +450,22 @@ int main(int argc, char *argv[])
 	const uint32_t SYSTEM_CLOCK = 10e6; // Hz
 	const uint32_t TIMESLOT_FREQUENCY = 100;//240;	// Hz
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
+	const uint32_t CYCLES_PER_TIMESLOT = SYSTEM_CLOCK / TIMESLOT_FREQUENCY;
 	const uint32_t CLOCKS_PER_60HZ = (SYSTEM_CLOCK / 60);
 	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
-	uint32_t clock_cycles = 0, tmp;
+	uint32_t clock_cycles = 0, cycles_run;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
-		for (i = 0; i < NUM_CPU_TIMESLOTS; i++){
+		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
-			tmp = m68k_execute(SYSTEM_CLOCK/TIMESLOT_FREQUENCY / NUM_CPU_TIMESLOTS);
-			clock_cycles += tmp;
+			cycles_run = m68k_execute(CYCLES_PER_TIMESLOT / NUM_CPU_TIMESLOTS);
+			clock_cycles += cycles_run;
 
 			// Run the DMA engine
 			if (state.dmaen) {
