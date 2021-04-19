@@ -345,6 +345,10 @@ void validate_memory(int base_memory, int extended_memory)
 				extended_memory);
 		exit(EXIT_FAILURE);
 	}
+
+    printf("Memory config: %iKB On-board, %iKB Expansion\n", base_memory, extended_memory);
+    if (base_memory + extended_memory < 1024)
+       printf("*WARNING*: UNIX 3.51 requires 1MB of RAM. This configuration will only boot UNIX 3.50.\n\n");
 }
 
 /****************************
