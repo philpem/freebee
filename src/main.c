@@ -13,6 +13,7 @@
 #include "state.h"
 #include "memory.h"
 #include "fbconfig.h"
+#include "utils.h"
 
 #include "lightbar.c"
 #include "i8274.h"
@@ -96,7 +97,7 @@ static int load_hd()
  * @param	y			Y co-ordinate
  * @param	pixel		Pixel value (from SDL_MapRGB)
  */
-void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
+static inline void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
 {
 	int bpp = surface->format->BytesPerPixel;
 	/* Here p is the address to the pixel we want to set */
@@ -307,31 +308,34 @@ bool HandleSDLEvents(SDL_Window *window)
 
 void validate_memory(int base_memory, int extended_memory)
 {
-	static const int memsizes_allowed[] = {
-		512, 1024, 1536, 2048
+	static const int base_memsizes_allowed[] = {
+		512, 1024, 2048
 	};
+	static const int extended_memsizes_allowed[] = {
+		0, 512, 1024, 1536, 2048
+	};
+
 	bool base_ok = false;
 	bool extended_ok = false;
 
 	int i;
-	int j = sizeof(memsizes_allowed) / sizeof(const int);
 
-	for (i = 0; i < j; i++) {
-		if (base_memory == memsizes_allowed[i]) {
+	for (i = 0; i < NELEMS(base_memsizes_allowed); i++) {
+		if (base_memory == base_memsizes_allowed[i]) {
 			 base_ok = true;
 			 break;
 		}
 	}
 
-	for (i = 0; i < j; i++) {
-		if (extended_memory == memsizes_allowed[i]) {
+	for (i = 0; i < NELEMS(extended_memsizes_allowed); i++) {
+		if (extended_memory == extended_memsizes_allowed[i]) {
 			 extended_ok = true;
 			 break;
 		}
 	}
 
 	if (! base_ok) {
-		fprintf(stderr, "Motherboard memory size %dK is invalid; it must be a multiple of 512K.\n",
+		fprintf(stderr, "Motherboard memory size %dK is invalid; it must be 512, 1024, or 2048.\n",
 				base_memory);
 		exit(EXIT_FAILURE);
 	}
@@ -341,6 +345,10 @@ void validate_memory(int base_memory, int extended_memory)
 				extended_memory);
 		exit(EXIT_FAILURE);
 	}
+
+    printf("Memory config: %iKB On-board, %iKB Expansion\n", base_memory, extended_memory);
+    if (base_memory + extended_memory < 1024)
+       printf("*WARNING*: UNIX 3.51 requires 1MB of RAM. This configuration will only boot UNIX 3.50.\n\n");
 }
 
 /****************************
@@ -400,6 +408,9 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+    // SDL default is "nearest", our default is "linear" if there's scaling
+    if (scalex != 1.0 || scaley != 1.0)
+	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, fbc_get_string("display", "scale_quality"));
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 	SDL_RenderSetScale(renderer, scalex, scaley);
 	if (!renderer){
@@ -445,21 +456,22 @@ int main(int argc, char *argv[])
 	const uint32_t SYSTEM_CLOCK = 10e6; // Hz
 	const uint32_t TIMESLOT_FREQUENCY = 100;//240;	// Hz
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
+	const uint32_t CYCLES_PER_TIMESLOT = SYSTEM_CLOCK / TIMESLOT_FREQUENCY;
 	const uint32_t CLOCKS_PER_60HZ = (SYSTEM_CLOCK / 60);
 	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
-	uint32_t clock_cycles = 0, tmp;
+	uint32_t clock_cycles = 0, cycles_run;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
-		for (i = 0; i < NUM_CPU_TIMESLOTS; i++){
+		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
-			tmp = m68k_execute(SYSTEM_CLOCK/TIMESLOT_FREQUENCY / NUM_CPU_TIMESLOTS);
-			clock_cycles += tmp;
+			cycles_run = m68k_execute(CYCLES_PER_TIMESLOT / NUM_CPU_TIMESLOTS);
+			clock_cycles += cycles_run;
 
 			// Run the DMA engine
 			if (state.dmaen) {
@@ -469,7 +481,7 @@ int main(int argc, char *argv[])
 					uint16_t d = 0;
 
 					// num tells us how many words we've copied. If this is greater than the per-timeslot DMA maximum, bail out!
-					if (num > (1e6/TIMESLOT_FREQUENCY)) break;
+					if (num > (1e6/TIMESLOT_FREQUENCY / NUM_CPU_TIMESLOTS)) break;
 
 					// Evidently we have more words to copy. Copy them.
 					if (state.dma_dev == DMA_DEV_FD){

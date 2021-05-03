@@ -19,7 +19,7 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 
 	// Initialise hardware registers
 	state.romlmap = false;
-	state.idmarw = state.dmaen = state.dmaenb = false;
+	state.idmarw = state.dmaen = false;
 	state.dma_count = state.dma_address = 0;
 	state.pie = 0;
 	state.ee = 0;

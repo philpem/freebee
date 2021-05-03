@@ -66,6 +66,7 @@ get_default_string(const char *heading, const char *item)
 		{ "roms", "rom_14c", "roms/14c.bin" },
 		{ "roms", "rom_15c", "roms/15c.bin" },
 		{ "serial", "symlink", "serial-pty" },
+		{ "display", "scale_quality", "linear" },
 		{ NULL, NULL, NULL }
 	};
 

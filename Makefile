@@ -112,7 +112,7 @@ VER_EXTRA	?=
 # build platform: win32 or linux
 PLATFORM	?=	linux
 # build type: release or debug
-BUILD_TYPE	?=	debug
+BUILD_TYPE	?=	release
 
 # target executable
 TARGET		=	freebee
@@ -166,8 +166,8 @@ endif
 ####
 CC		=	gcc
 CXX		=	g++
-CFLAGS	=	-O -Wall -pedantic -std=gnu99 $(EXT_CFLAGS)
-CXXFLAGS=	-O -Wall -pedantic -std=gnu++0x $(EXT_CXXFLAGS)
+CFLAGS	=	-Wall -pedantic -std=gnu99 $(EXT_CFLAGS)
+CXXFLAGS=	-Wall -pedantic -std=gnu++0x $(EXT_CXXFLAGS)
 LDFLAGS	=	$(EXT_LDFLAGS)
 RM		=	rm
 STRIP	=	strip

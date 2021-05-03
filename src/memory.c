@@ -40,7 +40,7 @@
  * Memory mapping
  ******************/
 
-#define MAPRAM(addr) (((uint16_t)state.map[addr*2] << 8) + ((uint16_t)state.map[(addr*2)+1]))
+#define MAPRAM(page) (((uint16_t)state.map[page*2] << 8) + ((uint16_t)state.map[(page*2)+1]))
 
 static uint32_t map_address_debug(uint32_t addr)
 {
@@ -53,64 +53,72 @@ static uint32_t map_address_debug(uint32_t addr)
 
 uint32_t mapAddr(uint32_t addr, bool writing)/*{{{*/
 {
-	if (addr < 0x400000) {
-		// RAM access. Check against the Map RAM
-		// Start by getting the original page address
-		uint16_t page = (addr >> 12) & 0x3FF;
+	assert(addr < 0x400000);
 
-		// Look it up in the map RAM and get the physical page address
-		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
+	// RAM access. Check against the Map RAM
+	// Start by getting the original page address
+	uint16_t page = (addr >> 12) & 0x3FF;
 
-		// Update the Page Status bits
-		uint8_t pagebits = (MAPRAM(page) >> 13) & 0x03;
-		// Pagebits --
-		//   0 = not present
-		//   1 = present but not accessed
-		//   2 = present, accessed (read from)
-		//   3 = present, dirty (written to)
-		switch (pagebits) {
-			case 0:
-				// Page not present
-				// This should cause a page fault
-				LOGS("Whoa! Pagebit update, when the page is not present!");
-				break;
+	// Look it up in the map RAM and get the physical page
+	uint32_t new_page = MAPRAM(page) & 0x3FF;
 
-			case 1:
-				// Page present -- first access
-				state.map[page*2] &= 0x9F;	// turn off "present" bit (but not write enable!)
-				if (writing)
-					state.map[page*2] |= 0x60;		// Page written to (dirty)
-				else
-					state.map[page*2] |= 0x40;		// Page accessed but not written
-				break;
+	// Update the Page Status bits
+	uint8_t pagebits = (state.map[page*2] >> 5) & 0x03;
+	// Pagebits --
+	//   0 = not present
+	//   1 = present but not accessed
+	//   2 = present, accessed (read from)
+	//   3 = present, dirty (written to)
+	switch (pagebits) {
+		case 0:
+			// Page not present
+			// This should cause a page fault
+			LOGS("Whoa! Pagebit update, when the page is not present!");
+			break;
 
-			case 2:
-			case 3:
-				// Page present, 2nd or later access
-				if (writing)
-					state.map[page*2] |= 0x60;		// Page written to (dirty)
-				break;
-		}
+		case 1:
+			// Page present -- first access
+			state.map[page*2] &= 0x9F;	// turn off "present" bit (but not write enable!)
+			if (writing)
+				state.map[page*2] |= 0x60;		// Page written to (dirty)
+			else
+				state.map[page*2] |= 0x40;		// Page accessed but not written
+			break;
 
-		// Return the address with the new physical page spliced in
-		return (new_page_addr << 12) + (addr & 0xFFF);
-	} else {
-		// I/O, VRAM or MapRAM space; no mapping is performed or required
-		// TODO: assert here?
-		return addr;
+		case 2:
+			// Page present, 2nd or later access
+			if (writing)
+				state.map[page*2] |= 0x60;		// Page written to (dirty)
+			break;
+		case 3:
+			// Page already dirty, no change
+			break;
 	}
+
+	// Return the address with the new physical page spliced in
+	return (new_page << 12) + (addr & 0xFFF);
 }/*}}}*/
 
 MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 {
 	// Get the page bits for this page.
 	uint16_t page = (addr >> 12) & 0x3FF;
-	uint8_t pagebits = (MAPRAM(page) >> 13) & 0x07;
+	uint8_t pagebits = state.map[page*2] >> 5;
 
 	// Check page is present (but only for RAM zone)
-	if ((addr < 0x400000) && ((pagebits & 0x03) == 0)) {
-		LOG_PF("Page fault: addr 0x%06X, page %04X, mapbits %04X", addr, page, MAPRAM(page));
-		return MEM_PAGEFAULT;
+	if (addr < 0x400000) {
+		if ((pagebits & 0x03) == 0)
+		{
+			LOG_PF("Page fault: addr 0x%06X, page %03X -> phys page %03X, pagebits %d",
+					addr, page, MAPRAM(page) & 0x3FF, pagebits);
+			return MEM_PAGEFAULT;
+		}
+		// early out valid user reads, and writes to write enabled pages,
+		// not in kernel space, to avoid call to "expensive" supervisor mode check
+		if (addr >= 0x080000 && (!writing || (pagebits & 0x04)))
+		{
+			return MEM_ALLOWED;
+		}
 	}
 
 	// Are we in Supervisor mode?
@@ -132,15 +140,15 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// User attempt to access the kernel
 	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
-	if (((addr >> 19) & 0x0F) == 0 && !(!writing && addr < ZEROPAGE)) {
+	if (addr < 0x080000 && !(!writing && addr < ZEROPAGE)) {
 		LOGS("Attempt by user code to access kernel space");
 		return MEM_KERNEL;
 	}
 
 	// Check page is write enabled
 	if (writing && ((pagebits & 0x04) == 0)) {
-		LOG_PF("Page not write enabled: inaddr 0x%06X, page %04X, mapram %04X [%02X %02X], pagebits %d",
-				addr, page, MAPRAM(page), state.map[page*2], state.map[(page*2)+1], pagebits);
+		LOG_PF("Page not write enabled: addr 0x%06X, page %03X -> phys page %03X, pagebits %d",
+				addr, page, MAPRAM(page) & 0x3FF, pagebits);
 		return MEM_PAGE_NO_WE;
 	}
 	// Page access allowed.
@@ -207,6 +215,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				state.bsr0 = 0x7C00;								\
 			else													\
 				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			if (st==MEM_UIE) state.bsr0 |= 0x8000; 					\
 			state.bsr0 |= (faultAddr >> 16);							\
 			state.bsr1 = faultAddr & 0xffff;							\
 			LOG_PF("Bus Error while writing, addr %08X, statcode %d", address, st);		\
@@ -271,6 +280,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 				state.bsr0 = 0x7C00;								\
 			else													\
 				state.bsr0 = (faultAddr & 1) ? 0x7E00 : 0x7D00;		\
+			if (st==MEM_UIE) state.bsr0 |= 0x8000;					\
 			state.bsr0 |= (faultAddr >> 16);							\
 			state.bsr1 = faultAddr & 0xffff;							\
 			LOG_PF("Bus Error while reading, addr %08X, statcode %d", faultAddr, st);		\
@@ -298,7 +308,8 @@ bool access_check_dma(int reading)
 
 		case MEM_UIE:
 			// User access to memory above 4MB
-			// FIXME? Shouldn't be possible with DMA... assert this?
+			// Shouldn't be possible with DMA, assert this
+			assert(0);
 			state.genstat = 0x30FF
 				| (reading ? 0x4000 : 0)
 				| (state.pie ? 0x8400 : 0);
@@ -308,7 +319,8 @@ bool access_check_dma(int reading)
 		case MEM_KERNEL:
 		case MEM_PAGE_NO_WE:
 			// Kernel access or page not write enabled
-			/* XXX: is this correct? */
+			// Shouldn't be possible with DMA, assert this
+			assert(0);
 			state.genstat = 0x31FF
 				| (reading ? 0x4000 : 0)
 				| (state.pie ? 0x8400 : 0);
@@ -323,8 +335,9 @@ bool access_check_dma(int reading)
 		state.bsr0 = 0x3C00;
 		state.bsr0 |= (state.dma_address >> 16);
 		state.bsr1 = state.dma_address & 0xffff;
+		// trigger NMI (DMA Page Fault) kernel panic
 		if (state.ee) m68k_set_irq(7);
-		printf("BUS ERROR FROM DMA: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
+		printf("DMA PAGE FAULT: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
 	}
 	return (access_ok);
 }
@@ -502,8 +515,11 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				break;
 			case 0x0C0000:				// Clear Status Register
 				// CSR is used to clear PERR* (main memory parity error), which is currently always returned as 'no parity error'
+				// "If the current cycle causes a parity error, MMU error, or processor bus error, GSR is not updated at the following cycles until CSR"
 				// clear MMU error in BSR0
 				state.bsr0 |= 0x8000;
+				// also disable PF- and UIE- in GSR
+				state.genstat |= 0x1100;
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -1040,6 +1056,12 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 {
 	uint8_t data = EMPTY & 0xFF;
 
+	// Musashi m68ki_exception_bus_error() check
+	// If this read occurs, pulse_bus_error() was called when we were already processing
+	//   a bus error, address error, or reset, this is a catastrophic failure
+	// This occurs during Diagnostics:Processor:Page Protection Tests #2 (12,2) and #4 (12,4)
+	assert(address != 0xFFFF01);
+
 	// If ROMLMAP is set, force system to access ROM
 	if (!state.romlmap)
 		address |= 0x800000;
@@ -1090,9 +1112,7 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 
 static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
 {
-	if (address < ZEROPAGE && USER_MODE) {
-		return;
-	} else if (address <= 0x1fffff) {
+	if (address <= 0x1fffff) {
 		if (address < state.base_ram_size) {
 			WR16(state.base_ram, address, state.base_ram_size - 1, value);
 		}
@@ -1158,9 +1178,7 @@ void m68k_write_memory_16(uint32_t address, uint32_t value)/*{{{*/
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 16);
 
-	if (address < ZEROPAGE && USER_MODE) {
-		return;
-	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
@@ -1207,9 +1225,7 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 	// Check access permissions
 	ACCESS_CHECK_WR(address, 8);
 
-	if (address < ZEROPAGE && USER_MODE) {
-		return;
-	} else if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
+	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access (read only!)
 	} else if (address <= 0x3FFFFF) {
 		// RAM access
