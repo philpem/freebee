@@ -32,3 +32,12 @@ roms
 TRM
 misc
 discs
+
+# config file
+.freebee.toml
+
+# disc images
+*.img
+
+# serial port pty link
+serial-pty
