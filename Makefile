@@ -235,6 +235,18 @@ else
 endif
 
 ####
+# Musashi config file
+####
+ifeq ($(PLATFORM),linux)
+	CFLAGS		+= -DMUSASHI_CNF=\"../m68kconf.h\"
+	CXXFLAGS	+= -DMUSASHI_CNF=\"../m68kconf.h\"
+endif
+ifeq ($(PLATFORM),win32)
+	CFLAGS		+= -DMUSASHI_CNF="../m68kconf.h"
+	CXXFLAGS	+= -DMUSASHI_CNF="../m68kconf.h"
+endif
+
+####
 # wxWidgets support
 ####
 ifeq ($(ENABLE_WX),yes)
