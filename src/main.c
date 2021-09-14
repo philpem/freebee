@@ -268,6 +268,7 @@ bool HandleSDLEvents(SDL_Window *window)
 				break;
 			case SDL_MOUSEMOTION:
 				SDL_GetRelativeMouseState(&dx, &dy);
+				if (dx==0 && dy==0) break;  // sometimes SDL returns 0 for both, don't process
 			case SDL_MOUSEBUTTONUP:
 			case SDL_MOUSEBUTTONDOWN:
 				if (mouse_grabbed){
