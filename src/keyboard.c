@@ -139,7 +139,7 @@ struct {
 enum {
 	KEY_ALL_UP				= 0x40,		///< All keys up
 	KEY_LIST_END			= 0x80,		///< End of key code list
-	KEY_BEGIN_MOUSE			= 0xCF,		///< Mouse data follows
+	KEY_BEGIN_MOUSE			= 0xCE,		///< Mouse data follows (sys/mouse.h states 0xCE, with 0xCF as mouse lost)
 	KEY_BEGIN_KEYBOARD		= 0xDF,		///< Keyboard data follows
 };
 
@@ -148,10 +148,10 @@ enum {
  */
 enum {
 	KEY_CMD_RESET			= 0x92,		///< Reset keyboard
-	KEY_CMD_CAPSLED_OFF		= 0xB1,		///< Caps Lock LED off--CHECK!
-	KEY_CMD_CAPSLED_ON		= 0xB0,		///< Caps Lock LED on --CHECK!
-	KEY_CMD_NUMLED_OFF		= 0xA1,		///< Num Lock LED off --CHECK!
-	KEY_CMD_NUMLED_ON		= 0xA0,		///< Num Lock LED on  --CHECK!
+	KEY_CMD_CAPSLED_OFF		= 0xB0,		///< Caps Lock LED off
+	KEY_CMD_CAPSLED_ON		= 0xB1,		///< Caps Lock LED on
+	KEY_CMD_NUMLED_OFF		= 0xA0,		///< Num Lock LED off
+	KEY_CMD_NUMLED_ON		= 0xA1,		///< Num Lock LED on
 	KEY_CMD_MOUSE_ENABLE	= 0xD0,		///< Enable mouse
 	KEY_CMD_MOUSE_DISABLE	= 0xD1		///< Disable mouse
 };
@@ -239,19 +239,24 @@ bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db)
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 
-
 	/* Second and third bytes are X and Y deltas */
-	xbyte = abs(dx);
+	xbyte = (abs(dx) > 127) ? 127 : abs(dx);
 	ks->buffer[ks->writep] = xbyte;
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
 
-	ybyte = abs(dy);
-	ybyte &= 0x7f;
-
+	ybyte = (abs(dy) > 127) ? 127 : abs(dy);
+	ybyte |= 0x80;
 	ks->buffer[ks->writep] = ybyte;
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
 	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+
+	// need to double send if KEY_BEGIN_KEYBOARD value ever encountered
+	if (ybyte == KEY_BEGIN_KEYBOARD) {
+		ks->buffer[ks->writep] = ybyte;
+		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
+		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+	}
 
 	ks->lastdata_mouse = 1;
 	return 1;
@@ -265,7 +270,6 @@ void keyboard_scan(KEYBOARD_STATE *ks)
 
 	// Skip doing the scan if the keyboard hasn't changed state
 	if (!ks->update_flag) return;
-
 
 	if (ks->lastdata_mouse){
 		//Keyboard Data Begins Here (BEGKBD)

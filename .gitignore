@@ -12,7 +12,9 @@ src/musashi/m68kopnz.c
 src/musashi/m68kops.c
 src/musashi/m68kops.h
 dep/musashi/*.d
+dep/musashi/softfloat/*.d
 obj/musashi/*.o
+obj/musashi/softfloat/*.o
 obj/musashi/m68kmake
 
 # version header
@@ -30,3 +32,12 @@ roms
 TRM
 misc
 discs
+
+# config file
+.freebee.toml
+
+# disc images
+*.img
+
+# serial port pty link
+serial-pty

@@ -268,6 +268,7 @@ bool HandleSDLEvents(SDL_Window *window)
 				break;
 			case SDL_MOUSEMOTION:
 				SDL_GetRelativeMouseState(&dx, &dy);
+				if (dx==0 && dy==0) break;  // sometimes SDL returns 0 for both, don't process
 			case SDL_MOUSEBUTTONUP:
 			case SDL_MOUSEBUTTONDOWN:
 				if (mouse_grabbed){
@@ -348,7 +349,7 @@ void validate_memory(int base_memory, int extended_memory)
 
     printf("Memory config: %iKB On-board, %iKB Expansion\n", base_memory, extended_memory);
     if (base_memory + extended_memory < 1024)
-       printf("*WARNING*: UNIX 3.51 requires 1MB of RAM. This configuration will only boot UNIX 3.50.\n\n");
+       printf("*WARNING*: 1MB or higher RAM recommended for UNIX 3.51.\n\n");
 }
 
 /****************************
