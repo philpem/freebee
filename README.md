@@ -10,11 +10,25 @@ Phil Pemberton -- <philpem@philpem.me.uk>
 
 ## Limitations
 
-There are a number of known instability issues with the Apple Mac OS. I'm bored of trying to work around these issues, for a platform I don't use.
+### Mac OS X support
 
-If you have an issue on OSX, first try to reproduce it under a Windows or Linux build. If you can, report it as an issue under one of those platforms.
+There have historically been a few instability issues on the Mac OS X platform, related to the SDL libraries. I've not heard much about them.
 
-**I will not accept pull requests or issues which have been reported solely on an Apple system or Mac OS.**
+Unfortunately I don't have a recent Mac, so I won't be able to reproduce or test issues which affect OS X versions later than High Sierra.
+Bugs will likely be left open until someone with a more recent system is able to look into them (unless you open a pull request with a fix!)
+
+If you have an issue on OSX and have a Windows or Linux system, please try to reproduce the issue on there as it will be easier for me to test.
+Please list all the platforms you've tested on (and the result) in the issue.
+
+In summary: all support is on a best-effort basis, but **I cannot guarantee that bugs reported solely on Mac OS X will be fixed as I don't have the equipment to test with.**
+
+
+### Memory mapper emulation inaccuracy
+
+There is a workaround in the memory mapping emulation, which allows supervisor-mode writes to low memory. If this is disabled, the kernel will fail to boot
+with a `PAGEIN` or `PAGEOUT` panic.
+
+If anyone can figure this out, 
 
 
 ## Things which are emulated...
