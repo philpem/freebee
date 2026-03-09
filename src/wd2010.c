@@ -307,7 +307,9 @@ void wd2010_write_data(WD2010_CTX *ctx, uint8_t val)
 		if (ctx->data_pos == ctx->data_len) {
 			if (!ctx->formatting){
 				fseek(ctx->disc_image[ctx->mcr2_ddrive1], ctx->write_pos, SEEK_SET);
-				fwrite(ctx->data[ctx->mcr2_ddrive1], 1, ctx->data_len, ctx->disc_image[ctx->mcr2_ddrive1]);
+				if (fwrite(ctx->data[ctx->mcr2_ddrive1], 1, ctx->data_len, ctx->disc_image[ctx->mcr2_ddrive1]) != ctx->data_len) {
+					fprintf(stderr, "WD2010: short write at pos %ld\n", (long)ctx->write_pos);
+				}
 				fflush(ctx->disc_image[ctx->mcr2_ddrive1]);
 			}
 			ctx->formatting = false;
@@ -501,6 +503,7 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 								sector_count = 1;
 							}
 							for (int i=0; i<sector_count; i++) {
+								size_t bytes_read;
 								// Calculate the LBA address of the required sector
 								// LBA = (C * nHeads * nSectors) + (H * nSectors) + S - 1
 								lba = (((ctx->track * ctx->geometry[ctx->mcr2_ddrive1].heads * ctx->geometry[ctx->mcr2_ddrive1].spt) + (ctx->head * ctx->geometry[ctx->mcr2_ddrive1].spt) + ctx->sector) + i);
@@ -510,8 +513,16 @@ void wd2010_write_reg(WD2010_CTX *ctx, uint8_t addr, uint8_t val)
 
 								// Read the sector from the file
 								fseek(ctx->disc_image[ctx->mcr2_ddrive1], lba, SEEK_SET);
-								// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
-								ctx->data_len += fread(&ctx->data[ctx->mcr2_ddrive1][ctx->data_len], 1, ctx->geometry[ctx->mcr2_ddrive1].secsz, ctx->disc_image[ctx->mcr2_ddrive1]);
+								bytes_read = fread(&ctx->data[ctx->mcr2_ddrive1][ctx->data_len], 1, ctx->geometry[ctx->mcr2_ddrive1].secsz, ctx->disc_image[ctx->mcr2_ddrive1]);
+								if (bytes_read != (size_t)ctx->geometry[ctx->mcr2_ddrive1].secsz) {
+									fprintf(stderr, "WD2010: short read: got %zu of %d bytes\n",
+										bytes_read, ctx->geometry[ctx->mcr2_ddrive1].secsz);
+									ctx->status = SR_ERROR;
+									ctx->error_reg = ER_ID_NOT_FOUND;
+									ctx->irq = true;
+									break;
+								}
+								ctx->data_len += bytes_read;
 								LOG("\tREAD len=%zu, pos=%zu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geometry[ctx->mcr2_ddrive1].secsz);
 							}
 

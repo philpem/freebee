@@ -491,7 +491,9 @@ uint8_t i8274_data_in(I8274_CTX *ctx, i8274_CHANNEL_INDEX chan_id)
 static void pty_out(I8274_CTX *ctx, uint8_t byte_out)
 {
 #ifdef __linux__
-	(void) write(ctx->ptyfd, &byte_out, 1);
+	if (write(ctx->ptyfd, &byte_out, 1) < 0) {
+		LOG("PTY write failed for byte 0x%02X", byte_out);
+	}
 #endif
 }
 

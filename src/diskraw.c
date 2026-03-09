@@ -50,10 +50,14 @@ static size_t read_sector_raw(struct disk_image *ctx, int cyl, int head, int sec
 	// Read the sector from the file
 	fseek(ctx->fp, lba, SEEK_SET);
 	
-	// TODO: check fread return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
 	bytes_read = fread(data, 1, ctx->secsz, ctx->fp);
 	LOG("\tREAD(raw) len=%lu, ssz=%d", bytes_read, ctx->secsz);
-	return bytes_read;	
+	if (bytes_read != (size_t)ctx->secsz) {
+		fprintf(stderr, "diskraw: short read: got %lu of %d bytes at LBA %d\n",
+			(unsigned long)bytes_read, ctx->secsz, lba / ctx->secsz);
+		return 0;
+	}
+	return bytes_read;
 }
 
 static void write_sector_raw(struct disk_image *ctx, int cyl, int head, int sect, uint8_t *data)
@@ -69,7 +73,9 @@ static void write_sector_raw(struct disk_image *ctx, int cyl, int head, int sect
 	lba *= ctx->secsz;
 	
 	fseek(ctx->fp, lba, SEEK_SET);
-	fwrite(data, 1, ctx->secsz, ctx->fp);
+	if (fwrite(data, 1, ctx->secsz, ctx->fp) != (size_t)ctx->secsz) {
+		fprintf(stderr, "diskraw: short write at LBA %d\n", lba / ctx->secsz);
+	}
 	fflush(ctx->fp);
 }
 

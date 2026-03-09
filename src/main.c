@@ -15,7 +15,7 @@
 #include "fbconfig.h"
 #include "utils.h"
 
-#include "lightbar.c"
+#include "lightbar_data.h"
 #include "i8274.h"
 
 extern int cpu_log_enabled;
