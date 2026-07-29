@@ -34,7 +34,6 @@
 
 #define SUPERVISOR_MODE ((m68k_get_reg(NULL, M68K_REG_SR) & 0x2000)==0x2000)
 #define USER_MODE (!SUPERVISOR_MODE)
-#define ZEROPAGE 0x1000
 
 /******************
  * Memory mapping
@@ -140,7 +139,7 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
 
 	// User attempt to access the kernel
 	// A19, A20, A21, A22 low (kernel access): RAM addr before paging; not in Supervisor mode
-	if (addr < 0x080000 && !(!writing && addr < ZEROPAGE)) {
+	if (addr < 0x080000) {
 		LOGS("Attempt by user code to access kernel space");
 		return MEM_KERNEL;
 	}
@@ -932,9 +931,6 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 
 static uint16_t ram_read_16(uint32_t address)
 {
-	if (address < ZEROPAGE && USER_MODE) {
-		return (0);
-	}
 	if (address <= 0x1fffff) {
 		// Base memory wraps around
 		return RD16(state.base_ram, address, state.base_ram_size - 1);
@@ -1016,9 +1012,6 @@ uint32_t m68k_read_memory_16(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 
-		if (address < ZEROPAGE && USER_MODE) {
-			return (0);
-		}
 		if (newAddr <= 0x1fffff) {
 			// Base memory wraps around
 			return RD16(state.base_ram, newAddr, state.base_ram_size - 1);
@@ -1070,9 +1063,6 @@ uint32_t m68k_read_memory_8(uint32_t address)/*{{{*/
 		// RAM access
 		uint32_t newAddr = mapAddr(address, false);
 
-		if (address < ZEROPAGE && USER_MODE) {
-			return (0);
-		}
 		if (newAddr <= 0x1fffff) {
 			// Base memory wraps around
 			return RD8(state.base_ram, newAddr, state.base_ram_size - 1);
