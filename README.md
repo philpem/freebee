@@ -23,14 +23,6 @@ Please list all the platforms you've tested on (and the result) in the issue.
 In summary: all support is on a best-effort basis, but **I cannot guarantee that bugs reported solely on Mac OS X will be fixed as I don't have the equipment to test with.**
 
 
-### Memory mapper emulation inaccuracy
-
-There is a workaround in the memory mapping emulation, which allows supervisor-mode writes to low memory. If this is disabled, the kernel will fail to boot
-with a `PAGEIN` or `PAGEOUT` panic.
-
-If anyone can figure this out, 
-
-
 ## Things which are emulated...
 
   * Revision P5.1 motherboard with 68010 processor, WD2010 hard drive controller and P5.1 upgrade.
@@ -41,12 +33,10 @@ If anyone can figure this out,
   * WD2010 MFM Winchester hard disk controller.
     * Two separate drives.
     * Maximum 1400 cylinders (limited by the UNIX OS, see [the UNIX PC FAQ, section 5.6](http://www.unixpc.org/FAQ)).
-    * Heads fixed at 8.
-    * Sectors per track fixed at 17.
+    * Heads and sectors per track configurable in `.freebee.toml`, but defaults to 8 heads and 17 sectors.
     * Fixed 512 bytes per sector.
-    * Those numbers are the default configuration; see below for more information.
   * WD2797 floppy disk controller.
-    * Double-sided, 512 bytes per sector, 10 sectors per track, any number of tracks.
+    * Double-sided, 512 bytes per sector, any number of tracks, with 8, 9 or 10 sectors per track.
   * Realtime clock.
     * Reading the RTC reads the date and time from the host.
     * Year is fixed at 1987 due to Y2K issues in the UNIX PC Kernel.
@@ -55,12 +45,18 @@ If anyone can figure this out,
     * Usage instructions: [README.serial.md](README.serial.md)
 
 
-
 ## Things which aren't emulated fully (or at all)
+
+This is also called my "to-do" list...
 
   * Printer port
   * Modem
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
+  * Expansion cards
+    * Expansion RAM is emulated, but other cards are of little utility and largely undocumented, so are unlikely to be added.
+    * With that said: the serial combo card might be useful to add an extra serial port (or several).
+    * DOS-73 is unlikely to ever be emulated unless someone reverse-engineers a schematic.
+    * Floppy Tape is of debatable utility when we can send files over the serial port with Kermit.
 
 
 # Build instructions
@@ -110,11 +106,13 @@ If anyone can figure this out,
       a login prompt after the installation.
 
 ## Importing files
+
   - Files can be imported using the 3b1 `msdos` command which allows reading a 360k MS-DOS floppy image.
     * Use dosbox to copy files to a DOS disk image named `floppy.img`. This image must be in the same directory as the Freebee executable (or path specified in the .freebee.toml config file).
     * If the floppy.img file wasn't present on boot or was updated, hit F11 to load/unload the floppy image.
     * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
   - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
+  - A third opiton is to use TAR to archive the files, and Kermit over the emulated serial port (Linux only) to send them to the 3B1.
 
 ## Scaling the display
 
@@ -162,3 +160,4 @@ facility is useful on large displays.
   * To make a 10 track per sector disk image, just use `count=400` in the `dd` command and then format the disk under Unix with `iv` and `mkfs`.
 
   * See this part of the [FAQ](https://stason.org/TULARC/pc/3b1-faq/4-4-How-do-I-get-multiple-login-windows.html) on setting up multiple login windows.
+
