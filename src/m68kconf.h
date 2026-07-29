@@ -43,6 +43,12 @@
 #define OPT_ON              1
 #define OPT_SPECIFY_HANDLER 2
 
+/* Musashi renamed these with an M68K_ prefix; the core now tests against the
+ * prefixed names, so define both spellings. */
+#define M68K_OPT_OFF             OPT_OFF
+#define M68K_OPT_ON              OPT_ON
+#define M68K_OPT_SPECIFY_HANDLER OPT_SPECIFY_HANDLER
+
 
 /* ======================================================================== */
 /* ============================== MAME STUFF ============================== */
