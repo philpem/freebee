@@ -43,6 +43,9 @@ In summary: all support is on a best-effort basis, but **I cannot guarantee that
   * Serial port.
     * Linux only: file 'serial-pty' is symlinked to PTY that can be used to access tty000
     * Usage instructions: [README.serial.md](README.serial.md)
+  * VIDPAL user-space video access mod
+    * Allows user-mode code to access the video memory without causing a bus error
+    * Useful for running the MGR window manager at a reasonable speed...!
 
 
 ## Things which aren't emulated fully (or at all)
@@ -112,7 +115,7 @@ This is also called my "to-do" list...
     * If the floppy.img file wasn't present on boot or was updated, hit F11 to load/unload the floppy image.
     * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
   - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
-  - A third opiton is to use TAR to archive the files, and Kermit over the emulated serial port (Linux only) to send them to the 3B1.
+  - A third option is to use TAR to archive the files, and Kermit over the emulated serial port (Linux only) to send them to the 3B1.
 
 ## Scaling the display
 
