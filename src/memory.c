@@ -785,7 +785,7 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				return (state.dma_count & 0x3fff) | 0xC000;
 				break;
 			case 0x070000:				// Line Printer Status Register (RD)
-				data = 0x00120012;	// no line printer error, no irqs from FDD or HDD, no parity error, dial tone
+				data = 0x00F200F2;	// no printer (BUSY, SEL, PAPER, ERR floating), no irqs from FDD or HDD, no parity error, dial tone
 				data |= wd2797_get_irq(&state.fdc_ctx) ? 0x00080008 : 0;
 				data |= wd2010_get_irq(&state.hdc_ctx) ? 0x00040004 : 0;
 				return data;
