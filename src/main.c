@@ -368,9 +368,9 @@ int main(int argc, char *argv[])
 	}
 
 	// copyright banner
-	printf("FreeBee: A Quick-and-Dirty AT&T 3B1 Emulator. Version %s, %s mode.\n", VER_FULLSTR, VER_BUILD_TYPE);
-	printf("Copyright (C) 2010 P. A. Pemberton. All rights reserved.\nLicensed under the Apache License Version 2.0.\n");
-	printf("Musashi M680x0 emulator engine developed by Karl Stenerud <kstenerud@gmail.com>\n");
+	printf("FreeBee: A perfectly cromulent AT&T 3B1 Emulator. Version %s, %s mode.\n", VER_FULLSTR, VER_BUILD_TYPE);
+	printf("Copyright (C) 2010-2026 P. A. Pemberton. All rights reserved.\nLicensed under the Apache License Version 2.0.\n");
+	printf("Musashi M680x0 emulator engine developed by Karl Stenerud <kstenerud@gmail.com> et al\n");
 	printf("\n");
 
 	// set up system state
