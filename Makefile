@@ -432,19 +432,19 @@ src/%.c:	src/%.l
 
 ###
 # make dependencies for our source files
-dep/%.d:	src/%.c
+dep/%.d:	src/%.c Makefile
 	$(CC) -MM $(CFLAGS) $(CPPFLAGS) $< > $@.$$$$; \
-		sed 's,\($*\)\.o[ :]*,obj/\1.o $@ : ,g' < $@.$$$$ > $@; \
+		sed 's,$(notdir $*)\.o[ :]*,obj/$*.o $@ : ,g' < $@.$$$$ > $@; \
 		rm -f $@.$$$$
 
-dep/%.d:	src/%.cpp
+dep/%.d:	src/%.cpp Makefile
 	$(CXX) -MM $(CXXFLAGS) $(CPPFLAGS) $< > $@.$$$$; \
-		sed 's,\($*\)\.o[ :]*,obj/\1.o $@ : ,g' < $@.$$$$ > $@; \
+		sed 's,$(notdir $*)\.o[ :]*,obj/$*.o $@ : ,g' < $@.$$$$ > $@; \
 		rm -f $@.$$$$
 
-dep/%.d:	src/%.cc
+dep/%.d:	src/%.cc Makefile
 	$(CXX) -MM $(CXXFLAGS) $(CPPFLAGS) $< > $@.$$$$; \
-		sed 's,\($*\)\.o[ :]*,obj/\1.o $@ : ,g' < $@.$$$$ > $@; \
+		sed 's,$(notdir $*)\.o[ :]*,obj/$*.o $@ : ,g' < $@.$$$$ > $@; \
 		rm -f $@.$$$$
 
 ####
