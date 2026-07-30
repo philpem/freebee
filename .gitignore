@@ -41,3 +41,6 @@ discs
 
 # serial port pty link
 serial-pty
+.DS_Store
+*.app
+*.log

@@ -69,4 +69,13 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val);
 
 bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db);
 
+#ifdef __APPLE__
+/**
+ * Queue host clipboard text for paced injection through the emulated keyboard.
+ * Unsupported non-ASCII characters are skipped.
+ */
+void keyboard_paste_text(KEYBOARD_STATE *ks, const char *text);
+void keyboard_paste_tick(KEYBOARD_STATE *ks);
+#endif
+
 #endif

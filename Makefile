@@ -150,6 +150,13 @@ WX_LIBS		=	std
 # SDL: set to "yes" to enable, anything else to disable
 ENABLE_SDL	=	yes
 
+# Native macOS application menus and preferences.  PLATFORM remains "linux"
+# for historical reasons when building on macOS, so detect the host directly.
+ifeq ($(shell uname -s),Darwin)
+	EXT_OBJ += macos_ui.o
+	LIBLNK += -framework AppKit
+endif
+
 ####
 # Win32 target-specific settings
 ####
@@ -417,6 +424,9 @@ obj/%.o:	src/%.cc
 
 obj/%.o:	src/%.cpp
 	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $< -o $@
+
+obj/%.o:	src/%.m
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 ###
 # make C files from yacc/bison source

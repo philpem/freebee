@@ -17,8 +17,18 @@
 
 #include "lightbar.c"
 #include "i8274.h"
+#ifdef __APPLE__
+#include "macos_ui.h"
+#endif
 
 extern int cpu_log_enabled;
+
+#ifdef __APPLE__
+static void paste_clipboard_text(const char *text)
+{
+	keyboard_paste_text(&state.kbd, text);
+}
+#endif
 
 void FAIL(char *err)
 {
@@ -47,11 +57,26 @@ static int load_fd()
 	}
 }
 
+static const char *hard_disk_path(int drive)
+{
+#ifdef __APPLE__
+	const char *preferred = macos_ui_disk_path(drive);
+	if (preferred != NULL)
+		return preferred;
+#endif
+	if (drive == 0) {
+		const char *bundled = getenv("FREEBEE_DEFAULT_HD");
+		if (bundled != NULL && bundled[0] != '\0')
+			return bundled;
+	}
+	return fbc_get_string("hard_disk", drive == 0 ? "disk1" : "disk2");
+}
+
 static int load_hd()
 {
 	int ret = 0;
-	const char *disk1 = fbc_get_string("hard_disk", "disk1");
-	const char *disk2 = fbc_get_string("hard_disk", "disk2");
+	const char *disk1 = hard_disk_path(0);
+	const char *disk2 = hard_disk_path(1);
 	int sectors_per_track = fbc_get_int("hard_disk", "sectors_per_track");
 	int heads = fbc_get_int("hard_disk", "heads");
 	// bytes per sector is fixed at 512, not configurable, all hard drives of the 3B1
@@ -360,6 +385,13 @@ int main(int argc, char *argv[])
 {
 	float scalex = fbc_get_double("display", "x_scale");
 	float scaley = fbc_get_double("display", "y_scale");
+#ifdef __APPLE__
+	double saved_scale = macos_ui_saved_scale();
+	if (saved_scale > 0.0) {
+		scalex = (float)saved_scale;
+		scaley = (float)saved_scale;
+	}
+#endif
 
 	if (scalex <= 0 || scalex > 45 || scaley <= 0 || scaley > 45) {
 		// 45 chosen as max because 45 * 720 < INT16_MAX
@@ -405,7 +437,8 @@ int main(int argc, char *argv[])
 	// Set up the video display
 	SDL_Window *window;
 	if ((window = SDL_CreateWindow("FreeBee 3B1 Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-									(int) ceilf(720*scalex), (int) ceilf(348*scaley), 0)) == NULL) {
+									(int) ceilf(720*scalex), (int) ceilf(348*scaley),
+									SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI)) == NULL) {
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
@@ -413,9 +446,12 @@ int main(int argc, char *argv[])
     if (scalex != 1.0 || scaley != 1.0)
 	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, fbc_get_string("display", "scale_quality"));
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-	SDL_RenderSetScale(renderer, scalex, scaley);
 	if (!renderer){
 		fprintf(stderr, "Error creating SDL renderer: %s.\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+	if (SDL_RenderSetLogicalSize(renderer, 720, 348) < 0) {
+		fprintf(stderr, "Error setting SDL logical display size: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
 	SDL_Texture *fbTexture = SDL_CreateTexture(renderer,
@@ -442,6 +478,14 @@ int main(int argc, char *argv[])
 	);
 	SDL_Texture *lightbarTexture = SDL_CreateTextureFromSurface(renderer, surf);
 	SDL_FreeSurface(surf);
+	if (!lightbarTexture){
+		fprintf(stderr, "Error creating SDL status texture: %s.\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+#ifdef __APPLE__
+	macos_ui_init(window, paste_clipboard_text);
+#endif
 
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", (int) ceilf(720*scalex), (int) ceilf(348*scaley), screen->format->BitsPerPixel);
 
@@ -464,6 +508,14 @@ int main(int argc, char *argv[])
 	uint32_t clock_cycles = 0, cycles_run;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
+
+	// SDL does not preserve the renderer backbuffer after SDL_RenderPresent().
+	// Seed the framebuffer texture before the first frame; subsequent frames
+	// only upload it again when the emulated VRAM changes.
+	refreshScreen(screen, renderer, fbTexture);
+	refreshStatusBar(renderer, lightbarTexture);
+	SDL_RenderPresent(renderer);
+	last_leds = state.leds;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
@@ -585,12 +637,15 @@ int main(int argc, char *argv[])
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
-			// Refresh the screen if VRAM has been changed
+			// Upload the framebuffer only if VRAM changed.  The renderer
+			// backbuffer must still be rebuilt in full before every present.
 			if (state.vram_updated){
 				refreshScreen(screen, renderer, fbTexture);
+			} else {
+				SDL_RenderCopy(renderer, fbTexture, NULL, NULL);
 			}
-			if (state.vram_updated || last_leds != state.leds){
-				refreshStatusBar(renderer, lightbarTexture);
+			refreshStatusBar(renderer, lightbarTexture);
+			if (last_leds != state.leds){
 				last_leds = state.leds;
 			}
 			state.vram_updated = false;
@@ -601,6 +656,9 @@ int main(int argc, char *argv[])
 				state.timer_asserted = true;
 			}
 			// scan the keyboard
+#ifdef __APPLE__
+			keyboard_paste_tick(&state.kbd);
+#endif
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
 			i8274_scan_incoming(&state.serial_ctx, CHAN_A);

@@ -72,6 +72,46 @@ This is also called my "to-do" list...
 
 # Running Freebee
 
+## macOS application wrapper
+
+After building `freebee`, create a Finder-launchable app bundle with:
+
+```sh
+scripts/create-macos-app.sh
+open FreeBee.app
+```
+
+The app embeds the current `freebee` executable, the two ROM files from
+`roms/`, and its SDL runtime libraries (including SDL3 when the build uses the
+SDL2 compatibility shim). It therefore does not require a source
+checkout, Homebrew, or a separate SDL installation on the destination Mac.
+The directory where the script was run remains the optional location for
+`.freebee.toml` and floppy images; if that directory is unavailable, the app
+falls back to its Application Support directory. By default it also bundles
+`3b1-hd.zip` (or `hd.img` if the ZIP is absent) as a pristine hard-disk seed.
+On first launch, a writable copy is installed at
+`~/Library/Application Support/FreeBee/hd.img`; the signed copy inside the app
+is never modified. Use `--disk-image PATH` to choose another seed or
+`--no-disk-image` to omit it.
+
+Use `--rom-dir PATH` to bundle ROMs from another directory or `--no-roms` to
+build a wrapper which still expects externally configured ROM files.
+
+The generated app is portable across Macs supported by the input executable
+and SDL library. The bundler reports the included CPU architectures and the
+minimum macOS version. A universal app requires a universal FreeBee executable
+and universal SDL library at build time.
+
+Use `--data-dir PATH` to select a different data directory, `--output PATH` to
+place the app elsewhere, or `--help` to see all options. Re-run the script
+after rebuilding the executable.
+
+On macOS, the **Machine** menu selects boot and secondary disk images. Disk
+changes take effect the next time FreeBee starts, preventing an active UNIX
+root filesystem from being hot-swapped. The **View** menu controls window
+scale, fit-to-screen, and full-screen modes. These app preferences take
+precedence over the corresponding TOML defaults.
+
 ## Initial Setup
   - Download the 3B1 ROMs from Bitsavers: [link](http://bitsavers.org/pdf/att/3b1/firmware/3b1_roms.zip)
   - Unzip the ROMs ZIP file and put the ROMs in a directory called `roms`:
@@ -119,15 +159,32 @@ This is also called my "to-do" list...
 
 ## Scaling the display
 
-You can scale the display by setting scale factors in the `.freebee.toml` file.
-Scale values must be greater than zero and less than or equal to 45. This
-facility is useful on large displays.
+The display window is resizable and preserves the emulated screen's aspect
+ratio. On macOS, use the **View** menu for common scale factors, fit-to-screen,
+or full-screen display. The selected scale is saved for the next launch.
+
+The `x_scale` and `y_scale` values in `.freebee.toml` remain available as
+startup defaults on platforms without app preferences. Scale values must be
+greater than zero and less than or equal to 45.
 
 # Keyboard commands
 
   * F10 -- Grab/Release mouse cursor
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
+
+## macOS clipboard
+
+Use **Edit → Paste** or **Command-V** to type text from the macOS clipboard
+into the emulated computer. FreeBee injects the text through the emulated 3B1
+keyboard at a controlled rate so the guest does not lose characters.
+
+Printable ASCII, tabs, and multiline text are supported. Characters which
+cannot be represented by the 3B1 keyboard, including non-ASCII Unicode
+characters, are skipped. The standard Cut and Copy menu commands use the macOS
+responder chain and are disabled when no native editable control is focused;
+the emulator cannot identify or extract a text selection from the guest
+screen.
 
 # 3b1-specific key mappings
 

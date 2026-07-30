@@ -1,0 +1,49 @@
+# MANUFACTURER:		AT&T
+# PRODUCT:			3B1 "Unix PC"
+#
+# DEVICE:			Mitsubishi M5L2764K (2764 EPROM)
+# 					datecodes 842602 (14C) and 841316 (15C)
+# LABEL:			Paper label with part number only.
+#
+# PROGRAMMER USED:	Conitec GALEP-4, software version 1.19.65
+# HOST SYSTEM:		IBM ThinkPad T42, Windows XP SP3
+#
+# IMAGED BY:		Philip Pemberton
+# 					<philpem@philpem.me.uk>
+# 					<http://www.philpem.me.uk>
+# DATE/TIME:		2010-11-26 12:00
+#
+#
+# FILE LIST:
+# 	Filename			Format		Board Loc.	Part Number
+# 	14C 72-00616.bin	Raw Binary	14C			72-00616
+# 	14C 72-00616.hex	Intel Hex	14C			72-00616
+# 	15C 72-00617.bin	Raw Binary	15C			72-00617
+# 	15C 72-00617.hex	Intel Hex	15C			72-00617
+#
+# NOTES:
+# 	This is the Boot ROM set for the AT&T 3B1 Unix PC. These two ROMs
+# 	contain a small (~4Kbyte) bootstrap program, which sets up the 3B1
+# 	hardware, runs a RAM test, then boots the 3B1 from disc.
+#
+# 	ROM 15C contains code for even locations.
+# 	ROM 14C contains code for odd locations.
+#
+# 	ROMs were provided by Michael Lee, and were sourced from a later-revision
+# 	3B1 motherboard.
+#
+# MD5SUMS:
+# 	To verify, run: md5sum -c README
+#
+443fab727d1e0f6e81829672fa87f6e4 *14C 72-00616.bin
+4bdf31d3c50137798b326becc16dcb4e *14C 72-00616.hex
+79cc4930b2a60046a9316107265a98ef *15C 72-00617.bin
+e85d2157d41dbb808643a08923860154 *15C 72-00617.hex
+#
+# SHA1SUMS:
+# 	To verify, run: sha1sum -c README
+ab3ac29935a2a587a083c4d175a5376badd39058 *14C 72-00616.bin
+b2014cfecdda0aa79718a17079db60e63ac1517e *14C 72-00616.hex
+1a97c8d32ec862f7f5fa1032f1688b76ea0672cc *15C 72-00617.bin
+a967bfc2dea0308735aa7a6fcb27565e95388254 *15C 72-00617.hex
+
