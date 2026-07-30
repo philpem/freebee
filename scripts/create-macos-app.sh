@@ -19,7 +19,7 @@ Options:
                      (default: project-root/roms)
   --no-roms          Build without bundled ROM files
   --output PATH      App bundle to create (default: project-root/FreeBee.app)
-  --force            Replace an existing bundle at the output path
+  --force            Compatibility option; existing bundles are replaced
   --no-sign          Do not ad-hoc sign the finished bundle
   -h, --help         Show this help
 EOF
@@ -117,14 +117,6 @@ mkdir -p "$output_parent"
 output_parent=$(CDPATH= cd -- "$output_parent" && pwd)
 output="$output_parent/$(basename -- "$output")"
 
-if [ -e "$output" ]; then
-	if [ "$force" -ne 1 ]; then
-		echo "Output already exists: $output (use --force to replace it)" >&2
-		exit 1
-	fi
-	rm -rf -- "$output"
-fi
-
 staging=$(mktemp -d "${TMPDIR:-/tmp}/freebee-app.XXXXXX")
 trap 'rm -rf -- "$staging"' EXIT HUP INT TERM
 app="$staging/FreeBee.app"
@@ -150,12 +142,33 @@ fi
 # Bundle SDL and replace its Homebrew/MacPorts load path. System libraries and
 # frameworks remain provided by macOS.
 sdl_library=$(otool -L "$executable" | awk '/libSDL2.*dylib/ { print $1; exit }')
+sdl3_library=
 if [ -n "$sdl_library" ]; then
 	[ -f "$sdl_library" ] || { echo "Linked SDL library not found: $sdl_library" >&2; exit 1; }
 	sdl_name=$(basename -- "$sdl_library")
 	cp -L "$sdl_library" "$contents/Frameworks/$sdl_name"
 	install_name_tool -id "@rpath/$sdl_name" "$contents/Frameworks/$sdl_name"
 	install_name_tool -change "$sdl_library" "@executable_path/../Frameworks/$sdl_name" "$contents/Resources/freebee"
+
+	# Homebrew may provide SDL2 through sdl2-compat. That shim loads SDL3 with
+	# dlopen() rather than declaring it in the Mach-O dependency list, so otool
+	# alone cannot discover it. Place the expected name beside the shim.
+	if strings "$sdl_library" | grep -q '@loader_path/libSDL3.dylib'; then
+		sdl3_libdir=$(pkg-config --variable=libdir sdl3 2>/dev/null || true)
+		if [ -n "$sdl3_libdir" ] && [ -f "$sdl3_libdir/libSDL3.0.dylib" ]; then
+			sdl3_library="$sdl3_libdir/libSDL3.0.dylib"
+		elif [ -x /opt/homebrew/bin/brew ]; then
+			sdl3_prefix=$(/opt/homebrew/bin/brew --prefix sdl3 2>/dev/null || true)
+			if [ -n "$sdl3_prefix" ] && [ -f "$sdl3_prefix/lib/libSDL3.0.dylib" ]; then
+				sdl3_library="$sdl3_prefix/lib/libSDL3.0.dylib"
+			fi
+		fi
+		[ -n "$sdl3_library" ] || {
+			echo "SDL2 compatibility library requires SDL3, but libSDL3.0.dylib was not found" >&2
+			exit 1
+		}
+		cp -L "$sdl3_library" "$contents/Frameworks/libSDL3.dylib"
+	fi
 fi
 
 minimum_os=$(otool -l "$executable" | awk '$1 == "minos" { print $2; exit }')
@@ -164,6 +177,12 @@ if [ -n "$sdl_library" ]; then
 	sdl_minimum_os=$(otool -l "$sdl_library" | awk '$1 == "minos" { print $2; exit }')
 	if [ -n "$sdl_minimum_os" ]; then
 		minimum_os=$(awk -v app="$minimum_os" -v sdl="$sdl_minimum_os" 'BEGIN { print (app + 0 >= sdl + 0) ? app : sdl }')
+	fi
+fi
+if [ -n "$sdl3_library" ]; then
+	sdl3_minimum_os=$(otool -l "$sdl3_library" | awk '$1 == "minos" { print $2; exit }')
+	if [ -n "$sdl3_minimum_os" ]; then
+		minimum_os=$(awk -v app="$minimum_os" -v sdl="$sdl3_minimum_os" 'BEGIN { print (app + 0 >= sdl + 0) ? app : sdl }')
 	fi
 fi
 
@@ -238,6 +257,13 @@ if [ "$sign" -eq 1 ] && command -v codesign >/dev/null 2>&1; then
 	codesign --force --deep --sign - "$app" >/dev/null
 fi
 
+# Replace an older generated app only after the new bundle has been fully
+# assembled, validated, and signed. This keeps the previous app available if
+# any earlier build step fails.
+if [ -e "$output" ]; then
+	echo "Removing old app bundle: $output"
+	rm -rf -- "$output"
+fi
 mv "$app" "$output"
 echo "Created $output"
 echo "FreeBee data directory: $data_dir"

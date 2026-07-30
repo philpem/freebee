@@ -83,7 +83,8 @@ open FreeBee.app
 ```
 
 The app embeds the current `freebee` executable, the two ROM files from
-`roms/`, and its SDL runtime library. It therefore does not require a source
+`roms/`, and its SDL runtime libraries (including SDL3 when the build uses the
+SDL2 compatibility shim). It therefore does not require a source
 checkout, Homebrew, or a separate SDL installation on the destination Mac.
 The directory where the script was run remains the optional location for
 `.freebee.toml` and floppy images; if that directory is unavailable, the app
@@ -170,6 +171,19 @@ greater than zero and less than or equal to 45.
   * F10 -- Grab/Release mouse cursor
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
+
+## macOS clipboard
+
+Use **Edit → Paste** or **Command-V** to type text from the macOS clipboard
+into the emulated computer. FreeBee injects the text through the emulated 3B1
+keyboard at a controlled rate so the guest does not lose characters.
+
+Printable ASCII, tabs, and multiline text are supported. Characters which
+cannot be represented by the 3B1 keyboard, including non-ASCII Unicode
+characters, are skipped. The standard Cut and Copy menu commands use the macOS
+responder chain and are disabled when no native editable control is focused;
+the emulator cannot identify or extract a text selection from the guest
+screen.
 
 # 3b1-specific key mappings
 

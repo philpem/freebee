@@ -9,6 +9,7 @@ static NSString *const Disk2Key = @"HardDisk2Path";
 static NSString *const DisplayScaleKey = @"DisplayScale";
 
 static SDL_Window *freebeeWindow;
+static macos_paste_callback freebeePasteCallback;
 
 static void set_display_scale(double scale)
 {
@@ -87,6 +88,14 @@ static void set_display_scale(double scale)
 	[alert runModal];
 }
 
+- (void)paste:(id)sender
+{
+	(void)sender;
+	NSString *text = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+	if (text != nil && freebeePasteCallback != NULL)
+		freebeePasteCallback(text.UTF8String);
+}
+
 - (void)setScale:(NSMenuItem *)sender
 {
 	set_display_scale((double)sender.tag / 100.0);
@@ -144,10 +153,11 @@ const char *macos_ui_disk_path(int drive)
 	return path.length == 0 ? NULL : path.fileSystemRepresentation;
 }
 
-void macos_ui_init(SDL_Window *window)
+void macos_ui_init(SDL_Window *window, macos_paste_callback paste_callback)
 {
 	static FreeBeeMenuController *controller;
 	freebeeWindow = window;
+	freebeePasteCallback = paste_callback;
 	controller = [[FreeBeeMenuController alloc] init];
 
 	NSMenu *menuBar = [[NSMenu alloc] initWithTitle:@""];
@@ -160,6 +170,14 @@ void macos_ui_init(SDL_Window *window)
 	[appMenu addItem:menu_item(@"Quit FreeBee", @selector(quit:), @"q", controller)];
 	appRoot.submenu = appMenu;
 	[menuBar addItem:appRoot];
+
+	NSMenuItem *editRoot = [[NSMenuItem alloc] initWithTitle:@"Edit" action:nil keyEquivalent:@""];
+	NSMenu *editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+	[editMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Cut" action:@selector(cut:) keyEquivalent:@"x"]];
+	[editMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"]];
+	[editMenu addItem:menu_item(@"Paste", @selector(paste:), @"v", controller)];
+	editRoot.submenu = editMenu;
+	[menuBar addItem:editRoot];
 
 	NSMenuItem *machineRoot = [[NSMenuItem alloc] initWithTitle:@"Machine" action:nil keyEquivalent:@""];
 	NSMenu *machineMenu = [[NSMenu alloc] initWithTitle:@"Machine"];

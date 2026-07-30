@@ -23,6 +23,13 @@
 
 extern int cpu_log_enabled;
 
+#ifdef __APPLE__
+static void paste_clipboard_text(const char *text)
+{
+	keyboard_paste_text(&state.kbd, text);
+}
+#endif
+
 void FAIL(char *err)
 {
 	state_done();
@@ -477,7 +484,7 @@ int main(int argc, char *argv[])
 	}
 
 #ifdef __APPLE__
-	macos_ui_init(window);
+	macos_ui_init(window, paste_clipboard_text);
 #endif
 
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", (int) ceilf(720*scalex), (int) ceilf(348*scaley), screen->format->BitsPerPixel);
@@ -649,6 +656,9 @@ int main(int argc, char *argv[])
 				state.timer_asserted = true;
 			}
 			// scan the keyboard
+#ifdef __APPLE__
+			keyboard_paste_tick(&state.kbd);
+#endif
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
 			i8274_scan_incoming(&state.serial_ctx, CHAN_A);

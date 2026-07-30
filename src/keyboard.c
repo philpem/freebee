@@ -1,4 +1,6 @@
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include "SDL.h"
 #include "utils.h"
 #include "keyboard.h"
@@ -156,6 +158,144 @@ enum {
 	KEY_CMD_MOUSE_DISABLE	= 0xD1		///< Disable mouse
 };
 
+#ifdef __APPLE__
+static char *paste_text = NULL;
+static size_t paste_pos = 0;
+static uint8_t paste_scancode = 0;
+static bool paste_shift = false;
+static bool paste_key_down = false;
+
+static bool paste_key_for_char(unsigned char ch, uint8_t *scancode, bool *shift)
+{
+	*shift = false;
+
+	if (ch >= 'a' && ch <= 'z') {
+		*scancode = ch;
+		return true;
+	}
+	if (ch >= 'A' && ch <= 'Z') {
+		*scancode = ch - 'A' + 'a';
+		*shift = true;
+		return true;
+	}
+	if (ch >= '0' && ch <= '9') {
+		*scancode = ch;
+		return true;
+	}
+
+	switch (ch) {
+		case ' ':  *scancode = 0x20; return true;
+		case '\t': *scancode = 0x09; return true;
+		case '\r':
+		case '\n': *scancode = 0x0d; return true;
+		case '\b': *scancode = 0x08; return true;
+		case '\'': *scancode = 0x27; return true;
+		case ',':  *scancode = 0x2c; return true;
+		case '-':  *scancode = 0x2d; return true;
+		case '.':  *scancode = 0x2e; return true;
+		case '/':  *scancode = 0x2f; return true;
+		case ';':  *scancode = 0x3b; return true;
+		case '=':  *scancode = 0x3d; return true;
+		case '[':  *scancode = 0x5b; return true;
+		case '\\': *scancode = 0x5c; return true;
+		case ']':  *scancode = 0x5d; return true;
+		case '`':  *scancode = 0x60; return true;
+		case '!': *scancode = 0x31; *shift = true; return true;
+		case '@': *scancode = 0x32; *shift = true; return true;
+		case '#': *scancode = 0x33; *shift = true; return true;
+		case '$': *scancode = 0x34; *shift = true; return true;
+		case '%': *scancode = 0x35; *shift = true; return true;
+		case '^': *scancode = 0x36; *shift = true; return true;
+		case '&': *scancode = 0x37; *shift = true; return true;
+		case '*': *scancode = 0x38; *shift = true; return true;
+		case '(': *scancode = 0x39; *shift = true; return true;
+		case ')': *scancode = 0x30; *shift = true; return true;
+		case '"': *scancode = 0x27; *shift = true; return true;
+		case '<': *scancode = 0x2c; *shift = true; return true;
+		case '_': *scancode = 0x2d; *shift = true; return true;
+		case '>': *scancode = 0x2e; *shift = true; return true;
+		case '?': *scancode = 0x2f; *shift = true; return true;
+		case ':': *scancode = 0x3b; *shift = true; return true;
+		case '+': *scancode = 0x3d; *shift = true; return true;
+		case '{': *scancode = 0x5b; *shift = true; return true;
+		case '|': *scancode = 0x5c; *shift = true; return true;
+		case '}': *scancode = 0x5d; *shift = true; return true;
+		case '~': *scancode = 0x60; *shift = true; return true;
+		default: return false;
+	}
+}
+
+void keyboard_paste_text(KEYBOARD_STATE *ks, const char *text)
+{
+	size_t len;
+	char *copy;
+
+	if (text == NULL)
+		return;
+
+	len = strlen(text);
+	copy = malloc(len + 1);
+	if (copy == NULL)
+		return;
+	memcpy(copy, text, len + 1);
+
+	if (paste_key_down) {
+		ks->keystate[paste_scancode] = 0;
+		if (paste_shift)
+			ks->keystate[0x48] = 0;
+		ks->update_flag = true;
+	}
+	free(paste_text);
+	paste_text = copy;
+	paste_pos = 0;
+	paste_key_down = false;
+}
+
+void keyboard_paste_tick(KEYBOARD_STATE *ks)
+{
+	if (paste_key_down) {
+		ks->keystate[paste_scancode] = 0;
+		if (paste_shift)
+			ks->keystate[0x48] = 0;
+		ks->update_flag = true;
+		paste_key_down = false;
+		return;
+	}
+
+	if (paste_text == NULL)
+		return;
+
+	// Leave room for Shift+key and the following All Keys Up packet.
+	if (ks->buflen > KEYBOARD_BUFFER_SIZE - 4)
+		return;
+
+	// Do not combine pasted characters with keys physically held by the user.
+	for (int i = 0; i < (int)(sizeof(ks->keystate) / sizeof(ks->keystate[0])); i++) {
+		if (ks->keystate[i])
+			return;
+	}
+
+	while (paste_text[paste_pos] != '\0') {
+		unsigned char ch = (unsigned char)paste_text[paste_pos++];
+		if (ch == '\r' && paste_text[paste_pos] == '\n')
+			paste_pos++;
+		if (!paste_key_for_char(ch, &paste_scancode, &paste_shift))
+			continue;
+
+		ks->keystate[paste_scancode] = 1;
+		if (paste_shift)
+			ks->keystate[0x48] = 1;
+		ks->update_flag = true;
+		paste_key_down = true;
+		return;
+	}
+
+	free(paste_text);
+	paste_text = NULL;
+	paste_pos = 0;
+}
+#endif
+
 void keyboard_init(KEYBOARD_STATE *ks)
 {
 	// Set all key states to "not pressed"
@@ -176,6 +316,11 @@ void keyboard_init(KEYBOARD_STATE *ks)
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 {
 	int v = 0;
+#ifdef __APPLE__
+	// Command-key combinations belong to the native application menus.
+	if (ev->key.keysym.mod & KMOD_GUI)
+		return;
+#endif
 	switch (ev->type) {
 		case SDL_KEYDOWN:
 			// Key down (pressed)
@@ -385,4 +530,3 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 		}
 	}
 }
-

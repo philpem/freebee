@@ -43,3 +43,4 @@ discs
 serial-pty
 .DS_Store
 *.app
+*.log
