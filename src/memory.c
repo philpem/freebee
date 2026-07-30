@@ -343,8 +343,33 @@ bool access_check_dma(int reading)
 		state.bsr0 = 0x3C00;
 		state.bsr0 |= (state.dma_address >> 16);
 		state.bsr1 = state.dma_address & 0xffff;
-		// trigger NMI (DMA Page Fault) kernel panic
-		if (state.ee) m68k_set_irq(7);
+		// Raise the NMI (DMA page fault). EE gates the NMI output, so with
+		// errors disabled the status registers still latch but nothing is
+		// raised.
+		//
+		// This must be asserted exactly once per fault. The DMA engine keeps
+		// retrying while DMAEN is set, so it re-enters here every slice with
+		// the fault still pending -- and m68k_set_irq(7) re-arms Musashi's
+		// nmi_pending each time it is called (m68ki_exception_interrupt zeroes
+		// CPU_INT_LEVEL after dispatch, so the "transition to 7" test passes
+		// again). Re-arming on every retry re-enters the handler before it can
+		// run, marching the supervisor stack down until the machine dies.
+		//
+		// nmi_latch models the hardware's latched NMI: held until the guest
+		// accesses the Clear Status Register, which the kernel's fault handler
+		// does a few instructions after entry ("*CSR_ADDR = 0; unlatch the
+		// GSR", uts/kern/os/trap.c). Holding it off suppresses the re-arm;
+		// clearing it via CSR lets a genuinely new fault raise a fresh NMI,
+		// which is the "repeated NMI error" case the kernel guards against.
+		//
+		// Note there's no need to re-assert this from the main loop's
+		// interrupt cascade: nmi_pending is sticky, so the NMI is delivered at
+		// the next instruction boundary regardless of the cascade lowering the
+		// level afterwards.
+		if (state.ee && !state.nmi_latch) {
+			state.nmi_latch = true;
+			m68k_set_irq(7);
+		}
 		printf("DMA PAGE FAULT: genstat=%04X, bsr0=%04X, bsr1=%04X\n", state.genstat, state.bsr0, state.bsr1);
 	}
 	return (access_ok);
@@ -533,6 +558,9 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 				state.bsr0 |= 0x8000;
 				// also disable PF- and UIE- in GSR
 				state.genstat |= 0x1100;
+				// Releases the latched NMI too -- it's latched along with the
+				// status regs this clears
+				state.nmi_latch = false;
 				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
@@ -813,7 +841,13 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				break;
 			case 0x0B0000:				// TM/DIALWR -- write only!
 				break;
-			case 0x0C0000:				// Clear Status Register -- write only!
+			case 0x0C0000:				// Clear Status Register
+				// hardware.h: "Read/Write. Any access to this register clears
+				// the GSR and BSR0, BSR1" -- so a read clears the latches too
+				state.bsr0 |= 0x8000;
+				state.genstat |= 0x1100;
+				state.nmi_latch = false;
+				handled = true;
 				break;
 			case 0x0D0000:				// DMA Address Register
 				break;

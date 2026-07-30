@@ -67,6 +67,13 @@ typedef struct {
 	/// which is why the kernel's clkstart() has to pulse it to get ticks.
 	bool		timer_clrsint;
 
+	/// The latched NMI request (level 7), raised by a DMA page fault and
+	/// cleared by any access to the Clear Status Register. Latched alongside
+	/// GENSTAT/BSR0/BSR1, which is how the kernel tells a DMA page fault
+	/// apart from the other NMI source -- a main memory parity error, which
+	/// we can't currently generate but which would share this latch.
+	bool		nmi_latch;
+
 	//// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the
 	/// 68010 to access ROM instead of RAM when booting. TRM page 2-36.
