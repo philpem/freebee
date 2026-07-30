@@ -163,7 +163,13 @@ static char *paste_text = NULL;
 static size_t paste_pos = 0;
 static uint8_t paste_scancode = 0;
 static bool paste_shift = false;
-static bool paste_key_down = false;
+typedef enum {
+	PASTE_READY,
+	PASTE_SHIFT_HELD,
+	PASTE_KEY_HELD,
+	PASTE_SHIFT_ONLY
+} PASTE_PHASE;
+static PASTE_PHASE paste_phase = PASTE_READY;
 
 static bool paste_key_for_char(unsigned char ch, uint8_t *scancode, bool *shift)
 {
@@ -239,34 +245,47 @@ void keyboard_paste_text(KEYBOARD_STATE *ks, const char *text)
 		return;
 	memcpy(copy, text, len + 1);
 
-	if (paste_key_down) {
+	if (paste_phase == PASTE_KEY_HELD)
 		ks->keystate[paste_scancode] = 0;
-		if (paste_shift)
-			ks->keystate[0x48] = 0;
+	if (paste_phase != PASTE_READY) {
+		ks->keystate[0x48] = 0;
 		ks->update_flag = true;
 	}
 	free(paste_text);
 	paste_text = copy;
 	paste_pos = 0;
-	paste_key_down = false;
+	paste_phase = PASTE_READY;
 }
 
 void keyboard_paste_tick(KEYBOARD_STATE *ks)
 {
-	if (paste_key_down) {
-		ks->keystate[paste_scancode] = 0;
-		if (paste_shift)
+	switch (paste_phase) {
+		case PASTE_SHIFT_HELD:
+			// Shift was reported on the previous scan. Press the character
+			// only after the guest has seen the modifier.
+			ks->keystate[paste_scancode] = 1;
+			ks->update_flag = true;
+			paste_phase = PASTE_KEY_HELD;
+			return;
+		case PASTE_KEY_HELD:
+			ks->keystate[paste_scancode] = 0;
+			ks->update_flag = true;
+			paste_phase = paste_shift ? PASTE_SHIFT_ONLY : PASTE_READY;
+			return;
+		case PASTE_SHIFT_ONLY:
 			ks->keystate[0x48] = 0;
-		ks->update_flag = true;
-		paste_key_down = false;
-		return;
+			ks->update_flag = true;
+			paste_phase = PASTE_READY;
+			return;
+		case PASTE_READY:
+			break;
 	}
 
 	if (paste_text == NULL)
 		return;
 
-	// Leave room for Shift+key and the following All Keys Up packet.
-	if (ks->buflen > KEYBOARD_BUFFER_SIZE - 4)
+	// Leave room for modifier, key, release, and All Keys Up packets.
+	if (ks->buflen > KEYBOARD_BUFFER_SIZE - 6)
 		return;
 
 	// Do not combine pasted characters with keys physically held by the user.
@@ -282,11 +301,14 @@ void keyboard_paste_tick(KEYBOARD_STATE *ks)
 		if (!paste_key_for_char(ch, &paste_scancode, &paste_shift))
 			continue;
 
-		ks->keystate[paste_scancode] = 1;
-		if (paste_shift)
+		if (paste_shift) {
 			ks->keystate[0x48] = 1;
+			paste_phase = PASTE_SHIFT_HELD;
+		} else {
+			ks->keystate[paste_scancode] = 1;
+			paste_phase = PASTE_KEY_HELD;
+		}
 		ks->update_flag = true;
-		paste_key_down = true;
 		return;
 	}
 
