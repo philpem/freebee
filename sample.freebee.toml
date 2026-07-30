@@ -36,3 +36,9 @@
 [memory]
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.
+
+[beeper]
+	# Volume of the dialer's tone output, 0-100. This covers the system beep
+	# (BEL) as well as DTMF dialling tones -- on real hardware they all come
+	# from the same chip. 0 disables audio entirely.
+	volume = 55

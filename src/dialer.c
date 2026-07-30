@@ -1,13 +1,17 @@
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "SDL.h"
 
 #include "dialer.h"
+#include "fbconfig.h"
 #include "utils.h"
 
 #define SAMPLE_RATE	44100
-#define AMPLITUDE	9000		///< per tone; two sum, so keep clear of INT16_MAX
+
+/// Peak amplitude at volume 100. Two tones sum, so half of full scale each.
+#define MAX_TONE_AMPLITUDE	(32767 / 2)
 
 /**
  * DTMF frequency pairs, indexed by the low nibble of the control word.
@@ -24,11 +28,16 @@ static const int row_hz[4] = { 697, 770, 852, 941 };
 static const int col_hz[4] = { 1209, 1477, 1336, 1336 };	///< col 3 unused by the keypad
 
 static SDL_AudioDeviceID audio_dev = 0;
+static int tone_amplitude = 0;		///< per-tone amplitude, from the volume setting
 
-/// Tone state. Written by the emulation thread under the audio device lock,
-/// read by the SDL audio callback.
+/// Decoded dialer state, for dialer_get_state().
+static DIALER_STATE dialer;
+
+/// Audio generator state. Written under the audio device lock, read by the SDL
+/// audio callback.
 static struct {
 	bool	active;
+	int		amplitude;
 	double	phase_lo, phase_hi;		///< carried across buffers to avoid clicks
 	double	step_lo, step_hi;		///< radians per sample
 } tone;
@@ -48,8 +57,8 @@ static void dialer_callback(void *userdata, Uint8 *stream, int len)
 	}
 
 	for (int i = 0; i < samples; i++) {
-		buf[i] = (int16_t)(AMPLITUDE * sin(tone.phase_lo))
-		       + (int16_t)(AMPLITUDE * sin(tone.phase_hi));
+		buf[i] = (int16_t)(tone.amplitude * sin(tone.phase_lo))
+		       + (int16_t)(tone.amplitude * sin(tone.phase_hi));
 		tone.phase_lo += tone.step_lo;
 		tone.phase_hi += tone.step_hi;
 		if (tone.phase_lo >= 2.0*M_PI) tone.phase_lo -= 2.0*M_PI;
@@ -60,8 +69,21 @@ static void dialer_callback(void *userdata, Uint8 *stream, int len)
 void dialer_init(void)
 {
 	SDL_AudioSpec want, have;
+	int volume;
 
+	memset(&dialer, 0, sizeof(dialer));
 	memset(&tone, 0, sizeof(tone));
+
+	volume = fbc_get_int("beeper", "volume");
+	if (volume < 0 || volume > 100) {
+		fprintf(stderr, "beeper volume must be between 0 and 100 (got %d)\n", volume);
+		exit(EXIT_FAILURE);
+	}
+	if (volume == 0) {
+		// Muted -- don't bother bringing up the audio subsystem at all
+		return;
+	}
+	tone_amplitude = (MAX_TONE_AMPLITUDE * volume) / 100;
 
 	if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
 		fprintf(stderr, "NOTE: no audio (%s); dialer tones and the system beep will be silent.\n",
@@ -73,7 +95,7 @@ void dialer_init(void)
 	want.freq     = SAMPLE_RATE;
 	want.format   = AUDIO_S16SYS;
 	want.channels = 1;
-	want.samples  = 512;			///< ~12ms, short enough to not smear a beep
+	want.samples  = 512;			// ~12ms, short enough to not smear a beep
 	want.callback = dialer_callback;
 
 	audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
@@ -96,30 +118,48 @@ void dialer_done(void)
 
 void dialer_write(uint16_t ctrl)
 {
-	// The low byte drives the tone generator: low nibble picks the DTMF pair,
-	// upper nibble is volume/ringer mode. A zero low byte is silence -- that's
-	// how the kernel stops a tone (beepoff() writes 0, and soundDTMF() writes
-	// kCallProg, whose low byte is zero).
-	uint8_t tonebyte = ctrl & 0xFF;
-	bool on = (tonebyte != 0);
+	uint8_t tonebyte = ctrl & DIALER_TONE_MASK;
+	DIALER_STATE prev = dialer;
+	bool audible;
 
-	// The high byte selects the output path (speaker, handset, line, call
-	// progress). We don't model the routing, so any tone the chip generates is
-	// audible -- slightly over-eager for tone-to-line-only, and correct for the
-	// cases that matter: the system beep and DTMF with the speaker enabled.
+	dialer.active        = (tonebyte != 0);
+	dialer.level         = tonebyte & DIALER_TONE_LEVEL;
+	// TODO: dialer.h names soft/normal/loud levels for both touch tone and
+	// ringing, but the beep uses 0x90, which is none of them -- so the level
+	// field isn't fully understood and doesn't scale the output yet.
+	dialer.f_low         = row_hz[tonebyte & 0x03];
+	dialer.f_high        = col_hz[(tonebyte >> 2) & 0x03];
+	dialer.to_speaker    = (ctrl & DIALER_SPEAKER)   != 0;
+	dialer.to_line       = (ctrl & DIALER_TO_LINE)   != 0;
+	dialer.to_handset    = (ctrl & DIALER_HANDSET)   != 0;
+	dialer.call_progress = (ctrl & DIALER_CALL_PROG) != 0;
+	dialer.open_circuit  = (ctrl & DIALER_OPEN_CCT)  != 0;
+
+	// A tone routed to the line is a digit being dialled. Nothing emulates the
+	// phone line yet, so just note it -- a future telephony or modem
+	// implementation can pick this up from dialer_get_state().
+	if (dialer.active && dialer.to_line && !(prev.active && prev.to_line)) {
+		LOG("dialer: %d + %d Hz to line%s (control word %04X)",
+				dialer.f_low, dialer.f_high,
+				dialer.to_speaker ? " and speaker" : "", ctrl);
+	}
+
+	// Only the speaker path is audible to the user. The handset earpiece is a
+	// separate output which we don't emulate.
+	audible = dialer.active && dialer.to_speaker;
 
 	if (audio_dev == 0)
 		return;
 
 	SDL_LockAudioDevice(audio_dev);
-	if (on) {
-		int lo = row_hz[tonebyte & 0x03];
-		int hi = col_hz[(tonebyte >> 2) & 0x03];
+	if (audible) {
 		if (!tone.active) {
-			LOG("dialer tone on: %d + %d Hz (control word %04X)", lo, hi, ctrl);
+			LOG("dialer tone on: %d + %d Hz (control word %04X)",
+					dialer.f_low, dialer.f_high, ctrl);
 		}
-		tone.step_lo = 2.0*M_PI * lo / SAMPLE_RATE;
-		tone.step_hi = 2.0*M_PI * hi / SAMPLE_RATE;
+		tone.step_lo = 2.0*M_PI * dialer.f_low / SAMPLE_RATE;
+		tone.step_hi = 2.0*M_PI * dialer.f_high / SAMPLE_RATE;
+		tone.amplitude = tone_amplitude;
 		tone.active = true;
 	} else {
 		if (tone.active) {
@@ -128,4 +168,9 @@ void dialer_write(uint16_t ctrl)
 		tone.active = false;
 	}
 	SDL_UnlockAudioDevice(audio_dev);
+}
+
+const DIALER_STATE *dialer_get_state(void)
+{
+	return &dialer;
 }

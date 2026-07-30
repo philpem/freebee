@@ -146,6 +146,7 @@ get_default_int(const char *heading, const char *item)
 		{ "hard_disk", "sectors_per_track", 17 },
 		{ "memory", "base_memory", 2048 },
 		{ "memory", "extended_memory", 2048 },
+		{ "beeper", "volume", 55 },
 		{ NULL, NULL, 0 }
 	};
 
