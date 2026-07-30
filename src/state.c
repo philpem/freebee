@@ -32,6 +32,7 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.nmi_latch = false;
 	state.dma_dev = DMA_DEV_UNDEF;
 	state.mcr2mirror = 0;
+	state.reverse_video = false;
 
 	// Enable VIDPAL mod (allows user writing to VRAM), per config setting
 	state.vidpal = fbc_get_bool("vidpal", "installed");

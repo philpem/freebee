@@ -124,6 +124,10 @@ typedef struct {
 	/// Update screen only when VRAM has been changed
 	bool vram_updated;
 
+	/// Whole screen reverse video (GCR bit-addressable register at 0xE47000).
+	/// Not in the TRM; the diagnostics use it to flag a failure visually.
+	bool reverse_video;
+
 	/// MCR2 mirror bit for P5.1 hardware detection
 	bool mcr2mirror;
 } S_state;

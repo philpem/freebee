@@ -711,6 +711,18 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 								break;
 							case 0x047000:		// [ef][4c][7F]xxx ==> Whole screen reverse video
 								ENFORCE_SIZE_W(bits, address, 16, "WHOLE SCREEN REVERSE VIDEO");
+								// Not in the TRM, but the diagnostics use it as
+								// a visual error flag -- CORE/diag/modem.c
+								// writes 0 when a test starts and 0x8000 when
+								// one fails.
+								if (state.reverse_video != ((data & 0x8000) == 0x8000)) {
+									state.reverse_video = ((data & 0x8000) == 0x8000);
+									LOG("Whole screen reverse video (%06X): %s", address,
+											state.reverse_video ? "on" : "off");
+									// Force a repaint; VRAM itself hasn't changed
+									state.vram_updated = true;
+								}
+								handled = true;
 								break;
 						}
 						break;

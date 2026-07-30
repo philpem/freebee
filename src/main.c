@@ -169,6 +169,11 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 	Uint32 fg = SDL_MapRGB(s->format, red, green, blue);
 	Uint32 bg = SDL_MapRGB(s->format, 0x00, 0x00, 0x00);	// black background
 
+	// Whole screen reverse video just swaps the two -- no need to touch VRAM
+	if (state.reverse_video) {
+		Uint32 t = fg; fg = bg; bg = t;
+	}
+
 	// Refresh the 3B1 screen area first. TODO: only do this if VRAM has actually changed!
 	uint32_t vram_address = 0;
 	for (int y=0; y<348; y++) {
