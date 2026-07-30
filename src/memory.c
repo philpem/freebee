@@ -196,8 +196,14 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
  * 			return-with-no-value. UGH!
  */
 /*{{{ macro: ACCESS_CHECK_WR(address, bits)*/
-// TODO: 32-bit check is broken, problem with 32-bit write straddling 2 pages, proper page faults may not occur
-//       if 1st word faults, 2nd page is never checked for PF (only an issue when straddling 2 pages)
+// A 32-bit access is two word bus cycles, so it can straddle a page boundary
+// and fault on either page. When bits==32 the second word's page is checked
+// too, but only if it actually lands in a different page.
+//
+// Note this checks both words before committing either. Real hardware would
+// have already written the first word when the second cycle faults; the 68010
+// bus error frame allows the faulting cycle to be continued, so nothing the
+// kernel does should be able to tell the difference.
 #define ACCESS_CHECK_WR(address, bits)								\
 	do {															\
 		bool fault = false;											\
@@ -260,8 +266,11 @@ MEM_STATUS checkMemoryAccess(uint32_t addr, bool writing, bool dma)/*{{{*/
  * 			return-with-no-value. UGH!
  */
 /*{{{ macro: ACCESS_CHECK_RD(address, bits)*/
-// TODO: 32-bit check is broken, problem with 32-bit read straddling 2 pages, if needed, 2nd page PF may not occur
-//       if 1st word faults, 2nd page is never checked for PF? (only an issue when straddling 2 pages)
+// A 32-bit access is two word bus cycles, so it can straddle a page boundary
+// and fault on either page. When bits==32 the second word's page is checked
+// too, but only if it actually lands in a different page. If the first word
+// faults we return without checking the second, which is what the hardware
+// does -- the CPU aborts the long access on the first bus error.
 #define ACCESS_CHECK_RD(address, bits)								\
 	do {															\
 		bool fault = false;											\
@@ -954,9 +963,7 @@ uint32_t m68k_read_memory_32(uint32_t address)/*{{{*/
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_RD(address, 16);
-	uint32_t addr2 = address + 2;
-	ACCESS_CHECK_RD(addr2, 16);
+	ACCESS_CHECK_RD(address, 32);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
@@ -1117,9 +1124,7 @@ void m68k_write_memory_32(uint32_t address, uint32_t value)/*{{{*/
 		address |= 0x800000;
 
 	// Check access permissions
-	ACCESS_CHECK_WR(address, 16);
-	uint32_t addr2 = address + 2;
-	ACCESS_CHECK_WR(addr2, 16);
+	ACCESS_CHECK_WR(address, 32);
 
 	if ((address >= 0x800000) && (address <= 0xBFFFFF)) {
 		// ROM access
