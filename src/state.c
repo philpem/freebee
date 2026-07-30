@@ -104,7 +104,25 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 		state.rom[i+1] = romdat2[i/2];
 	}
 
-	// TODO: if ROM buffer not filled, repeat the ROM data we read until it is (wraparound emulation)
+	// If the PROMs are smaller than the space they decode into, the image
+	// repeats. Per the TRM: "Boot PROMs can be 2x 2764 or 2x 27128. Total size
+	// = 16KiB or 32KiB respectively. If 16K ROM installed, data is repeated to
+	// make up 32K." A pair of 2764s is the common case -- the ROM set on
+	// Bitsavers is 8KiB per device -- so without this the top half of the ROM
+	// window reads back as zeroes instead of mirroring the bottom half.
+	//
+	// This is address decoding, not arithmetic: the PROMs are wired to only as
+	// many address lines as they have, and the ones above that simply aren't
+	// connected. So the image always repeats on a power-of-two boundary and the
+	// address is masked, exactly as the read path masks with ROM_SIZE-1.
+	size_t imglen = romlen + romlen2;
+	if ((imglen & (imglen - 1)) != 0) {
+		fprintf(stderr, "[state] Combined ROM size %zu is not a power of two.\n", imglen);
+		return -3;
+	}
+	for (size_t i = imglen; i < ROM_SIZE; i++) {
+		state.rom[i] = state.rom[i & (imglen - 1)];
+	}
 
 	// free the data arrays and close the files
 	free(romdat1);
