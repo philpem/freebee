@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "memory.h"
 #include "i8274.h"
+#include "dialer.h"
 
 // Memory access debugging options, to reduce logspam
 #undef MEM_DEBUG_PAGEFAULTS
@@ -533,18 +534,28 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						LOG("RS-232 baud (%06X) set to %i", address, baudgenN ? 1228800/(4*baudgenN) : 0);
 						break;
 					case 0x400:
-						// DIALER TXD lower byte shift reg load
+						// DIALER TXD lower byte shift reg load.
+						// Like the baud latch above, the data is carried on
+						// A1-A8, not A0-A7 -- io/phsub.c writedialer() does
+						//   *(DIALER_LOWER + ((ctrl & 0x00ff) << 1)) = 0
+						// so shift back down to recover the byte.
 						dialerReg &= 0xff00;
-						dialerReg |= address & 0xff;
-						LOG("dialer reg low byte (%06X) now: %i", address, dialerReg);
+						dialerReg |= (address >> 1) & 0xff;
+						LOG("dialer reg low byte (%06X) now: %04X", address, dialerReg);
 						handled = true;
 						break;
 					case 0x800:
 						// DIALER TXD upper byte shift reg load
 						// and starts shifting data out of DIALER TXD at 4800 baud
+						//   *(DIALER_HIGHER + ((ctrl & 0xff00) >> 7)) = 0
+						// is the same A1-A8 encoding: >>7 of the high byte is
+						// (byte << 1), so shift down by one to recover it.
 						dialerReg &= 0xff;
-						dialerReg |= (address & 0xff) << 8;
-						LOG("dialer reg high byte (%06X) now: %i", address, dialerReg);
+						dialerReg |= ((address >> 1) & 0xff) << 8;
+						LOG("dialer reg high byte (%06X) now: %04X", address, dialerReg);
+						// Loading the upper byte is what starts the transfer,
+						// so the control word is complete -- act on it.
+						dialer_write(dialerReg);
 						handled = true;
 						break;
 					default:

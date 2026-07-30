@@ -17,6 +17,7 @@
 
 #include "lightbar.c"
 #include "i8274.h"
+#include "dialer.h"
 
 extern int cpu_log_enabled;
 
@@ -445,6 +446,9 @@ int main(int argc, char *argv[])
 
 	printf("Set %dx%d at %d bits-per-pixel mode\n\n", (int) ceilf(720*scalex), (int) ceilf(348*scaley), screen->format->BitsPerPixel);
 
+	// Set up the dialer's tone output (the system beep comes through it)
+	dialer_init();
+
 	// Load a disc image
 	load_fd();
 
@@ -640,6 +644,8 @@ int main(int argc, char *argv[])
 	if (state.fdc_disc != NULL) {
 		fclose(state.fdc_disc);
 	}
+
+	dialer_done();
 
 	// Clean up SDL
 	SDL_DestroyTexture(lightbarTexture);
