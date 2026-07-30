@@ -563,24 +563,26 @@ int main(int argc, char *argv[])
 			}
 
 
-			// Any interrupts? --> TODO: masking
-/*			if (!lastirq_fdc) {
-				if (wd2797_get_irq(&state.fdc_ctx)) {
-					lastirq_fdc = true;
-					m68k_set_irq(2);
-				}
-			}
-*/
-			if (i8274_get_irq(&state.serial_ctx)) {
+			// Present the highest-priority pending interrupt to the CPU.
+			// This is re-evaluated every slice, so a level which is still
+			// pending is re-presented once a higher one has been serviced.
+			//
+			// Level 6 is latched in hardware and stays asserted until the
+			// guest dismisses it via MCR.CLRSINT -- unlike the device
+			// interrupts below, it must not be dropped just because the CPU
+			// hasn't got around to taking it yet (e.g. it is sat at SPL6).
+			//
+			// TODO: MCR2.F_MASK (0x0400) masks the floppy interrupt
+			if (state.timer_int_latch) {
+				m68k_set_irq(6);
+			} else if (i8274_get_irq(&state.serial_ctx)) {
 				m68k_set_irq(4);
 			} else if (keyboard_get_irq(&state.kbd)) {
 				m68k_set_irq(3);
 			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
 				m68k_set_irq(2);
 			} else {
-//				if (!state.timer_asserted){
-					m68k_set_irq(0);
-//				}
+				m68k_set_irq(0);
 			}
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
@@ -596,9 +598,11 @@ int main(int argc, char *argv[])
 			state.vram_updated = false;
 			SDL_RenderPresent(renderer);
 
-			if (state.timer_enabled){
-				m68k_set_irq(6);
-				state.timer_asserted = true;
+			// Latch the 60Hz interrupt. If CLRSINT- is being held low the
+			// clear input is asserted, so the latch can't set and this tick
+			// is lost -- same as the real hardware.
+			if (state.timer_clrsint) {
+				state.timer_int_latch = true;
 			}
 			// scan the keyboard
 			keyboard_scan(&state.kbd);

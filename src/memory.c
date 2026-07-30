@@ -474,11 +474,16 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 			case 0x0A0000:				// Miscellaneous Control Register (WR) high byte
 				ENFORCE_SIZE_W(bits, address, 16, "MISCCON");
 				// TODO: handle the ctrl bits properly (bit 13: LP strobe, bit 12: Chan B clock select (0 = modem clock [baud gen?], 1 = fixed 19.2k [uses 8274 16x divider for 1200baud, 64x divider for 300baud])
-				if (data & 0x8000){
-					state.timer_enabled = 1;
-				}else{
-					state.timer_enabled = 0;
-					state.timer_asserted = 0;
+				// B15 = CLRSINT-. This is not a timer enable: it's the clear
+				// input on the 60Hz interrupt latch. hardware.h calls it
+				// "toggle from 1 to 0 and back to 1 to dismiss level 6, 60
+				// hertz interrupt", and the kernel's clock ISR dismisses the
+				// tick that way on every interrupt (clkstart(), machdep.c,
+				// called from clock(), clock.c). Treat it as an active-low
+				// async clear: low clears the latch and holds it clear.
+				state.timer_clrsint = ((data & 0x8000) == 0x8000);
+				if (!state.timer_clrsint) {
+					state.timer_int_latch = false;
 				}
 				state.dma_reading = (data & 0x4000);
 				if (state.leds != ((~data & 0xF00) >> 8)) {

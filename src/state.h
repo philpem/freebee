@@ -58,8 +58,14 @@ typedef struct {
 	bool		dma_reading;		///< True if Disc DMA reads from the controller, false otherwise
 	uint8_t		leds;				///< LED status, 1=on, in order red3/green2/yellow1/red0 from bit3 to bit0
 
-	bool		timer_enabled;
-	bool		timer_asserted;
+	/// The latched 60Hz interrupt request (level 6). Set by the periodic
+	/// timer, cleared only by pulsing MCR.CLRSINT low.
+	bool		timer_int_latch;
+	/// State of MCR.CLRSINT as last written. This is an active-low
+	/// asynchronous clear on the 60Hz interrupt latch, so while it is held
+	/// low the interrupt cannot latch at all. Low after reset (MCR = 0),
+	/// which is why the kernel's clkstart() has to pulse it to get ticks.
+	bool		timer_clrsint;
 
 	//// GENERAL CONTROL REGISTER
 	/// GENCON.ROMLMAP -- false ORs the address with 0x800000, forcing the

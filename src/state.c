@@ -26,7 +26,9 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.leds = 0;
 	state.genstat = 0;				// FIXME: check this
 	state.bsr0 = state.bsr1 = 0;	// FIXME: check this
-	state.timer_enabled = state.timer_asserted = false;
+	// MCR reads back as zero after reset, so CLRSINT- starts asserted and
+	// the 60Hz interrupt is held clear until the guest releases it.
+	state.timer_int_latch = state.timer_clrsint = false;
 	state.dma_dev = DMA_DEV_UNDEF;
 	state.mcr2mirror = 0;
 
