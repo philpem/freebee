@@ -22,13 +22,13 @@ initialize(void)
 	char errbuf[200];
 	char toml_file[BUFSIZ];
 
-	strcpy(toml_file, ".freebee.toml");
+	snprintf(toml_file, sizeof(toml_file), ".freebee.toml");
 	fp = fopen(toml_file, "r");
 	if (fp == NULL) {
 		char *home = getenv("HOME");
 
 		if (home != NULL) {
-			sprintf(toml_file, "%s/.freebee.toml", home);
+			snprintf(toml_file, sizeof(toml_file), "%s/.freebee.toml", home);
 			fp = fopen(toml_file, "r");
 		}
 	}

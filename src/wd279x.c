@@ -417,11 +417,19 @@ void wd2797_write_reg(WD2797_CTX *ctx, uint8_t addr, uint8_t val)
 						temp = 1;
 
 					for (int i=0; i<temp; i++) {
+						size_t bytes_read;
 						LOG("\tREAD C,H,S = %i,%i,%i", ctx->track, ctx->head, ctx->sector+i);
 
 						// Read the sector from the file
-						ctx->data_len += ctx->dif->read_sector(ctx->dif, ctx->track, ctx->head, ctx->sector+i, &ctx->data[ctx->data_len]);
-						// TODO: check read_sector return value! if < secsz, BAIL! (call it a crc error or secnotfound maybe? also log to stderr)
+						bytes_read = ctx->dif->read_sector(ctx->dif, ctx->track, ctx->head, ctx->sector+i, &ctx->data[ctx->data_len]);
+						if (bytes_read < (size_t)ctx->geom_secsz) {
+							fprintf(stderr, "WD2797: short read at C,H,S=%d,%d,%d\n",
+								ctx->track, ctx->head, ctx->sector+i);
+							ctx->status = 0x10; // Record Not Found
+							ctx->irq = true;
+							break;
+						}
+						ctx->data_len += bytes_read;
 						LOG("\tREAD len=%lu, pos=%lu, ssz=%d", ctx->data_len, ctx->data_pos, ctx->geom_secsz);
 					}
 

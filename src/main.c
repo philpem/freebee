@@ -15,7 +15,7 @@
 #include "fbconfig.h"
 #include "utils.h"
 
-#include "lightbar.c"
+#include "lightbar_data.h"
 #include "i8274.h"
 #include "dialer.h"
 

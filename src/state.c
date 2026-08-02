@@ -58,16 +58,21 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	// Load ROMs
 	const char *rom14c = fbc_get_string("roms", "rom_14c");
 	const char *rom15c = fbc_get_string("roms", "rom_15c");
-	FILE *r14c, *r15c;
+	FILE *r14c = NULL, *r15c = NULL;
+	uint8_t *romdat1 = NULL, *romdat2 = NULL;
+	int rom_err = 0;
+
 	r14c = fopen(rom14c, "rb");
 	if (r14c == NULL) {
 		fprintf(stderr, "[state] Error loading roms/14c.bin.\n");
-		return -3;
+		rom_err = -3;
+		goto rom_cleanup;
 	}
 	r15c = fopen(rom15c, "rb");
 	if (r15c == NULL) {
 		fprintf(stderr, "[state] Error loading roms/15c.bin.\n");
-		return -3;
+		rom_err = -3;
+		goto rom_cleanup;
 	}
 
 	// get ROM file size
@@ -79,24 +84,32 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	fseek(r15c, 0, SEEK_SET);
 	if (romlen2 != romlen) {
 		fprintf(stderr, "[state] ROMs are not the same size!\n");
-		return -3;
+		rom_err = -3;
+		goto rom_cleanup;
 	}
 	if ((romlen + romlen2) > ROM_SIZE) {
 		fprintf(stderr, "[state] ROM files are too large!\n");
-		return -3;
+		rom_err = -3;
+		goto rom_cleanup;
 	}
 
 	// sanity checks completed; load the ROMs!
-	uint8_t *romdat1, *romdat2;
 	romdat1 = malloc(romlen);
 	romdat2 = malloc(romlen2);
+	if (romdat1 == NULL || romdat2 == NULL) {
+		fprintf(stderr, "[state] Error allocating ROM buffers.\n");
+		rom_err = -2;
+		goto rom_cleanup;
+	}
 	if (fread(romdat1, 1, romlen, r15c) != romlen) {
 		fprintf(stderr, "[state] Error reading ROM 15C.\n");
-		return -3;
+		rom_err = -3;
+		goto rom_cleanup;
 	}
 	if (fread(romdat2, 1, romlen2, r14c) != romlen) {
 		fprintf(stderr, "[state] Error reading ROM 14C.\n");
-		return -3;
+		rom_err = -3;
+		goto rom_cleanup;
 	}
 
 	// convert the ROM data
@@ -125,11 +138,12 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 		state.rom[i] = state.rom[i & (imglen - 1)];
 	}
 
-	// free the data arrays and close the files
+rom_cleanup:
 	free(romdat1);
 	free(romdat2);
-	fclose(r14c);
-	fclose(r15c);
+	if (r14c != NULL) fclose(r14c);
+	if (r15c != NULL) fclose(r15c);
+	if (rom_err != 0) return rom_err;
 
 	// Initialise the disc controller
 	wd2797_init(&state.fdc_ctx);

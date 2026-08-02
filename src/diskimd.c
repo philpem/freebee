@@ -126,7 +126,12 @@ static size_t read_sector_imd(struct disk_image *ctx, int cyl, int head, int sec
 	switch (sdrType) {
 		case IMD_SDR_DATA:
 			bytes_read = fread(data, 1, ctx->secsz, ctx->fp);
-			LOG("\tREAD(IMD) len=%lu, ssz=%d", bytes_read, ctx->secsz);			
+			LOG("\tREAD(IMD) len=%lu, ssz=%d", bytes_read, ctx->secsz);
+			if (bytes_read != (size_t)ctx->secsz) {
+				fprintf(stderr, "diskimd: short read: got %lu of %d bytes at LBA %d\n",
+					(unsigned long)bytes_read, ctx->secsz, lba);
+				return 0;
+			}
 			break;
 		case (IMD_SDR_DATA + IMD_SDR_COMPRESSED):
 			fill = fgetc(ctx->fp);
@@ -157,7 +162,9 @@ static void write_sector_imd(struct disk_image *ctx, int cyl, int head, int sect
 	sdrType = fgetc(ctx->fp);
 	switch (sdrType) {
 		case IMD_SDR_DATA:
-			fwrite(data, 1, ctx->secsz, ctx->fp);
+			if (fwrite(data, 1, ctx->secsz, ctx->fp) != (size_t)ctx->secsz) {
+				fprintf(stderr, "diskimd: short write at LBA %d\n", lba);
+			}
 			fflush(ctx->fp);
 			LOG("WRITE(IMD), ssz=%i", ctx->secsz);
 			break;
