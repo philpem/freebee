@@ -152,13 +152,16 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 		}
 	}
 
-	static int red, green, blue;
+	static int red, green, blue, bg_red, bg_green, bg_blue;
 	static bool inited = false;
 	if (! inited) {
 		inited = true;
 		red = fbc_get_int("display", "red");
 		green = fbc_get_int("display", "green");
 		blue = fbc_get_int("display", "blue");
+		bg_red = fbc_get_int("display", "bg_red");
+		bg_green = fbc_get_int("display", "bg_green");
+		bg_blue = fbc_get_int("display", "bg_blue");
 	}
 
 	// Map the foreground and background colours
@@ -166,8 +169,11 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 //	Uint32 fg = SDL_MapRGB(s->format, 0xFF, 0xFF, 0xFF);	// white foreground
 //	Uint32 fg = SDL_MapRGB(s->format, 0x50, 0xFF, 0xA0);	// minty foreground (possibly closer to actual color?)
 //	Uint32 fg = SDL_MapRGB(s->format, 0x00, 0xFF, 0x00);	// green foreground
+//	Uint32 fg = SDL_MapRGB(s->format, 0x5D, 0xEC, 0xAA);	// foreground color sampled from photo of original hardware
 	Uint32 fg = SDL_MapRGB(s->format, red, green, blue);
-	Uint32 bg = SDL_MapRGB(s->format, 0x00, 0x00, 0x00);	// black background
+//	Uint32 bg = SDL_MapRGB(s->format, 0x00, 0x00, 0x00);	// black background
+//	Uint32 bg = SDL_MapRGB(s->format, 0x35, 0x50, 0x4B);	// background color sampled from photo of original hardware
+	Uint32 bg = SDL_MapRGB(s->format, bg_red, bg_green, bg_blue);
 
 	// Whole screen reverse video just swaps the two -- no need to touch VRAM
 	if (state.reverse_video) {

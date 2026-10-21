@@ -22,6 +22,9 @@
 	red = 0x00			# foreground colors
 	green = 0xFF
 	blue = 0x00
+	bg_red = 0x00			# background colors
+	bg_green = 0x00
+	bg_blue = 0x00
 
 [roms]
 	rom_14c = "/path/to/roms/14c.bin"	# Odd locations
