@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
+#include <string.h>
 #include "SDL.h"
 #include "musashi/m68k.h"
 #include "wd2010.h"
@@ -127,10 +127,10 @@ static int wd2010_disk_label_init(WD2010_CTX *ctx, FILE *fp, int drivenum)
 
 	drivenum = drivenum ? 1 : 0;	// force to 1 or 0
 	// convert big endian data to native data
-	ctx->geometry[drivenum].tracks = ntohs(disk_label.cyls);
-	ctx->geometry[drivenum].secsz = ntohs(disk_label.sectorsz);
-	ctx->geometry[drivenum].heads = ntohs(disk_label.heads);
-	ctx->geometry[drivenum].spt = ntohs(disk_label.psectrk);
+	ctx->geometry[drivenum].tracks = SDL_SwapBE16(disk_label.cyls);
+	ctx->geometry[drivenum].secsz = SDL_SwapBE16(disk_label.sectorsz);
+	ctx->geometry[drivenum].heads = SDL_SwapBE16(disk_label.heads);
+	ctx->geometry[drivenum].spt = SDL_SwapBE16(disk_label.psectrk);
 
 	return WD2010_ERR_OK;
 }

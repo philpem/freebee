@@ -120,7 +120,12 @@ TARGET		=	freebee
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c control.c keys.c
 SRC			+=	lance.c enet.c netslirp.c
+ifeq ($(strip $(PLATFORM)),win32)
+# Windows has no pty, Unix sockets or MCP server: stubs for the MCP calls
+SRC			+=	mcp/stub.c
+else
 SRC			+=	mcp/json.c mcp/img.c mcp/server.c mcp/schemas.c mcp/tools.c mcp/record.c mcp/bridge.c
+endif
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 
 # source type - either "c" or "cpp" (C or C++)
@@ -131,6 +136,9 @@ EXT_OBJ		=
 # libraries to link in -- these will be specified as "-l" parameters, the -l
 # is prepended automatically
 LIB			= m pthread z
+ifeq ($(strip $(PLATFORM)),win32)
+LIB			+= ws2_32 iphlpapi
+endif
 # library paths -- where to search for the above libraries
 LIBPATH		=
 # include paths -- where to search for #include files (in addition to the
@@ -159,8 +167,9 @@ ENABLE_SDL	=	yes
 ifeq ($(strip $(PLATFORM)),win32)
 	# windows executables have a .exe suffix
 	TARGET := $(addsuffix .exe,$(TARGET))
-	# console mode application
-	EXT_CFLAGS = -mconsole
+	# console mode application, for Windows 7 and up (WSAPoll, inet_pton)
+	EXT_CFLAGS = -mconsole -D_WIN32_WINNT=0x0601
+	EXT_LDFLAGS = -mconsole
 endif
 
 
@@ -245,8 +254,8 @@ ifeq ($(PLATFORM),linux)
 	CXXFLAGS	+= -DMUSASHI_CNF=\"../m68kconf.h\"
 endif
 ifeq ($(PLATFORM),win32)
-	CFLAGS		+= -DMUSASHI_CNF="../m68kconf.h"
-	CXXFLAGS	+= -DMUSASHI_CNF="../m68kconf.h"
+	CFLAGS		+= -DMUSASHI_CNF=\"../m68kconf.h\"
+	CXXFLAGS	+= -DMUSASHI_CNF=\"../m68kconf.h\"
 endif
 
 ####
@@ -273,20 +282,28 @@ endif
 ####
 # SDL support
 ####
+# SDL2_CONFIG, SDL2_CFLAGS and SDL2_LIBS can be set on the command line,
+# for a static SDL or a cross build.
 ifeq ($(ENABLE_SDL),yes)
-	LIBLNK		+=	$(shell sdl2-config --libs)
-	CFLAGS		+=	$(shell sdl2-config --cflags)
+	SDL2_CONFIG	?=	sdl2-config
+	SDL2_CFLAGS	?=	$(shell $(SDL2_CONFIG) --cflags)
+	SDL2_LIBS	?=	$(shell $(SDL2_CONFIG) --libs)
+	LIBLNK		+=	$(SDL2_LIBS)
+	CFLAGS		+=	$(SDL2_CFLAGS)
 endif
 
 ####
 # libslirp, for the Ethernet board's user mode network (pkg-config slirp).
 # Without it the board is there, with its cable unplugged. make SLIRP=no
-# leaves it out.
+# leaves it out. PKG_CONFIG, SLIRP_CFLAGS and SLIRP_LIBS can be set too.
 ####
-SLIRP		?=	$(shell pkg-config --exists slirp 2>/dev/null && echo yes)
+PKG_CONFIG	?=	pkg-config
+SLIRP		?=	$(shell $(PKG_CONFIG) --exists slirp 2>/dev/null && echo yes)
 ifeq ($(SLIRP),yes)
-	CFLAGS		+=	$(shell pkg-config --cflags slirp) -DHAVE_SLIRP
-	LIBLNK		+=	$(shell pkg-config --libs slirp)
+	SLIRP_CFLAGS	?=	$(shell $(PKG_CONFIG) --cflags slirp)
+	SLIRP_LIBS	?=	$(shell $(PKG_CONFIG) --libs slirp)
+	CFLAGS		+=	$(SLIRP_CFLAGS) -DHAVE_SLIRP
+	LIBLNK		+=	$(SLIRP_LIBS)
 endif
 
 
@@ -418,9 +435,11 @@ $(shell mkdir -p obj/mcp dep/mcp)
 
 ####
 ## musashi build rules
-# 68k CPU builder
-obj/musashi/m68kmake:	obj/musashi/m68kmake.o
-	$(CC) $(CFLAGS) $(CPPFLAGS) obj/musashi/m68kmake.o -o $@
+# 68k CPU builder: it runs during the build, so a cross build makes it
+# with HOSTCC, the compiler for the machine that builds
+HOSTCC		?=	$(CC)
+obj/musashi/m68kmake:	src/musashi/m68kmake.c
+	$(HOSTCC) -O2 $< -o $@
 # 68k CPU sources
 src/musashi/m68kops.h src/musashi/m68kops.c:	obj/musashi/m68kmake src/musashi/m68k_in.c
 	./obj/musashi/m68kmake src/musashi src/musashi/m68k_in.c

@@ -2,6 +2,7 @@
  * netslirp - user mode networking for the Ethernet board, with libslirp.
  * The way QEMU's net/slirp.c drives it, in a few lines: FreeBee's main
  * loop calls netslirp_poll() about every millisecond, with no waiting.
+ * On Windows the sockets are polled with WSAPoll.
  */
 
 #ifdef HAVE_SLIRP
@@ -9,9 +10,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <poll.h>
 #include <time.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#else
+#include <poll.h>
 #include <arpa/inet.h>
+#endif
 #include <libslirp.h>
 #include "netslirp.h"
 #include "enet.h"
@@ -35,10 +42,27 @@ static TIMER *timers[MAX_TIMERS];
 
 static int64_t clock_ns(void)
 {
+#ifdef _WIN32
+	static LARGE_INTEGER freq;
+	LARGE_INTEGER c;
+
+	if (freq.QuadPart == 0)
+		QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&c);
+	return c.QuadPart / freq.QuadPart * 1000000000LL +
+		c.QuadPart % freq.QuadPart * 1000000000LL / freq.QuadPart;
+#else
 	struct timespec ts;
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+#endif
+}
+
+// an IPv4 address in dotted form (inet_aton is not on Windows)
+static bool ip4(const char *s, struct in_addr *a)
+{
+	return inet_pton(AF_INET, s, a) == 1;
 }
 
 /*
@@ -233,7 +257,11 @@ static void notify(void *opaque)
 	(void)opaque;
 }
 
+#if SLIRP_CONFIG_VERSION_MAX >= 6
+static int add_poll(slirp_os_socket fd, int events, void *opaque)
+#else
 static int add_poll(int fd, int events, void *opaque)
+#endif
 {
 	(void)opaque;
 	if (npfd == maxpfd) {
@@ -249,12 +277,14 @@ static int add_poll(int fd, int events, void *opaque)
 		ev |= POLLIN;
 	if (events & SLIRP_POLL_OUT)
 		ev |= POLLOUT;
+#ifndef _WIN32		// WSAPoll takes only POLLIN and POLLOUT
 	if (events & SLIRP_POLL_PRI)
 		ev |= POLLPRI;
 	if (events & SLIRP_POLL_ERR)
 		ev |= POLLERR;
 	if (events & SLIRP_POLL_HUP)
 		ev |= POLLHUP;
+#endif
 	pfd[npfd].fd = fd;
 	pfd[npfd].events = ev;
 	pfd[npfd].revents = 0;
@@ -306,7 +336,7 @@ static bool add_hostfwd(const char *rule)
 		return false;
 	*colon = '\0';
 	haddr.s_addr = INADDR_ANY;
-	if (*p && !inet_aton(p, &haddr))
+	if (*p && !ip4(p, &haddr))
 		return false;
 	hport = atoi(colon + 1);
 
@@ -315,8 +345,8 @@ static bool add_hostfwd(const char *rule)
 	if ((colon = strrchr(p, ':')) == NULL)
 		return false;
 	*colon = '\0';
-	inet_aton(GUEST_ADDR, &gaddr);
-	if (*p && !inet_aton(p, &gaddr))
+	ip4(GUEST_ADDR, &gaddr);
+	if (*p && !ip4(p, &gaddr))
 		return false;
 	gport = atoi(colon + 1);
 
@@ -339,6 +369,13 @@ bool netslirp_init(const char *hostfwd)
 	SlirpConfig cfg;
 	static SlirpCb cb;
 
+#ifdef _WIN32
+	WSADATA wsa;
+	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+		fprintf(stderr, "network: Windows sockets did not start\n");
+		return false;
+	}
+#endif
 	memset(&cfg, 0, sizeof(cfg));
 #if SLIRP_CONFIG_VERSION_MAX >= 6
 	cfg.version = 6;
@@ -347,12 +384,12 @@ bool netslirp_init(const char *hostfwd)
 #endif
 	cfg.restricted = 0;
 	cfg.in_enabled = true;
-	inet_aton("10.0.2.0", &cfg.vnetwork);
-	inet_aton("255.255.255.0", &cfg.vnetmask);
-	inet_aton("10.0.2.2", &cfg.vhost);
+	ip4("10.0.2.0", &cfg.vnetwork);
+	ip4("255.255.255.0", &cfg.vnetmask);
+	ip4("10.0.2.2", &cfg.vhost);
 	cfg.in6_enabled = false;
-	inet_aton(GUEST_ADDR, &cfg.vdhcp_start);
-	inet_aton("10.0.2.3", &cfg.vnameserver);
+	ip4(GUEST_ADDR, &cfg.vdhcp_start);
+	ip4("10.0.2.3", &cfg.vnameserver);
 	// slirp's helpers for old protocols through NAT: FTP's PORT command
 	// (the 3B1's ftp has no passive mode), rlogin, ident
 	cfg.enable_emu = fbc_get_bool("network", "emu");
@@ -408,7 +445,11 @@ void netslirp_poll(void)
 #else
 	slirp_pollfds_fill(slirp, &timeout, add_poll, NULL);
 #endif
+#ifdef _WIN32
+	int const r = npfd ? WSAPoll(pfd, npfd, 0) : 0;
+#else
 	int const r = npfd ? poll(pfd, npfd, 0) : 0;
+#endif
 	slirp_pollfds_poll(slirp, r < 0, get_revents, NULL);
 
 	int64_t const now = clock_ns() / 1000000;
@@ -423,8 +464,12 @@ void netslirp_poll(void)
 
 void netslirp_done(void)
 {
-	if (slirp != NULL)
+	if (slirp != NULL) {
 		slirp_cleanup(slirp);
+#ifdef _WIN32
+		WSACleanup();
+#endif
+	}
 	slirp = NULL;
 	free(pfd);
 	pfd = NULL;
