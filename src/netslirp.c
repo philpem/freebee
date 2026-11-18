@@ -270,8 +270,11 @@ static bool add_hostfwd(const char *rule)
 		fprintf(stderr, "[network] hostfwd %s: could not forward host port %d (in use?)\n", rule, hport);
 		return true;
 	}
+	char hbuf[INET_ADDRSTRLEN], gbuf[INET_ADDRSTRLEN];	// inet_ntoa has one buffer
+	inet_ntop(AF_INET, &haddr, hbuf, sizeof(hbuf));
+	inet_ntop(AF_INET, &gaddr, gbuf, sizeof(gbuf));
 	printf("Ethernet: host %s port %s:%d goes to the guest's %s:%d\n", is_udp ? "udp" : "tcp",
-			haddr.s_addr == INADDR_ANY ? "*" : inet_ntoa(haddr), hport, inet_ntoa(gaddr), gport);
+			haddr.s_addr == INADDR_ANY ? "*" : hbuf, hport, gbuf, gport);
 	return true;
 }
 
