@@ -12,6 +12,8 @@
 bool control_init(void);
 // Called at every 60Hz tick: reads commands, feeds queued keys.
 void control_tick(void);
+// Commands only, no keys (while MCP has the CPU paused).
+void control_poll(void);
 void control_done(void);
 
 // true while "speed max" is on: the main loop does not wait for real time.

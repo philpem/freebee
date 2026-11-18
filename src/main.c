@@ -19,6 +19,7 @@
 #include "i8274.h"
 #include "dialer.h"
 #include "control.h"
+#include "fbmcp.h"
 
 extern int cpu_log_enabled;
 
@@ -30,6 +31,7 @@ void FAIL(char *err)
 }
 
 static char *floppy_path;
+static char *hd2_path;
 
 static int load_fd_path(const char *discim)
 {
@@ -100,8 +102,41 @@ int freebee_hd2_insert(const char *path)
 	if (state.hdc_disc1)
 		fclose(state.hdc_disc1);
 	state.hdc_disc1 = fp;
+	free(hd2_path);
+	hd2_path = strdup(path);
 	printf("Drive 1: Disc image '%s' loaded.\n", path);
 	return 1;
+}
+
+const char *freebee_hd2_path(void)
+{
+	return state.hdc_disc1 ? hd2_path : NULL;
+}
+
+// the reset button (MCP vm-power reset): the CPU starts again from the
+// boot ROM; memory and the disks stay
+void freebee_reset(void)
+{
+	state.romlmap = false;
+	state.idmarw = state.dmaen = false;
+	state.dma_count = state.dma_address = 0;
+	state.pie = 0;
+	state.ee = 0;
+	state.leds = 0;
+	state.genstat = 0;
+	state.bsr0 = state.bsr1 = 0;
+	state.timer_int_latch = state.timer_clrsint = false;
+	state.nmi_latch = false;
+	state.dma_dev = DMA_DEV_UNDEF;
+	state.mcr2mirror = 0;
+	state.reverse_video = false;
+	state.vram_updated = true;
+	keyboard_init(&state.kbd);
+	wd2797_reset(&state.fdc_ctx);
+	wd2010_reset(&state.hdc_ctx);
+	m68k_set_irq(0);
+	m68k_pulse_reset();
+	printf("Reset.\n");
 }
 
 static int load_hd()
@@ -140,6 +175,7 @@ static int load_hd()
 		} else {
 			fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
 		}
+		hd2_path = strdup(disk2);
 	}
 	return ret;
 }
@@ -424,6 +460,14 @@ void validate_memory(int base_memory, int extended_memory)
 
 int main(int argc, char *argv[])
 {
+	// the MCP server an agent starts: it only talks to running FreeBees
+	if (argc > 1 && strcmp(argv[1], "-mcp-bridge") == 0)
+		return fbmcp_bridge_main(argc, argv);
+	// no window (for agents and recordings): FREEBEE_HEADLESS=1
+	const char *headless = getenv("FREEBEE_HEADLESS");
+	if (headless && *headless && strcmp(headless, "0"))
+		SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
+
 	float scalex = fbc_get_double("display", "x_scale");
 	float scaley = fbc_get_double("display", "y_scale");
 
@@ -522,6 +566,9 @@ int main(int argc, char *argv[])
 	// Scripting socket (optional)
 	control_init();
 
+	// MCP server (on unless [mcp] enabled = false or FREEBEE_MCP=0)
+	fbmcp_init();
+
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * 60.821331Hz, with a 60Hz periodic interrupt.
@@ -539,12 +586,40 @@ int main(int argc, char *argv[])
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
+		if (fbmcp_paused()) {
+			// MCP paused the CPU (or a breakpoint stopped it): MCP, the
+			// control socket and the window go on
+			fbmcp_service();
+			control_poll();
+			if (fbmcp_reset_wanted())
+				freebee_reset();
+			bool vram_changed = state.vram_updated;
+			if (vram_changed)
+				refreshScreen(screen, renderer, fbTexture);
+			if (vram_changed || last_leds != state.leds || window_dirty) {
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, fbTexture, NULL, NULL);
+				refreshStatusBar(renderer, lightbarTexture);
+				SDL_RenderPresent(renderer);
+				last_leds = state.leds;
+				window_dirty = false;
+			}
+			state.vram_updated = false;
+			if (HandleSDLEvents(window) || control_quit || fbmcp_quit())
+				break;
+			SDL_Delay(5);
+			next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
+			continue;
+		}
 		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
 			cycles_run = m68k_execute(CYCLES_PER_TIMESLOT / NUM_CPU_TIMESLOTS);
 			clock_cycles += cycles_run;
+			// an MCP breakpoint or step stopped the CPU before an instruction
+			if (fbmcp_cpu_stopped())
+				break;
 
 			// Run the DMA engine
 			if (state.dmaen) {
@@ -687,6 +762,12 @@ int main(int argc, char *argv[])
 			control_tick();
 			if (control_quit)
 				exitEmu = true;
+			// MCP: the screen for tools and recordings, mouse packets, calls
+			fbmcp_tick(vram_changed);
+			if (fbmcp_quit())
+				exitEmu = true;
+			if (fbmcp_reset_wanted())
+				freebee_reset();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
@@ -727,6 +808,7 @@ int main(int argc, char *argv[])
 		fclose(state.fdc_disc);
 	}
 
+	fbmcp_done();
 	dialer_done();
 	control_done();
 

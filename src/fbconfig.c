@@ -116,6 +116,7 @@ get_default_bool(const char *heading, const char *item)
 		bool value;
 	} defaults[] = {
 		{ "vidpal", "installed", true },
+		{ "mcp", "enabled", true },
 		{ NULL, NULL, false }
 	};
 

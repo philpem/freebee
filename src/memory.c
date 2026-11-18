@@ -1314,6 +1314,10 @@ void m68k_write_memory_8(uint32_t address, uint32_t value)/*{{{*/
 // for the disassembler
 uint32_t m68k_read_disassembler_32(uint32_t addr)
 {
+	if (!state.romlmap)
+		addr |= 0x800000;
+	if (addr >= 0x800000 && addr <= 0xBFFFFF)
+		return RD32(state.rom, addr, ROM_SIZE - 1);
 	if (addr < 0x400000) {
 		uint32_t newAddrHigh, newAddrLow;
 		newAddrHigh = map_address_debug(addr);
@@ -1322,13 +1326,16 @@ uint32_t m68k_read_disassembler_32(uint32_t addr)
 			ram_read_16(newAddrLow));
 
 	} else {
-		printf(">>> WARNING Disassembler RD32 out of range 0x%08X\n", addr);
 		return EMPTY;
 	}
 }
 
 uint32_t m68k_read_disassembler_16(uint32_t addr)
 {
+	if (!state.romlmap)
+		addr |= 0x800000;
+	if (addr >= 0x800000 && addr <= 0xBFFFFF)
+		return RD16(state.rom, addr, ROM_SIZE - 1);
 	if (addr < 0x400000) {
 		uint16_t page = (addr >> 12) & 0x3FF;
 		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
@@ -1345,13 +1352,16 @@ uint32_t m68k_read_disassembler_16(uint32_t addr)
 				return EMPTY & 0xffff;
 		}
 	} else {
-		printf(">>> WARNING Disassembler RD16 out of range 0x%08X\n", addr);
 		return EMPTY & 0xffff;
 	}
 }
 
 uint32_t m68k_read_disassembler_8 (uint32_t addr)
 {
+	if (!state.romlmap)
+		addr |= 0x800000;
+	if (addr >= 0x800000 && addr <= 0xBFFFFF)
+		return RD8(state.rom, addr, ROM_SIZE - 1);
 	if (addr < 0x400000) {
 		uint16_t page = (addr >> 12) & 0x3FF;
 		uint32_t new_page_addr = MAPRAM(page) & 0x3FF;
@@ -1368,7 +1378,6 @@ uint32_t m68k_read_disassembler_8 (uint32_t addr)
 				return EMPTY & 0xff;
 		}
 	} else {
-		printf(">>> WARNING Disassembler RD8 out of range 0x%08X\n", addr);
 		return EMPTY & 0xff;
 	}
 }

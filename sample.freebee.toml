@@ -40,6 +40,11 @@
 [control]
 	socket = "freebee.sock"		# commands over a Unix socket (optional)
 
+[mcp]
+	# The MCP server for AI agents: see MCP.md. FREEBEE_MCP=0 turns it off.
+	enabled = true
+	name = "myvm"			# the VM's name for the tools (default: the folder's name)
+
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep
 	# (BEL) as well as DTMF dialling tones -- on real hardware they all come

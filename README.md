@@ -123,6 +123,12 @@ You can scale the display by setting scale factors in the `.freebee.toml` file.
 Scale values must be greater than zero and less than or equal to 45. This
 facility is useful on large displays.
 
+# Controlling FreeBee from an AI agent (MCP)
+
+FreeBee has a built-in MCP server: an agent can see the screen, type, use the
+mouse, run commands on the serial port, change floppies, debug the 68010 and
+record videos with sound. See [MCP.md](MCP.md).
+
 # Keyboard commands
 
   * F10 -- Grab/Release mouse cursor

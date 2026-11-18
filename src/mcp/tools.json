@@ -1,0 +1,247 @@
+[
+{"name":"vm-info",
+ "description":"Describe the VM: name, folder, run state, speed, guest time, disks and floppy, the serial port's pty, LEDs, whether the guest turned the mouse on, where the pointer is thought to be, and the recording. Use it first.",
+ "inputSchema":{"type":"object","properties":{}},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"vm-power",
+ "description":"Pause or resume the CPU, reset the machine (like a power cycle, but the disks stay attached), or quit FreeBee. A paused VM keeps answering: screenshots, memory and registers work. Resume also goes on after debug-run or debug-step stopped the CPU. Never pause, reset or quit a VM you did not start unless the user asked.",
+ "inputSchema":{"type":"object","properties":{
+   "action":{"type":"string","enum":["pause","resume","reset","quit"],"description":"what to do"}},
+  "required":["action"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"vm-speed",
+ "description":"Run the guest at its real speed (a 10 MHz 68010) or as fast as the host can (max), for installs and compiles. Guest time, and so the guest's clock and every wait measured in guest time, runs faster at max. Without speed, it says the speed.",
+ "inputSchema":{"type":"object","properties":{
+   "speed":{"type":"string","enum":["real","max"],"description":"the new speed"}}},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"screenshot",
+ "description":"Capture the screen as a PNG, white on black. Coordinates in all tools are screen pixels (720x348, origin top-left); with scale, divide image coordinates by scale. The screen's pixels are taller than wide: aspect=true stretches the picture to 4:3 as the monitor showed it, and then image y is screen y times 1.55 (times scale).",
+ "inputSchema":{"type":"object","properties":{
+   "region":"@RECT@",
+   "scale":{"type":"number","description":"from 0.5 to 4 (default: 1; 2 makes small text easier to read)"},
+   "aspect":{"type":"boolean","description":"stretch to the monitor's 4:3 shape (default: false)"},
+   "pointer":{"type":"boolean","description":"draw a small marker where FreeBee thinks the mouse pointer is (default: false)"}}},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"wait-screen",
+ "description":"Wait until the screen changes, or becomes stable, or both. Use it instead of sleeping. change-then-stable waits for something to happen, then for it to settle. Changes smaller than min-pixels do not count, nor do changes back to a picture of the last few seconds (the blinking cursor). stable-ms is guest time; timeout-ms is wall time. One call can wait up to 25 minutes; for a longer install, call it again.",
+ "inputSchema":{"type":"object","properties":{
+   "until":{"type":"string","enum":["change","stable","change-then-stable"],"description":"what to wait for"},
+   "stable-ms":{"type":"integer","description":"how long the screen must not change to be stable (default: 2000)"},
+   "timeout-ms":{"type":"integer","description":"give up after this long, at most 1500000, 25 minutes (default: 60000)"},
+   "min-pixels":{"type":"integer","description":"a change must touch at least this many pixels (default: 16)"},
+   "region":"@RECT@",
+   "ignore":{"type":"array","items":"@RECT@","description":"changes inside these rectangles do not count, such as a clock"},
+   "screenshot":"@SHOT_TRUE@"},
+  "required":["until"]},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"key",
+ "description":"Press keys and key combinations on the 3B1 keyboard, one after another. Join a combination with - or + (\"ctrl-d\", \"shift-f1\"); \"down*5\" presses Down five times; a single character is that key (\"A\" is shift-a). Return and Enter are different keys: shell lines end with Return; Office forms and menus take Enter. Names: return (ret), enter, tab, backspace (bksp), esc, del, space, up, down, left, right, home, end, beg, page, next, prev, f1-f8, exit, cancl, cmd, help, msg, undo, redo, find, rplac, slct, input, creat, save, move, ops, copy, close, open, print, clear, refresh, clearline, rstrt, suspd, rsume, break, dletechar, caps, numlock, shift, rshift, ctrl, rctrl, minus, equal, comma, period, slash, semicolon, apostrophe, grave, backslash, bracketleft, bracketright.",
+ "inputSchema":{"type":"object","properties":{
+   "keys":{"type":"array","items":{"type":"string"},"description":"keys or combinations to press, in order"},
+   "hold-ms":{"type":"integer","description":"how long each key stays down (default: 33)"},
+   "delay-ms":{"type":"integer","description":"pause after each key (default: 17)"},
+   "then":"@THEN@"},
+  "required":["keys"]},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"type-text",
+ "description":"Type a string on the 3B1 keyboard (US layout). \"\\n\" presses Return, \"\\t\" Tab; a control character is ctrl and a letter. Every character is checked first; if one cannot be typed, nothing is typed. For a form field that ends with Enter, type the text, then press enter with the key tool.",
+ "inputSchema":{"type":"object","properties":{
+   "text":{"type":"string","description":"the text to type"},
+   "char-delay-ms":{"type":"integer","description":"pause after each character (default: 17; while recording, a person's pace)"},
+   "human":{"type":"boolean","description":"type at a person's uneven pace (default: true while recording, else false)"},
+   "then":"@THEN@"},
+  "required":["text"]},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"mouse-move",
+ "description":"Move the mouse pointer to x, y, or by dx, dy. The 3B1 mouse is relative: to reach x, y FreeBee first homes the pointer to the top-left corner (when it does not know where it is), then moves it in small paced steps, one pixel a mouse count. The guest must have turned the mouse on (the Office does).",
+ "inputSchema":{"type":"object","properties":{
+   "x":{"type":"integer","description":"target x in screen pixels"},
+   "y":{"type":"integer","description":"target y in screen pixels"},
+   "dx":{"type":"integer","description":"move right by this many pixels (negative: left)"},
+   "dy":{"type":"integer","description":"move down by this many pixels (negative: up)"},
+   "home":{"type":"string","enum":["auto","always","never"],"description":"when to home the pointer first; auto: when its position is not known (default: auto)"},
+   "step-px":{"type":"integer","description":"largest step in mouse counts (default: 8)"},
+   "then":"@THEN@"}},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"mouse-click",
+ "description":"Click a mouse button, after moving to x, y if given (see mouse-move).",
+ "inputSchema":{"type":"object","properties":{
+   "x":{"type":"integer","description":"target x in screen pixels"},
+   "y":{"type":"integer","description":"target y in screen pixels"},
+   "button":{"type":"string","enum":["left","middle","right"],"description":"which button (default: left)"},
+   "count":{"type":"integer","description":"1 to 3; 2 is a double-click (default: 1)"},
+   "hold-ms":{"type":"integer","description":"time the button stays down (default: 80)"},
+   "interval-ms":{"type":"integer","description":"time between clicks (default: 120)"},
+   "home":{"type":"string","enum":["auto","always","never"],"description":"as in mouse-move (default: auto)"},
+   "then":"@THEN@"}},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"mouse-button",
+ "description":"Press or release a mouse button without moving, for menus that need press-and-hold: mouse-button down, mouse-move, mouse-button up.",
+ "inputSchema":{"type":"object","properties":{
+   "action":{"type":"string","enum":["down","up"],"description":"press or release"},
+   "button":{"type":"string","enum":["left","middle","right"],"description":"which button (default: left)"},
+   "then":"@THEN@"},
+  "required":["action"]},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"mouse-drag",
+ "description":"Drag with a button held: move to x, y, press, move to to-x, to-y, release.",
+ "inputSchema":{"type":"object","properties":{
+   "x":{"type":"integer","description":"start x"},
+   "y":{"type":"integer","description":"start y"},
+   "to-x":{"type":"integer","description":"end x"},
+   "to-y":{"type":"integer","description":"end y"},
+   "button":{"type":"string","enum":["left","middle","right"],"description":"which button (default: left)"},
+   "then":"@THEN@"},
+  "required":["x","y","to-x","to-y"]},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"pointer-locate",
+ "description":"Find the mouse pointer on the screen by moving it a little sideways and back, and tell the mouse tools where its tip is. The screenshot marks it with a red cross. Use it when clicks miss.",
+ "inputSchema":{"type":"object","properties":{}},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"serial-write",
+ "description":"Send text to the serial port tty000, as if typed on a terminal there. \"\\n\" is sent as Return (CR) unless raw is true. Control characters go as they are (\"\\u0003\" is ctrl-c, \"\\u0004\" ctrl-d).",
+ "inputSchema":{"type":"object","properties":{
+   "text":{"type":"string","description":"what to send"},
+   "raw":{"type":"boolean","description":"send \\n as LF, not CR (default: false)"}},
+  "required":["text"]},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"serial-read",
+ "description":"Read what the guest wrote to the serial port tty000 since the last serial-read, serial-expect or serial-run, or with all, the latest output whether read or not.",
+ "inputSchema":{"type":"object","properties":{
+   "all":{"type":"boolean","description":"return the latest max-bytes of output, read or not (default: false)"},
+   "max-bytes":{"type":"integer","description":"at most this much, the newest (default: 16384, at most 262144)"}}},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"serial-expect",
+ "description":"Wait until the guest writes some text to the serial port tty000. It looks at the output after the last serial read, so call it after the write that should cause the text. Returns the output up to the match; the next read starts after it.",
+ "inputSchema":{"type":"object","properties":{
+   "text":{"type":"string","description":"the text to wait for"},
+   "regex":{"type":"boolean","description":"text is a POSIX extended regular expression (default: false)"},
+   "timeout-ms":{"type":"integer","description":"give up after this long, at most 1500000 (default: 30000)"}},
+  "required":["text"]},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"serial-run",
+ "description":"Run a shell command on the serial port tty000, where a shell must be logged in, and return its output and exit status. A long or multi-line command, or one with # or @ (the tty's erase and kill keys), goes through a temporary script, /tmp/fbmcp.sh, sent with XON/XOFF flow control (it leaves stty ixoff on). If it is still running at the timeout, the call returns the output so far; serial-expect or serial-read get the rest.",
+ "inputSchema":{"type":"object","properties":{
+   "command":{"type":"string","description":"the command line, or several lines of shell"},
+   "timeout-ms":{"type":"integer","description":"give up after this long, at most 1500000 (default: 60000)"}},
+  "required":["command"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"media",
+ "description":"Floppies and the second hard disk. status says what is in the drives. insert puts a floppy image file in the drive (the one there comes out first); FreeBee reads raw images (320K and 400K, 512-byte sectors) and ImageDisk .IMD files; a read-only file is a write-protected floppy. eject takes it out. With drive hd2, insert changes the second hard disk's image: the guest must not be using it. Paths are relative to the VM's folder.",
+ "inputSchema":{"type":"object","properties":{
+   "action":{"type":"string","enum":["status","insert","eject"],"description":"what to do"},
+   "drive":{"type":"string","enum":["floppy","hd2"],"description":"which drive (default: floppy)"},
+   "file":{"type":"string","description":"with insert: the image file"}},
+  "required":["action"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"sound",
+ "description":"Hear the guest's sound: the beeper and the phone dialer's tones, both through the speaker. Call it with start, do the thing that should make a sound, then call it with wait (waits for a sound and the quiet after it) or stop. It says each tone: when, how long, and its two frequencies.",
+ "inputSchema":{"type":"object","properties":{
+   "action":{"type":"string","enum":["start","wait","stop"],"description":"what to do"},
+   "timeout-ms":{"type":"integer","description":"with wait: give up after this long (default: 30000)"},
+   "quiet-ms":{"type":"integer","description":"with wait: how long it must be quiet after a sound (default: 500)"}},
+  "required":["action"]},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"record",
+ "description":"Record the screen as a video, with the guest's sound, for a screencast or a YouTube video. The video is lossless (ZMBV in AVI, which ffmpeg, VLC and video editors read), 60 frames a second of guest time: every frame is there, and a paused VM records nothing. Call it with start, use the other tools as usual, add marks, then call it with stop, which returns the files, an ffmpeg command that renders them for YouTube (4K, sharp pixels, the monitor's 4:3 shape), the chapters, and a contact sheet of the video. With freeze, the VM runs only during MCP calls, so the video has no waits while you think: let it run with a wait (a 'then', wait-screen) or a mark's hold-ms. With skip-still-ms, long stretches where nothing moves are cut short. While it records, type-text types like a person and the mouse moves like a hand.",
+ "inputSchema":{"type":"object","properties":{
+   "action":{"type":"string","enum":["start","mark","status","stop"],"description":"what to do"},
+   "file":{"type":"string","description":"with start: where to write, without an extension: <file>.avi (then <file>-2.avi after 1 GiB), <file>.json and <file>.srt. Relative to the VM's folder (default: freebee-take-<date>-<time>)"},
+   "color":{"type":"string","enum":["white","green","amber"],"description":"with start: the phosphor (default: white)"},
+   "audio":{"type":"boolean","description":"with start: record the beeper and dialer (default: true)"},
+   "freeze":{"type":"boolean","description":"with start: pause the VM between MCP calls (default: false)"},
+   "skip-still-ms":{"type":"integer","description":"with start: when the screen stands still and nothing sounds for longer than this, leave the rest of that time out; 0 records everything (default: 0)"},
+   "kind":{"type":"string","enum":["chapter","caption","zoom","note"],"description":"with mark: a chapter title, a caption (a subtitle), a close-up of region, or a note for the edit (default: chapter)"},
+   "text":{"type":"string","description":"with mark: the chapter's title, the caption or the note"},
+   "region":"@RECT@",
+   "duration-ms":{"type":"integer","description":"with mark: how long a caption or a zoom lasts (default: 3000)"},
+   "hold-ms":{"type":"integer","description":"with mark: then record this much more guest time before returning, also with freeze, at most 60000 (default: 0)"}},
+  "required":["action"]},
+ "annotations":{"openWorldHint":false}},
+
+{"name":"steps",
+ "description":"Run several tool calls in one, in order: keys, typing, mouse, waits, serial, media. Use it for a sequence you know, such as the next pages of an installer or a login. It stops at the first step that fails or whose wait does not get what it waits for (wait-screen or a 'then' wait that times out, serial-expect with no match, serial-run still running, debug-run that does not get to its address), and says which. All steps are checked before the first one runs. They share one call's 25 minutes. The result has each step's summary and the last screenshot taken.",
+ "inputSchema":{"type":"object","properties":{
+   "steps":{"type":"array","minItems":1,"maxItems":50,"description":"the calls, in order",
+    "items":{"type":"object","properties":{
+      "tool":{"type":"string","description":"a tool, such as key, type-text, mouse-click, wait-screen, serial-write or serial-expect"},
+      "args":{"type":"object","description":"its arguments, as in a call of its own"}},
+     "required":["tool"]}}},
+  "required":["steps"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"debug-registers",
+ "description":"Show the 68010's registers (D0-D7, A0-A7, PC, SR with its flags, USP, SSP, VBR, SFC, DFC) and the next instructions. While the CPU runs, it is a snapshot between two time slices.",
+ "inputSchema":{"type":"object","properties":{
+   "instructions":{"type":"integer","description":"how many instructions to show from PC (default: 4, at most 32)"}}},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"register-write",
+ "description":"Set a 68010 register: d0-d7, a0-a7, pc, sr, usp, ssp, vbr, sfc or dfc. Pause the CPU first (vm-power pause, or debug-run) so the guest does not trip over it.",
+ "inputSchema":{"type":"object","properties":{
+   "register":{"type":"string","description":"the register's name"},
+   "value":{"type":"string","description":"the new value: hex with 0x, or decimal"}},
+  "required":["register","value"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"memory-read",
+ "description":"Read guest memory as a hex dump with ASCII, or as a C string. Virtual addresses (below 0x400000) go through the 3B1's page map, as the CPU sees them; physical ones are RAM itself. The boot ROM is at 0x800000 and video RAM at 0x420000.",
+ "inputSchema":{"type":"object","properties":{
+   "address":{"type":"string","description":"the first address: hex with 0x, or decimal"},
+   "length":{"type":"integer","description":"bytes, up to 4096 (default: 128)"},
+   "physical":{"type":"boolean","description":"a physical RAM address (default: false)"},
+   "string":{"type":"boolean","description":"show a C string there, up to its zero byte or length (default: false)"}},
+  "required":["address"]},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"memory-write",
+ "description":"Write guest RAM: bytes given as hex, or a text string. Addresses as in memory-read; only RAM can be written.",
+ "inputSchema":{"type":"object","properties":{
+   "address":{"type":"string","description":"the first address: hex with 0x, or decimal"},
+   "hex":{"type":"string","description":"the bytes, as hex digits (\"4e71 4e75\"; spaces are ignored)"},
+   "text":{"type":"string","description":"or a string to write (no zero byte is added)"},
+   "physical":{"type":"boolean","description":"a physical RAM address (default: false)"}},
+  "required":["address"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"disassemble",
+ "description":"Disassemble 68010 code, as the CPU sees it through the page map.",
+ "inputSchema":{"type":"object","properties":{
+   "address":{"type":"string","description":"where to start: hex with 0x, or decimal (default: PC)"},
+   "count":{"type":"integer","description":"how many instructions, up to 200 (default: 16)"}}},
+ "annotations":{"readOnlyHint":true,"openWorldHint":false}},
+
+{"name":"debug-run",
+ "description":"Let the CPU run until it is about to run the instruction at an address (a breakpoint), then stop it there and show the registers. With a timeout, the breakpoints go away and the CPU keeps running. After a stop, debug-step goes on one instruction at a time, debug-run to the next address, and vm-power resume lets it run.",
+ "inputSchema":{"type":"object","properties":{
+   "address":{"description":"an address, or a list of up to 16, as hex with 0x or decimal","anyOf":[{"type":"string"},{"type":"array","items":{"type":"string"}}]},
+   "count":{"type":"integer","description":"stop the count-th time it gets there (default: 1)"},
+   "supervisor":{"type":"boolean","description":"only in supervisor mode (true) or only in user mode (false) (default: either)"},
+   "timeout-ms":{"type":"integer","description":"give up after this long, at most 1500000 (default: 30000)"}},
+  "required":["address"]},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}},
+
+{"name":"debug-step",
+ "description":"Run some instructions and stop. The CPU must be stopped: by debug-run, or vm-power pause. Interrupts are taken as usual.",
+ "inputSchema":{"type":"object","properties":{
+   "count":{"type":"integer","description":"how many instructions, up to 100000 (default: 1)"}}},
+ "annotations":{"destructiveHint":true,"openWorldHint":false}}
+]

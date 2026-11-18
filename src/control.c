@@ -34,222 +34,30 @@
 #include "fbconfig.h"
 #include "keyboard.h"
 #include "control.h"
+#include "keys.h"
 
 bool control_speed_max = false;
 bool control_quit = false;
 
-/* ---- key queue ---- */
-
-#define MAXCHORD 6
-struct chord {
-	uint8_t code[MAXCHORD];
-	int n;
-};
-
-#define QSIZE 65536
-static struct chord queue[QSIZE];
-static int q_head, q_tail;		// pop at head, push at tail
-static int q_count;
-
-static struct chord cur;
-static int phase;			// 0 idle, 3 modifiers down, 1 keys down, 2 keys up (gap)
-static int counter;
-
-// SHIFT and CTRL go down one tick before the other keys: the keyboard sends
-// the keys that are down in scan code order, so a letter or digit (lower
-// code) would reach the kernel before its SHIFT (0x48) and come out plain.
-static bool is_modifier(uint8_t code)
-{
-	return code == 0x48 || code == 0x49 || code == 0x4c || code == 0x4d;
-}
-
-static bool keys_set_mods(const struct chord *c)
-{
-	bool any = false;
-	for (int i = 0; i < c->n; i++) {
-		if (is_modifier(c->code[i])) {
-			state.kbd.keystate[c->code[i]] = 1;
-			any = true;
-		}
-	}
-	if (any)
-		state.kbd.update_flag = true;
-	return any;
-}
-
-static bool q_push(const struct chord *c)
-{
-	if (q_count >= QSIZE)
-		return false;
-	queue[q_tail] = *c;
-	q_tail = (q_tail + 1) % QSIZE;
-	q_count++;
-	return true;
-}
-
-static void keys_set(const struct chord *c, int down)
-{
-	for (int i = 0; i < c->n; i++)
-		state.kbd.keystate[c->code[i] & 0x7f] = down;
-	state.kbd.update_flag = true;
-}
-
-static void key_machine(void)
-{
-	if (phase == 3) {
-		if (--counter <= 0) {
-			keys_set(&cur, 1);
-			phase = 1;
-			counter = 2;
-		}
-		return;
-	}
-	if (phase == 1) {
-		if (--counter <= 0) {
-			keys_set(&cur, 0);
-			phase = 2;
-			counter = 1;
-		}
-		return;
-	}
-	if (phase == 2) {
-		if (--counter > 0)
-			return;
-		phase = 0;
-	}
-	if (phase == 0 && q_count > 0) {
-		cur = queue[q_head];
-		q_head = (q_head + 1) % QSIZE;
-		q_count--;
-		if (keys_set_mods(&cur)) {
-			phase = 3;
-			counter = 1;
-		} else {
-			keys_set(&cur, 1);
-			phase = 1;
-			counter = 2;
-		}
-	}
-}
-
-/* ---- key names and ASCII ---- */
-
-enum { K_SHIFT = 0x48, K_CTRL = 0x4c, K_RETURN = 0x0d };
-
-static const struct { const char *name; uint8_t code; } key_names[] = {
-	{ "UP", 0x01 }, { "CLEARLINE", 0x02 }, { "RSTRT", 0x03 }, { "REF", 0x03 },
-	{ "EXIT", 0x04 }, { "PREV", 0x05 }, { "MSG", 0x06 },
-	{ "CANCL", 0x07 }, { "CANCEL", 0x07 }, { "BACKSPACE", 0x08 }, { "BS", 0x08 },
-	{ "TAB", 0x09 }, { "ENTER", 0x0a }, { "DOWN", 0x0b }, { "NEXT", 0x0c },
-	{ "RETURN", 0x0d }, { "RET", 0x0d }, { "LEFT", 0x0e }, { "RIGHT", 0x0f },
-	{ "CREAT", 0x10 }, { "CREATE", 0x10 }, { "SAVE", 0x11 }, { "MOVE", 0x12 },
-	{ "OPS", 0x13 }, { "COPY", 0x14 },
-	{ "F1", 0x15 }, { "F2", 0x16 }, { "F3", 0x17 }, { "F4", 0x18 },
-	{ "F5", 0x19 }, { "F6", 0x1a }, { "ESC", 0x1b }, { "F7", 0x1c }, { "F8", 0x1d },
-	{ "SUSPD", 0x1e }, { "SUSPEND", 0x1e }, { "RSUME", 0x1f }, { "RESUME", 0x1f },
-	{ "SPACE", 0x20 }, { "UNDO", 0x21 }, { "REDO", 0x22 }, { "FIND", 0x23 },
-	{ "RPLAC", 0x24 }, { "REPLACE", 0x24 }, { "BREAK", 0x25 }, { "RESET", 0x25 },
-	{ "DLETECHAR", 0x26 }, { "DELCHAR", 0x26 }, { "SLCT", 0x28 }, { "MARK", 0x28 },
-	{ "INPUT", 0x29 }, { "MODE", 0x29 }, { "HELP", 0x2a }, { "CMD", 0x41 },
-	{ "CLOSE", 0x42 }, { "OPEN", 0x42 }, { "PRINT", 0x43 }, { "CLEAR", 0x44 },
-	{ "RFRSH", 0x44 }, { "REFRESH", 0x44 }, { "CAPS", 0x45 }, { "PAGE", 0x46 },
-	{ "BEG", 0x47 }, { "SHIFT", 0x48 }, { "LSHIFT", 0x48 }, { "RSHIFT", 0x49 },
-	{ "HOME", 0x4a }, { "END", 0x4b }, { "CTRL", 0x4c }, { "LCTRL", 0x4c },
-	{ "RCTRL", 0x4d }, { "NUMLOCK", 0x7e }, { "DEL", 0x7f }, { "DLETE", 0x7f },
-	{ "DELETE", 0x7f },
-	{ NULL, 0 }
-};
-
-// ASCII 0x20..0x7e -> scancode, bit 7 set = needs SHIFT
-static uint8_t ascii_code(int c)
-{
-	static const char *shifted = "!@#$%^&*()_+{}|:\"<>?~";
-	static const char *plain   = "1234567890-=[]\\;',./`";
-	if (c >= 'a' && c <= 'z') return c;
-	if (c >= 'A' && c <= 'Z') return 0x80 | (c - 'A' + 'a');
-	if (c >= '0' && c <= '9') return c;
-	if (c == ' ') return 0x20;
-	const char *p = strchr(plain, c);
-	if (p && c) return c;
-	p = strchr(shifted, c);
-	if (p && c) return 0x80 | plain[p - shifted];
-	return 0;
-}
-
-// one name like "F1", "CTRL", "d", "A": adds to chord. false if unknown.
-static bool chord_add_name(struct chord *ch, const char *name)
-{
-	if (ch->n >= MAXCHORD)
-		return false;
-	for (int i = 0; key_names[i].name; i++) {
-		if (strcasecmp(key_names[i].name, name) == 0) {
-			ch->code[ch->n++] = key_names[i].code;
-			return true;
-		}
-	}
-	if (strlen(name) == 1) {
-		uint8_t c = ascii_code((unsigned char)name[0]);
-		if (!c)
-			return false;
-		if ((c & 0x80) && ch->n < MAXCHORD)
-			ch->code[ch->n++] = K_SHIFT;
-		if (ch->n >= MAXCHORD)
-			return false;
-		ch->code[ch->n++] = c & 0x7f;
-		return true;
-	}
-	return false;
-}
+/* ---- typing (the key queue is in keys.c) ---- */
 
 static bool push_ascii(int c)
 {
-	struct chord ch = { {0}, 0 };
-	switch (c) {
-	case '\n': case '\r': ch.code[ch.n++] = K_RETURN; return q_push(&ch);
-	case '\t': ch.code[ch.n++] = 0x09; return q_push(&ch);
-	case 0x1b: ch.code[ch.n++] = 0x1b; return q_push(&ch);
-	case '\b': ch.code[ch.n++] = 0x08; return q_push(&ch);
-	case 0x7f: ch.code[ch.n++] = 0x7f; return q_push(&ch);
-	}
-	if (c >= 1 && c <= 26) {
-		ch.code[ch.n++] = K_CTRL;
-		ch.code[ch.n++] = 'a' + c - 1;
-		return q_push(&ch);
-	}
-	uint8_t k = ascii_code(c);
-	if (!k)
-		return false;
-	if (k & 0x80)
-		ch.code[ch.n++] = K_SHIFT;
-	ch.code[ch.n++] = k & 0x7f;
-	return q_push(&ch);
+	key_chord ch;
+	return keys_from_char(&ch, c) && keys_push(&ch) != 0;
 }
 
 // {NAME} or {CTRL-SHIFT-NAME}; s points after '{', len excludes '}'
 static bool push_braced(const char *s, int len)
 {
 	char buf[64];
-	struct chord ch = { {0}, 0 };
+	key_chord ch;
+	memset(&ch, 0, sizeof(ch));
 	if (len <= 0 || len >= (int)sizeof(buf))
 		return false;
 	memcpy(buf, s, len);
 	buf[len] = 0;
-	char *p = buf;
-	for (;;) {
-		char *dash = strchr(p, '-');
-		// a lone "-" as the last part is the minus key
-		if (dash && dash[1] == 0 && dash == p)
-			dash = NULL;
-		if (dash)
-			*dash = 0;
-		if (!chord_add_name(&ch, p))
-			return false;
-		if (!dash)
-			break;
-		p = dash + 1;
-	}
-	// CTRL with a shifted letter: CTRL-A means CTRL-a
-	return q_push(&ch);
+	return keys_parse_combo(&ch, buf) && keys_push(&ch) != 0;
 }
 
 static const char *do_type(const char *s)
@@ -287,15 +95,16 @@ static const char *do_type(const char *s)
 
 static const char *do_key(char *args)
 {
-	struct chord ch = { {0}, 0 };
+	key_chord ch;
 	char *save = NULL;
+	memset(&ch, 0, sizeof(ch));
 	for (char *t = strtok_r(args, " \t", &save); t; t = strtok_r(NULL, " \t", &save)) {
-		if (!chord_add_name(&ch, t))
+		if (!keys_add_name(&ch, t))
 			return "err unknown key";
 	}
 	if (ch.n == 0)
 		return "err no key";
-	return q_push(&ch) ? "ok" : "err queue full";
+	return keys_push(&ch) ? "ok" : "err queue full";
 }
 
 /* ---- PNG screenshot ---- */
@@ -522,7 +331,7 @@ static void command(struct client *c, char *line)
 		const char *fp = freebee_floppy_path();
 		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s keys=%d leds=%d",
 			fp ? fp : "none", control_speed_max ? "max" : "real",
-			q_count + (phase ? 1 : 0), state.leds);
+			keys_pending(), state.leds);
 		reply(c, msg);
 	} else if (strcmp(line, "quit") == 0) {
 		control_quit = true;
@@ -644,5 +453,10 @@ void control_done(void) { }
 void control_tick(void)
 {
 	poll_socket();
-	key_machine();
+	keys_tick();
+}
+
+void control_poll(void)
+{
+	poll_socket();
 }
