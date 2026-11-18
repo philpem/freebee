@@ -540,6 +540,19 @@ static void mc_info(void *p)
 	r->sr = m68k_get_reg(NULL, M68K_REG_SR);
 }
 
+// the speed, for vm-info and vm-speed
+static const char *speed_text(char *buf, size_t n)
+{
+	if (control_speed_max)
+		snprintf(buf, n, "max (as fast as the host can; guest time races)");
+	else if (control_turbo > 1)
+		snprintf(buf, n, "real time with turbo %d (the CPU %d times as fast, %d MHz)",
+			control_turbo, control_turbo, control_turbo * 10);
+	else
+		snprintf(buf, n, "real (10 MHz)");
+	return buf;
+}
+
 static bool tool_vm_info(call *c, const json *a)
 {
 	(void)a;
@@ -562,8 +575,9 @@ static bool tool_vm_info(call *c, const json *a)
 	double secs = s.ticks / (double)TICK_HZ;
 	call_printf(c, "VM %s (FreeBee, AT&T UNIX PC 3B1), pid %d, folder %s\n", mcp_vm_name,
 		(int)getpid(), mcp_vm_dir);
+	char sd[160];
 	call_printf(c, "State: %s, speed %s, guest time %d:%02d:%02d, PC %06x (%s mode)\n", run,
-		control_speed_max ? "max" : "real (10 MHz)", (int)secs / 3600, (int)secs / 60 % 60,
+		speed_text(sd, sizeof(sd)), (int)secs / 3600, (int)secs / 60 % 60,
 		(int)secs % 60, r.pc & 0xffffff, (r.sr & 0x2000) ? "supervisor" : "user");
 	call_printf(c, "Memory: %d KB on the main board, %d KB expansion\n",
 		(int)(state.base_ram_size / 1024), (int)(state.exp_ram_size / 1024));
@@ -649,10 +663,14 @@ static bool tool_vm_speed(call *c, const json *a)
 {
 	static const char *const sp[] = { "real", "max", NULL };
 	int s;
-	if (!arg_enum(c, a, "speed", sp, control_speed_max ? 1 : 0, &s))
+	long t;
+	if (!arg_enum(c, a, "speed", sp, control_speed_max ? 1 : 0, &s) ||
+	    !arg_int(c, a, "turbo", control_turbo, 1, TURBO_MAX, &t))
 		return false;
 	control_speed_max = s == 1;
-	call_printf(c, "Speed: %s.", s ? "max (as fast as the host can)" : "real (10 MHz)");
+	control_turbo = (int)t;
+	char d[160];
+	call_printf(c, "Speed: %s.", speed_text(d, sizeof(d)));
 	return true;
 }
 

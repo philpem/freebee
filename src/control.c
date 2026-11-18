@@ -37,6 +37,7 @@
 #include "keys.h"
 
 bool control_speed_max = false;
+int control_turbo = 1;
 bool control_quit = false;
 
 /* ---- typing (the key queue is in keys.c) ---- */
@@ -327,10 +328,21 @@ static void command(struct client *c, char *line)
 		}
 		snprintf(msg, sizeof(msg), "ok speed=%s", control_speed_max ? "max" : "real");
 		reply(c, msg);
+	} else if (strcmp(line, "turbo") == 0) {
+		int t;
+		if (*args) {
+			if (sscanf(args, "%d", &t) != 1 || t < 1 || t > TURBO_MAX) {
+				reply(c, "err turbo 1-32");
+				return;
+			}
+			control_turbo = t;
+		}
+		snprintf(msg, sizeof(msg), "ok turbo=%d", control_turbo);
+		reply(c, msg);
 	} else if (strcmp(line, "status") == 0) {
 		const char *fp = freebee_floppy_path();
-		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s keys=%d leds=%d",
-			fp ? fp : "none", control_speed_max ? "max" : "real",
+		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s turbo=%d keys=%d leds=%d",
+			fp ? fp : "none", control_speed_max ? "max" : "real", control_turbo,
 			keys_pending(), state.leds);
 		reply(c, msg);
 	} else if (strcmp(line, "quit") == 0) {

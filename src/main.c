@@ -581,6 +581,13 @@ int main(int argc, char *argv[])
 	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, cycles_run;
+	uint32_t last_turbo = 1;
+
+	control_turbo = fbc_get_int("cpu", "turbo");
+	if (control_turbo < 1 || control_turbo > TURBO_MAX) {
+		fprintf(stderr, "[cpu] turbo must be 1 to %d (got %d); using 1\n", TURBO_MAX, control_turbo);
+		control_turbo = 1;
+	}
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
@@ -611,7 +618,15 @@ int main(int argc, char *argv[])
 			next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 			continue;
 		}
-		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
+		// Turbo: run the CPU that many times as fast, and stretch the 60Hz
+		// tick by as much, so the clock stays real. At max speed it is moot:
+		// the tick then comes as often as it can, and guest time races.
+		uint32_t turbo = control_speed_max ? 1 : (uint32_t)control_turbo;
+		if (turbo != last_turbo) {
+			clock_cycles = (uint32_t)((uint64_t)clock_cycles * turbo / last_turbo);
+			last_turbo = turbo;
+		}
+		for (i = 0; i < CYCLES_PER_TIMESLOT * turbo; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
@@ -733,7 +748,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
-		if (clock_cycles > CLOCKS_PER_60HZ) {
+		if (clock_cycles > CLOCKS_PER_60HZ * turbo) {
 			// Refresh the screen if VRAM has been changed. Draw the whole
 			// window (screen + LEDs) and present it only when something
 			// changed: presenting a frame that was not drawn whole makes
@@ -773,7 +788,7 @@ int main(int argc, char *argv[])
 			// scan the serial pty for new data
 			i8274_scan_incoming(&state.serial_ctx, CHAN_A);
 			// decrement clock cycle counter, we've handled the intr.
-			clock_cycles -= CLOCKS_PER_60HZ;
+			clock_cycles -= CLOCKS_PER_60HZ * turbo;
 		}
 
 		// handle SDL events -- returns true if we need to exit

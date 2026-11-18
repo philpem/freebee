@@ -149,6 +149,7 @@ get_default_int(const char *heading, const char *item)
 		{ "memory", "base_memory", 2048 },
 		{ "memory", "extended_memory", 2048 },
 		{ "beeper", "volume", 55 },
+		{ "cpu", "turbo", 1 },
 		{ NULL, NULL, 0 }
 	};
 

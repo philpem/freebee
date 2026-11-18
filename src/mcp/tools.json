@@ -12,9 +12,10 @@
  "annotations":{"destructiveHint":true,"openWorldHint":false}},
 
 {"name":"vm-speed",
- "description":"Run the guest at its real speed (a 10 MHz 68010) or as fast as the host can (max), for installs and compiles. Guest time, and so the guest's clock and every wait measured in guest time, runs faster at max. Without speed, it says the speed.",
+ "description":"Run the guest in real time (real) or as fast as the host can (max), for installs and compiles. At max, guest time, and so the guest's clock and every wait measured in guest time, races ahead of wall time, and a key held by a person repeats. In real time, turbo makes the CPU that many times as fast as a real 3B1's 10 MHz 68010 while the clock, key repeat and waits stay real. Without arguments, it says the speed.",
  "inputSchema":{"type":"object","properties":{
-   "speed":{"type":"string","enum":["real","max"],"description":"the new speed"}}},
+   "speed":{"type":"string","enum":["real","max"],"description":"the new speed"},
+   "turbo":{"type":"integer","minimum":1,"maximum":32,"description":"in real time: how many times as fast the CPU runs (1 is a real 3B1, 10 is 100 MHz; default: as it is)"}}},
  "annotations":{"openWorldHint":false}},
 
 {"name":"screenshot",

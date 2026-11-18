@@ -18,6 +18,10 @@ void control_done(void);
 
 // true while "speed max" is on: the main loop does not wait for real time.
 extern bool control_speed_max;
+/// [cpu] turbo: the CPU runs this many times as fast as a real 3B1's, while
+/// the 60Hz clock (and so the guest's time) stays real. 1 is a real 3B1.
+extern int control_turbo;
+#define TURBO_MAX 32
 // set by the "quit" command
 extern bool control_quit;
 

@@ -45,6 +45,7 @@ for no sound on the host either (recordings still get the sound).
 | `FREEBEE_MCP=0` | Turns MCP off; `FREEBEE_MCP=1` turns it on, whatever the file says |
 | `FREEBEE_NAME=x` | The VM's name, over `[mcp]` `name` |
 | `FREEBEE_HEADLESS=1` | No window |
+| `[cpu]` `turbo` | The CPU runs N times as fast as a real 3B1's 10 MHz, while time stays real (default: 1) |
 | `[modem]` `present` | Whether the kernel finds the built-in modem (default: `true`). See [The beep](#the-beep) |
 
 ## Tools
@@ -58,7 +59,7 @@ when only one VM runs.
 | `vm-wait` | Wait for a VM to start (`up`), end (`gone`) or start again (`restarted`) |
 | `vm-info` | Describe the VM: run state, speed, guest time, disks, floppy, serial pty, mouse, recording. Use it first |
 | `vm-power` | `pause`, `resume`, `reset` or `quit` |
-| `vm-speed` | `real` (a 10 MHz 68010) or `max` (as fast as the host can), for installs and compiles |
+| `vm-speed` | `real` time or `max` (as fast as the host can, for installs); in real time, `turbo` makes the CPU N times as fast |
 | `screenshot` | A picture of the screen (PNG); `region` crops, `scale` zooms, `aspect` shows it 4:3 like the monitor, `pointer` marks the mouse |
 | `wait-screen` | Wait until the screen changes, settles, or both. Use it instead of sleeping |
 | `key` | Press keys and combinations, with the 3B1's own keys (Enter, Exit, Cancl, Cmd, Help, Page, Beg, End...) |
