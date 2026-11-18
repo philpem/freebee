@@ -20,6 +20,7 @@
 #include "dialer.h"
 #include "control.h"
 #include "fbmcp.h"
+#include "enet.h"
 
 extern int cpu_log_enabled;
 
@@ -134,6 +135,7 @@ void freebee_reset(void)
 	keyboard_init(&state.kbd);
 	wd2797_reset(&state.fdc_ctx);
 	wd2010_reset(&state.hdc_ctx);
+	enet_reset();
 	m68k_set_irq(0);
 	m68k_pulse_reset();
 	printf("Reset.\n");
@@ -575,6 +577,9 @@ int main(int argc, char *argv[])
 
 	load_hd();
 
+	// Ethernet board (optional): [network] enabled = true
+	enet_init();
+
 	// Scripting socket (optional)
 	control_init();
 
@@ -594,6 +599,7 @@ int main(int argc, char *argv[])
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, cycles_run;
 	uint32_t last_turbo = 1;
+	uint32_t net_slices = 0, last_net_poll = 0;
 
 	control_turbo = fbc_get_int("cpu", "turbo");
 	if (control_turbo < 1 || control_turbo > TURBO_MAX) {
@@ -647,6 +653,17 @@ int main(int argc, char *argv[])
 			// an MCP breakpoint or step stopped the CPU before an instruction
 			if (fbmcp_cpu_stopped())
 				break;
+
+			// Ethernet board: transmit poll, receive; the host network
+			// about every millisecond
+			enet_tick(cycles_run);
+			if ((++net_slices & 15) == 0) {
+				uint32_t const ms = SDL_GetTicks();
+				if (ms != last_net_poll) {
+					last_net_poll = ms;
+					enet_host_poll();
+				}
+			}
 
 			// Run the DMA engine
 			if (state.dmaen) {
@@ -747,14 +764,22 @@ int main(int argc, char *argv[])
 			// hasn't got around to taking it yet (e.g. it is sat at SPL6).
 			//
 			// TODO: MCR2.F_MASK (0x0400) masks the floppy interrupt
+			//
+			// The Ethernet board asks for level 1, or 5 if the driver
+			// picks that (5 is the expansion slots' other level).
+			int const enet_level = enet_irq();
 			if (state.timer_int_latch) {
 				m68k_set_irq(6);
+			} else if (enet_level == 5) {
+				m68k_set_irq(5);
 			} else if (i8274_get_irq(&state.serial_ctx)) {
 				m68k_set_irq(4);
 			} else if (keyboard_get_irq(&state.kbd)) {
 				m68k_set_irq(3);
 			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
 				m68k_set_irq(2);
+			} else if (enet_level == 1) {
+				m68k_set_irq(1);
 			} else {
 				m68k_set_irq(0);
 			}
@@ -838,6 +863,7 @@ int main(int argc, char *argv[])
 	fbmcp_done();
 	dialer_done();
 	control_done();
+	enet_done();
 
 	// Clean up SDL
 	SDL_DestroyTexture(lightbarTexture);

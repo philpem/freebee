@@ -19,6 +19,7 @@
 #include "../keyboard.h"
 #include "../control.h"
 #include "../fbconfig.h"
+#include "../enet.h"
 #include "../musashi/m68k.h"
 
 #define ASPECT 1.5517	// screen y to 4:3: (720 / 348) * (3 / 4)
@@ -525,7 +526,7 @@ static void finish_then(call *c, const then_t *t, const frame_t *before)
 /* ---- vm-info, vm-power, vm-speed ---- */
 
 typedef struct {
-	char floppy[600], hd2[600];
+	char floppy[600], hd2[600], net[240];
 	uint32_t pc, sr;
 } info_req;
 
@@ -536,6 +537,8 @@ static void mc_info(void *p)
 	const char *h = freebee_hd2_path();
 	snprintf(r->floppy, sizeof(r->floppy), "%s", f ? f : "");
 	snprintf(r->hd2, sizeof(r->hd2), "%s", h ? h : "");
+	const char *n = enet_info();
+	snprintf(r->net, sizeof(r->net), "%s", n ? n : "");
 	r->pc = m68k_get_reg(NULL, M68K_REG_PC);
 	r->sr = m68k_get_reg(NULL, M68K_REG_SR);
 }
@@ -586,6 +589,7 @@ static bool tool_vm_info(call *c, const json *a)
 		r.floppy[0] ? r.floppy : "none (empty drive)");
 	call_printf(c, "Serial port tty000: pty %s (link %s); MCP serial tools reach it too\n",
 		pty[0] ? pty : "?", link ? link : "?");
+	call_printf(c, "Ethernet: %s\n", r.net[0] ? r.net : "no board ([network] enabled = false)");
 	call_printf(c, "Screen: 720x348, one bit%s; LEDs (red, green, yellow, red): %d%d%d%d\n",
 		s.frame.rev ? ", reverse video" : "",
 		s.leds & 1, (s.leds >> 1) & 1, (s.leds >> 2) & 1, (s.leds >> 3) & 1);

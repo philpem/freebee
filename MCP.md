@@ -57,7 +57,7 @@ when only one VM runs.
 |---|---|
 | `vm-list` | List the running VMs: name, PID, folder, who started it |
 | `vm-wait` | Wait for a VM to start (`up`), end (`gone`) or start again (`restarted`) |
-| `vm-info` | Describe the VM: run state, speed, guest time, disks, floppy, serial pty, mouse, recording. Use it first |
+| `vm-info` | Describe the VM: run state, speed, guest time, disks, floppy, serial pty, Ethernet board, mouse, recording. Use it first |
 | `vm-power` | `pause`, `resume`, `reset` or `quit` |
 | `vm-speed` | `real` time or `max` (as fast as the host can, for installs); in real time, `turbo` makes the CPU N times as fast |
 | `screenshot` | A picture of the screen (PNG); `region` crops, `scale` zooms, `aspect` shows it 4:3 like the monitor, `pointer` marks the mouse |
@@ -196,6 +196,6 @@ fails as it always did, and the 3B1 never beeps.
 ## Limits
 
 - Text on the screen is pixels: read it from screenshots.
-- No snapshots, no network.
+- No snapshots.
 - One serial port, tty000.
 - `zoom` marks are notes for the edit: the render command does not zoom.

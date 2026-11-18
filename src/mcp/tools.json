@@ -1,6 +1,6 @@
 [
 {"name":"vm-info",
- "description":"Describe the VM: name, folder, run state, speed, guest time, disks and floppy, the serial port's pty, LEDs, whether the guest turned the mouse on, where the pointer is thought to be, and the recording. Use it first.",
+ "description":"Describe the VM: name, folder, run state, speed, guest time, disks and floppy, the serial port's pty, the Ethernet board, LEDs, whether the guest turned the mouse on, where the pointer is thought to be, and the recording. Use it first.",
  "inputSchema":{"type":"object","properties":{}},
  "annotations":{"readOnlyHint":true,"openWorldHint":false}},
 

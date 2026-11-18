@@ -43,6 +43,8 @@ In summary: all support is on a best-effort basis, but **I cannot guarantee that
   * Serial port.
     * Linux only: file 'serial-pty' is symlinked to PTY that can be used to access tty000
     * Usage instructions: [README.serial.md](README.serial.md)
+  * Ethernet board (AT&T's, with an AMD Am7990 LANCE), for the Wollongong WIN/3B TCP/IP software.
+    * Off by default. User mode network with libslirp: see [Networking](#networking).
   * VIDPAL user-space video access mod
     * Allows user-mode code to access the video memory without causing a bus error
     * Useful for running the MGR window manager at a reasonable speed...!
@@ -57,7 +59,7 @@ This is also called my "to-do" list...
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
     * Only the kernel's boot probe of the modem is answered (`[modem] present`, on by default): the kernel then starts its phone scan, which times the system beep.
   * Expansion cards
-    * Expansion RAM is emulated, but other cards are of little utility and largely undocumented, so are unlikely to be added.
+    * Expansion RAM and the Ethernet board are emulated. Other cards are of little utility and largely undocumented, so are unlikely to be added.
     * With that said: the serial combo card might be useful to add an extra serial port (or several).
     * DOS-73 is unlikely to ever be emulated unless someone reverse-engineers a schematic.
     * Floppy Tape is of debatable utility when we can send files over the serial port with Kermit.
@@ -66,6 +68,7 @@ This is also called my "to-do" list...
 # Build instructions
 
   - Install the `libsdl2-dev` package
+  - For networking, also install libslirp (`libslirp-dev`, or `brew install libslirp` on macOS). Without it FreeBee builds with the Ethernet board's cable unplugged; `make SLIRP=no` leaves libslirp out.
   - Clone a copy of Freebee (remember to check out the submodules too)
     - `git clone --recurse-submodules https://github.com/philpem/freebee`
   - Build Freebee (run 'make')
@@ -117,6 +120,44 @@ This is also called my "to-do" list...
     * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
   - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
   - A third option is to use TAR to archive the files, and Kermit over the emulated serial port (Linux only) to send them to the 3B1.
+
+## Networking
+
+FreeBee emulates the 3B1's Ethernet board: an AMD Am7990 LANCE in an
+expansion slot (card id 0x1003). It works with the Wollongong WIN/3B TCP/IP
+software ("TWG-TCP/IP", `/etc/lddrv/ether`), which has telnet, ftp, rcp,
+rsh, rlogin and their servers. The board is off by default. Turn it on in
+`.freebee.toml`:
+
+```toml
+[network]
+	enabled = true
+	hostfwd = "tcp:127.0.0.1:2323-:23, tcp:127.0.0.1:2121-:21"
+```
+
+The board is on a user mode network (libslirp, as in QEMU's
+`-netdev user`). It needs no root and no setup on the host.
+
+  * The 3B1 is 10.0.2.15, the host is 10.0.2.2 and DNS is 10.0.2.3. The
+    driver's `ether.rc` runs `ifconfig en0 <hostname>`, so give the 3B1's
+    name the address 10.0.2.15 in its `/etc/hosts`.
+  * From the 3B1 out: to reach hosts other than 10.0.2.2, add a default
+    route on the 3B1: `/usr/bin/route add default 10.0.2.2 1`. Then the
+    3B1 reaches the host's networks through NAT.
+  * Into the 3B1: `hostfwd` sends host ports to the 3B1, with the rule
+    format of QEMU's `hostfwd`. With the example above, `telnet localhost
+    2323` gets the 3B1's login.
+  * FTP: the 3B1's ftp and ftpd (1986) have only active mode.
+    * Into the 3B1: use an active mode client, such as
+      `lftp -e 'set ftp:passive-mode off' -p 2121 -u root,x localhost`.
+      The ftpd wants a password; for an account that has none, any
+      password works. The client asks the 3B1 to connect back to
+      127.0.0.1, which on the 3B1 is the 3B1 itself, so FreeBee changes
+      that address to 10.0.2.2 on its way in.
+    * From the 3B1 out: slirp's FTP helper (`emu = true`) rewrites the 3B1's
+      PORT command for servers on port 21.
+  * Each VM needs its own `mac`.
+  * `FREEBEE_ENET_DEBUG=1` logs every frame and status word to stderr.
 
 ## Scaling the display
 

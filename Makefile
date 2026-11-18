@@ -119,6 +119,7 @@ TARGET		=	freebee
 
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c control.c keys.c
+SRC			+=	lance.c enet.c netslirp.c
 SRC			+=	mcp/json.c mcp/img.c mcp/server.c mcp/schemas.c mcp/tools.c mcp/record.c mcp/bridge.c
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 
@@ -275,6 +276,17 @@ endif
 ifeq ($(ENABLE_SDL),yes)
 	LIBLNK		+=	$(shell sdl2-config --libs)
 	CFLAGS		+=	$(shell sdl2-config --cflags)
+endif
+
+####
+# libslirp, for the Ethernet board's user mode network (pkg-config slirp).
+# Without it the board is there, with its cable unplugged. make SLIRP=no
+# leaves it out.
+####
+SLIRP		?=	$(shell pkg-config --exists slirp 2>/dev/null && echo yes)
+ifeq ($(SLIRP),yes)
+	CFLAGS		+=	$(shell pkg-config --cflags slirp) -DHAVE_SLIRP
+	LIBLNK		+=	$(shell pkg-config --libs slirp)
 endif
 
 

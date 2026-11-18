@@ -78,4 +78,14 @@ uint32_t mapAddr(uint32_t addr, bool writing);
  */
 bool access_check_dma(int reading);
 
+/**
+ * @brief   Bus master (expansion card) access to a word of RAM at a logical
+ *          address, through the page map like disk DMA
+ * @return  false if the page is not present
+ */
+bool mem_dma_read16(uint32_t logical, uint16_t *data);
+bool mem_dma_write16(uint32_t logical, uint16_t data, uint16_t mem_mask);
+/// The same read without touching the page's accessed bit
+bool mem_peek16(uint32_t logical, uint16_t *data);
+
 #endif
