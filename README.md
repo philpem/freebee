@@ -55,6 +55,7 @@ This is also called my "to-do" list...
   * Printer port
   * Modem
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
+    * Only the kernel's boot probe of the modem is answered (`[modem] present`, on by default): the kernel then starts its phone scan, which times the system beep.
   * Expansion cards
     * Expansion RAM is emulated, but other cards are of little utility and largely undocumented, so are unlikely to be added.
     * With that said: the serial combo card might be useful to add an extra serial port (or several).

@@ -37,6 +37,12 @@
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.
 
+[modem]
+	# Answer the kernel's boot probe of the built-in modem. The kernel
+	# starts its phone scan, which also times the system beep, only when
+	# it finds the modem: with false, the 3B1 never beeps.
+	present = true
+
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep
 	# (BEL) as well as DTMF dialling tones -- on real hardware they all come
