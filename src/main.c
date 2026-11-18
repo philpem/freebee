@@ -62,7 +62,12 @@ static int load_fd_path(const char *discim)
 
 static int load_fd()
 {
-	return load_fd_path(fbc_get_string("floppy", "disk"));
+	const char *p = fbc_get_string("floppy", "disk");
+
+	// disk = "" in [floppy]: the drive stays empty, with no error
+	if (!p || !*p)
+		return 0;
+	return load_fd_path(p);
 }
 
 // for the control socket
@@ -167,6 +172,10 @@ static int load_hd()
 		}
 	}
 
+	// disk2 = "": no second disk, with no error
+	state.hdc_disc1 = NULL;
+	if (!disk2 || !*disk2)
+		return ret;
 	state.hdc_disc1 = fopen(disk2, "r+b");
 	if (!state.hdc_disc1){
 		fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
