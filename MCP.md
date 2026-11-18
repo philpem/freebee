@@ -45,6 +45,7 @@ for no sound on the host either (recordings still get the sound).
 | `FREEBEE_MCP=0` | Turns MCP off; `FREEBEE_MCP=1` turns it on, whatever the file says |
 | `FREEBEE_NAME=x` | The VM's name, over `[mcp]` `name` |
 | `FREEBEE_HEADLESS=1` | No window |
+| `[modem]` `present` | Whether the kernel finds the built-in modem (default: `true`). See [The beep](#the-beep) |
 
 ## Tools
 
@@ -155,6 +156,18 @@ ffmpeg -i take.avi \
   -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p \
   -c:a aac -b:a 192k -ar 48000 -movflags +faststart take.mp4
 ```
+
+## The beep
+
+The 3B1 has no separate beeper: the kernel's `beep()` plays a tone on the
+phone dialer. The kernel times that tone from its phone scan, and starts
+the phone scan only when its boot probe finds the built-in modem (it raises
+DTR and wants DSR back).
+
+FreeBee does not emulate the modem. With `[modem]` `present = true` (the
+default), the probe finds a modem whose DSR simply follows DTR. The kernel
+then starts its phone scan, and the 3B1 beeps. With `false`, the probe
+fails as it always did, and the 3B1 never beeps.
 
 ## Debugging
 

@@ -756,6 +756,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						handled = true;
 						switch (address & 0x00F000) {
 							case 0x0000:
+								state.modem_wr0 = data;
 								LOG("Modem WR0 - Line control (%06X) write: %04X = talk mode: %i, offhook: %i, data mode: %i, DTR: %i, power reset: %i",
 									address, data, ((data & 0x40)==0x40), ((data & 0x20)==0x20), ((data & 0x10)==0x10), ((data & 0x04)==0x04), ((data & 0x01)==0x01));
 								break;
@@ -840,7 +841,14 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				if (state.mcr2mirror) {
 					data |= 0x10;
 				}
-				LOG("phone status reg (%06X) RD%i: onhook, not ringing, no msg waiting, MCR2 bit 4 mirror: %i", address, bits, state.mcr2mirror);
+				{
+					// the kernel's phone scan reads it many times a second:
+					// log it only when it changes
+					static int last_logged = -1;
+					if (data != last_logged)
+						LOG("phone status reg (%06X) RD%i: onhook, not ringing, no msg waiting, MCR2 bit 4 mirror: %i", address, bits, state.mcr2mirror);
+					last_logged = data;
+				}
 				return data;
 				break;
 			case 0x060000:				// DMA Count
@@ -962,8 +970,17 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 							case 0x2000:  // modem.h: Modem status to terminal interface
 								// 0x80: failed self test, 0x40: test mode, 0x20: data mode (incoming call answered), 0x10: DSR on
 								// 0x04: 1200 baud, 0x02: data valid (set after modem handshake), 0x01: CTS on
-								data = 0xFF; 	// FF interpreted as "no modem"
-								LOG("Modem RR2 (%06X) - Modem status RD%i returning: no modem", address, bits);
+								// FF means "no modem". With a modem, the kernel's
+								// boot probe raises DTR and wants DSR back (0x10);
+								// it starts the phone scan, which also times the
+								// system beep, only then. No phone line is emulated:
+								// DSR simply follows DTR.
+								if (!state.modem_present) {
+									LOG("Modem RR2 (%06X) - Modem status RD%i returning: no modem", address, bits);
+									return 0xFF;
+								}
+								data = (state.modem_wr0 & 0x04) ? 0x10 : 0x00;
+								LOG("Modem RR2 (%06X) - Modem status RD%i returning: %02X", address, bits, data);
 								return data;
 								break;
 							case 0x3000: // modem.h: Modem status to lamps and relays

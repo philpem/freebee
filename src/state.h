@@ -121,6 +121,11 @@ typedef struct {
 	/// VIDPAL mod (allows user writing to VRAM)
 	bool vidpal;
 
+	/// Modem (882A): whether the kernel's probe finds it, and the last line
+	/// control word (WR0) the guest wrote
+	bool modem_present;
+	uint16_t modem_wr0;
+
 	/// Update screen only when VRAM has been changed
 	bool vram_updated;
 
