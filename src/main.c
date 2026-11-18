@@ -320,6 +320,16 @@ void refreshStatusBar(SDL_Renderer *r, SDL_Texture *lightbar_tex)
 }
 
 /**
+ * @brief	Show in the title bar whether the 3B1 has the mouse, and what F10 does.
+ */
+static void show_mouse_state(SDL_Window *window, bool grabbed)
+{
+	SDL_SetWindowTitle(window, grabbed
+		? "FreeBee 3B1 - Mouse: GRABBED - F10 to release"
+		: "FreeBee 3B1 - Mouse: free - F10 to grab");
+}
+
+/**
  * @brief	Handle events posted by SDL.
  */
 bool HandleSDLEvents(SDL_Window *window)
@@ -351,6 +361,7 @@ bool HandleSDLEvents(SDL_Window *window)
 							SDL_SetRelativeMouseMode(SDL_TRUE);
 							mouse_grabbed = 1;
 						}
+						show_mouse_state(window, mouse_grabbed);
 						break;
 					case SDLK_F11:
 						if (state.fdc_disc) {
@@ -519,6 +530,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+	show_mouse_state(window, false);
     // SDL default is "nearest", our default is "linear" if there's scaling
     if (scalex != 1.0 || scaley != 1.0)
 	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, fbc_get_string("display", "scale_quality"));
