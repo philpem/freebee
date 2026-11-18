@@ -166,10 +166,17 @@ static int wd2010_pre_label_init(WD2010_CTX *ctx, FILE *fp, int drivenum)
 
 int wd2010_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int heads)
 {
+	wd2010_reset(ctx);
+	return wd2010_attach(ctx, fp, drivenum, secsz, spt, heads);
+}
+
+// Attach a disc image to a drive without resetting the controller, so the
+// second drive's image can be changed while the guest runs (control socket
+// "hd2" command). The guest must not be using that drive at the time.
+int wd2010_attach(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int heads)
+{
 	int result;
 	char magic[4];
-
-	wd2010_reset(ctx);
 
 	// read first 4 bytes
 	// if UNIX PC magic, get real geometry
