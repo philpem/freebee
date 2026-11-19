@@ -118,7 +118,7 @@ BUILD_TYPE	?=	release
 TARGET		=	freebee
 
 # source files that produce object files
-SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c control.c keys.c
+SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c pointer.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c control.c keys.c
 SRC			+=	lance.c enet.c netslirp.c
 ifeq ($(strip $(PLATFORM)),win32)
 # Windows has no pty, Unix sockets or MCP server: stubs for the MCP calls

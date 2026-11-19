@@ -47,6 +47,7 @@ for no sound on the host either (recordings still get the sound).
 | `FREEBEE_HEADLESS=1` | No window |
 | `[cpu]` `turbo` | The CPU runs N times as fast as a real 3B1's 10 MHz, while time stays real (default: 1) |
 | `[cpu]` `idle` | While UNIX is idle, FreeBee sleeps until the next interrupt instead of running the kernel's idle loop; vm-info shows how much of the last second it saved (default: `true`; off at max speed) |
+| `[mouse]` `seamless` | Over the window, the 3B1's pointer follows the host's, with no grab (default: `true`). `false`: F10 grabs the mouse instead. The mouse tools work either way |
 | `[modem]` `present` | Whether the kernel finds the built-in modem (default: `true`). See [The beep](#the-beep) |
 
 ## Tools
@@ -99,9 +100,12 @@ The server sends these rules to every agent that connects
   status. It copes with `#` and `@`, which the serial tty takes as its
   erase and kill keys. Long or multi-line commands go through a script,
   sent with XON/XOFF flow control, so nothing is lost.
-- **The mouse is relative.** The tools home the pointer to the top-left
-  corner, then move it one pixel a count. The guest must have turned the
-  mouse on (the Office does). If a click misses, use `pointer-locate`.
+- **The mouse is relative.** The tools know where the pointer is: FreeBee
+  reads UNIX 3.51's own count, or (with another kernel) homes the pointer
+  to the top-left corner once. Then they move it one pixel a count. The
+  guest must have turned the mouse on (the Office does). If a click
+  misses, use `pointer-locate`. A person's mouse over the window moves
+  the pointer too.
 - **The pixels are tall.** The screen is 720x348, shown 4:3 on the
   monitor. Tool coordinates are always screen pixels.
 - **Never stop a VM you did not start**, unless the user asked.

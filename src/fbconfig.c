@@ -120,6 +120,7 @@ get_default_bool(const char *heading, const char *item)
 		{ "vidpal", "installed", true },
 		{ "mcp", "enabled", true },
 		{ "cpu", "idle", true },
+		{ "mouse", "seamless", true },
 		{ "modem", "present", true },
 		{ "network", "emu", true },
 		{ NULL, NULL, false }

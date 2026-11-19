@@ -171,9 +171,12 @@ static void mouse_tick_locked(void)
 	if (!mq_count)
 		return;
 	mouse_pkt p = mq[mq_head];
+	// the keyboard buffer is full: the packet waits for the next tick (with
+	// the mouse off it goes nowhere, as before)
+	if (state.kbd.mouse_enabled && !mouse_event(&state.kbd, p.dx, p.dy, p.buttons))
+		return;
 	mq_head = (mq_head + 1) % MQ;
 	mq_count--;
-	mouse_event(&state.kbd, p.dx, p.dy, p.buttons);
 	mq_wait = p.wait;
 	mq_done++;
 }

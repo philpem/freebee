@@ -44,6 +44,12 @@
 	# off at max speed.
 	idle = true
 
+[mouse]
+	# true: the seamless mouse. Over the window, the 3B1's pointer follows
+	# the host's, and the host's pointer hides there. There is no grab.
+	# false: F10 grabs the mouse for the 3B1, and F10 again lets it go.
+	seamless = true
+
 [memory]
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.

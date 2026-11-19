@@ -20,6 +20,7 @@
 #include "../control.h"
 #include "../fbconfig.h"
 #include "../enet.h"
+#include "../pointer.h"
 #include "../musashi/m68k.h"
 
 #define ASPECT 1.5517	// screen y to 4:3: (720 / 348) * (3 / 4)
@@ -208,13 +209,11 @@ int frame_diff(const frame_t *a, const frame_t *b, const rect *region,
 	return n;
 }
 
-/* mouse pointer, as the mouse tools think it is */
+/* the mouse tools: one at a time, and the buttons they hold down. Where
+ * the pointer is comes from pointer.c: the kernel's own count, or the
+ * packets counted since the pointer was pushed into a corner (one pixel a
+ * count, no acceleration, 0..719 across and 0..694 down). */
 static pthread_mutex_t mouse_mu = PTHREAD_MUTEX_INITIALIZER;
-// The 3B1's window driver moves the pointer one pixel a mouse count, with
-// no acceleration, and stops it at the screen's edges: so the tools home it
-// to the top left corner once, then count.
-static bool m_known;
-static double m_x, m_y;
 static int m_buttons;
 
 static void put_image(call *c, const uint8_t *pix, int w, int h, const uint8_t *pal, int n)
@@ -254,10 +253,9 @@ static void shot(call *c, const frame_t *f, const rect *region, double scale, bo
 			}
 		}
 		if (pointer) {
-			pthread_mutex_lock(&mouse_mu);
-			bool known = m_known;
-			int px = (int)lround((m_x - r.x) * sx), py = (int)lround((m_y - r.y) * sy);
-			pthread_mutex_unlock(&mouse_mu);
+			int mx, my;
+			bool const known = pointer_get(&mx, &my);
+			int px = (int)lround((mx - r.x) * sx), py = (int)lround((my - r.y) * sy);
 			if (known) {
 				for (int d = -6; d <= 6; d++) {
 					if (px + d >= 0 && px + d < w && py >= 0 && py < h)
@@ -597,15 +595,15 @@ static bool tool_vm_info(call *c, const json *a)
 	call_printf(c, "Screen: 720x348, one bit%s; LEDs (red, green, yellow, red): %d%d%d%d\n",
 		s.frame.rev ? ", reverse video" : "",
 		s.leds & 1, (s.leds >> 1) & 1, (s.leds >> 2) & 1, (s.leds >> 3) & 1);
-	pthread_mutex_lock(&mouse_mu);
+	int mx, my;
 	if (!s.mouse_enabled)
 		call_printf(c, "Mouse: the guest has not turned it on\n");
-	else if (m_known)
-		call_printf(c, "Mouse: on; the pointer is thought to be at %d,%d\n",
-			(int)lround(m_x), (int)lround(m_y));
+	else if (pointer_get(&mx, &my))
+		call_printf(c, "Mouse: on; the pointer is at %d,%d%s%s\n", mx, my,
+			my >= SCR_H ? ", below the screen" : "",
+			pointer_from_kernel() ? " (the kernel's own count)" : "");
 	else
 		call_printf(c, "Mouse: on; pointer position not known yet\n");
-	pthread_mutex_unlock(&mouse_mu);
 	call_printf(c, "Keys waiting: %d. Recording: %s.", keys_pending(), rec_active() ? "yes" : "no");
 	return true;
 }
@@ -650,7 +648,6 @@ static bool tool_vm_power(call *c, const json *a)
 		pthread_cond_broadcast(&mcp_cv);
 		pthread_mutex_unlock(&mcp_mu);
 		pthread_mutex_lock(&mouse_mu);
-		m_known = false;
 		m_buttons = 0;
 		pthread_mutex_unlock(&mouse_mu);
 		call_printf(c, "Reset: the machine starts again from its boot ROM.%s",
@@ -966,28 +963,33 @@ static uint64_t send_counts(int cx, int cy, int step, bool human)
 static void home_pointer(call *c)
 {
 	uint64_t s = 0;
-	for (int i = 0; i < 10; i++)
+	// 6 x 127 counts reach the corner from anywhere (0..719, 0..694)
+	for (int i = 0; i < 6; i++)
 		s = mcp_mouse_push(-127, -127, m_buttons, 0);
 	wait_delivered(c, 0, s, false);
 	wait_ticks(c, 3);
-	m_x = m_y = 0;
-	m_known = true;
 }
 
 // mouse_mu held
 static void move_to(call *c, int x, int y, int home, int step, bool human)
 {
-	if (home == 1 || (home == 0 && !m_known))
+	int px, py;
+	if (home == 1 || (home == 0 && !pointer_get(&px, &py)))
 		home_pointer(c);
-	int cx = (int)lround(x - m_x), cy = (int)lround(y - m_y);
-	wait_delivered(c, 0, send_counts(cx, cy, step, human), false);
+	pointer_get(&px, &py);	// home never, and not known: a guess
+	wait_delivered(c, 0, send_counts(x - px, y - py, step, human), false);
 	wait_ticks(c, 3);	// the guest draws the pointer at the next tick or two
-	m_x += cx;
-	m_y += cy;
-	if (m_x < 0) m_x = 0;
-	if (m_y < 0) m_y = 0;
-	if (m_x > SCR_W - 1) m_x = SCR_W - 1;
-	if (m_y > SCR_H - 1) m_y = SCR_H - 1;
+}
+
+// "at X,Y" for the results
+static const char *pointer_at(char *buf, size_t len)
+{
+	int x, y;
+	if (pointer_get(&x, &y))
+		snprintf(buf, len, "%d,%d", x, y);
+	else
+		snprintf(buf, len, "a place not known yet");
+	return buf;
 }
 
 static bool get_xy(call *c, const json *a, const char *kx, const char *ky, bool *has, long *x, long *y)
@@ -1030,14 +1032,9 @@ static bool tool_mouse_move(call *c, const json *a)
 	} else {
 		wait_delivered(c, 0, send_counts(dx, dy, step, human), false);
 		wait_ticks(c, 3);
-		m_x += dx;
-		m_y += dy;
-		if (m_x < 0) m_x = 0;
-		if (m_y < 0) m_y = 0;
-		if (m_x > SCR_W - 1) m_x = SCR_W - 1;
-		if (m_y > SCR_H - 1) m_y = SCR_H - 1;
 	}
-	call_printf(c, "The pointer is at %d,%d.", (int)lround(m_x), (int)lround(m_y));
+	char at[48];
+	call_printf(c, "The pointer is at %s.", pointer_at(at, sizeof(at)));
 	pthread_mutex_unlock(&mouse_mu);
 	finish_then(c, &t, before);
 	free(before);
@@ -1070,8 +1067,9 @@ static bool tool_mouse_click(call *c, const json *a)
 		s = mcp_mouse_push(0, 0, m_buttons, i + 1 < count ? ms_ticks(interval_ms) : 1);
 	}
 	wait_delivered(c, 0, s, false);
-	call_printf(c, "Clicked %s%s at %d,%d.", button_names[button], count == 2 ? " twice" :
-		count == 3 ? " three times" : "", (int)lround(m_x), (int)lround(m_y));
+	char at[48];
+	call_printf(c, "Clicked %s%s at %s.", button_names[button], count == 2 ? " twice" :
+		count == 3 ? " three times" : "", pointer_at(at, sizeof(at)));
 	pthread_mutex_unlock(&mouse_mu);
 	finish_then(c, &t, before);
 	free(before);
@@ -1128,7 +1126,8 @@ static bool tool_mouse_drag(call *c, const json *a)
 	move_to(c, tx, ty, 2, 4, human);
 	m_buttons &= ~button_bits[button];
 	wait_delivered(c, 0, mcp_mouse_push(0, 0, m_buttons, 2), false);
-	call_printf(c, "Dragged from %ld,%ld to %d,%d.", x, y, (int)lround(m_x), (int)lround(m_y));
+	char at[48];
+	call_printf(c, "Dragged from %ld,%ld to %s.", x, y, pointer_at(at, sizeof(at)));
 	pthread_mutex_unlock(&mouse_mu);
 	finish_then(c, &t, before);
 	free(before);
@@ -1186,7 +1185,9 @@ static bool tool_pointer_locate(call *c, const json *a)
 	rect blobs[64];
 	pthread_mutex_lock(&mouse_mu);
 	// a short move sideways: a menu line under the pointer stays lit
-	int w = m_known && m_x > SCR_W - 40 ? -8 : 8;
+	int px, py;
+	bool const known = pointer_get(&px, &py);
+	int w = known && px > SCR_W - 40 ? -8 : 8;
 	// each picture once the guest has redrawn (the Office lights the menu
 	// line under the pointer a moment after it moves)
 	wait_screen_core(c, W_STABLE, 300, 3000, 1, NULL, NULL, 0, NULL);
@@ -1203,7 +1204,7 @@ static bool tool_pointer_locate(call *c, const json *a)
 		// the pointer, drawn twice 8 pixels apart: small
 		if (blobs[i].w > 48 || blobs[i].h > 40 || blobs[i].w < 9)
 			continue;
-		double d = m_known ? hypot(blobs[i].x - m_x, blobs[i].y - m_y) : blobs[i].w * blobs[i].h;
+		double d = known ? hypot(blobs[i].x - px, blobs[i].y - py) : blobs[i].w * blobs[i].h;
 		if (d < best_d) {
 			best_d = d;
 			best = i;
@@ -1212,10 +1213,14 @@ static bool tool_pointer_locate(call *c, const json *a)
 	if (best >= 0) {
 		rect *r = &blobs[best];
 		// the arrow's tip is its top left corner
-		m_x = r->x - (w < 0 ? w : 0);
-		m_y = r->y;
-		m_known = true;
-		call_printf(c, "The pointer's tip is at %d,%d (the red cross).", (int)m_x, (int)m_y);
+		int const tx = r->x - (w < 0 ? w : 0), ty = r->y;
+		if (!known)
+			pointer_set(tx, ty);
+		if (!known || (abs(tx - px) <= 2 && abs(ty - py) <= 2))
+			call_printf(c, "The pointer's tip is at %d,%d (the red cross).", tx, ty);
+		else
+			call_printf(c, "The pointer is drawn at %d,%d (its top left corner); the mouse is at %d,%d (the red cross).",
+				tx, ty, px, py);
 	} else if (n) {
 		call_printf(c, "The pointer was not found among %d changed areas (", n);
 		for (int i = 0; i < n && i < 8; i++)

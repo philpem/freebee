@@ -19,9 +19,13 @@
  *                      not be using it: nothing mounted, no cpio running)
  *   screenshot PATH    save the screen as a 720x348 1-bit PNG
  *   mouse DX DY [B]    move the mouse, B = buttons (4 left, 2 mid, 1 right)
+ *   pointer X Y [B]    as if the host pointer were at X,Y over the window,
+ *                      with buttons B: the seamless mouse follows it
  *   speed max|real     run as fast as the host can, or at 10 MHz
- *   status             floppy, speed, keys still queued, LEDs, and idle: how
- *                      much of the last second the idle skip took off the CPU
+ *   status             floppy, speed, keys still queued, LEDs, idle: how
+ *                      much of the last second the idle skip took off the
+ *                      CPU, and the mouse: off, or where the pointer is
+ *                      (? = not known yet)
  *   quit               leave FreeBee (like Alt-F12)
  */
 #include <stdio.h>
@@ -36,6 +40,7 @@
 #include "keyboard.h"
 #include "control.h"
 #include "keys.h"
+#include "pointer.h"
 
 bool control_speed_max = false;
 int control_turbo = 1;
@@ -317,7 +322,21 @@ static void command(struct client *c, char *line)
 			reply(c, "err mouse DX DY [BUTTONS]");
 			return;
 		}
-		mouse_event(&state.kbd, dx, dy, b);
+		if (!state.kbd.mouse_enabled)
+			reply(c, "err the guest has not turned the mouse on");
+		else if (!mouse_event(&state.kbd, dx, dy, b))
+			reply(c, "err the keyboard buffer is full");
+		else
+			reply(c, "ok");
+	} else if (strcmp(line, "pointer") == 0) {
+		int x = 0, y = 0, b = -1;
+		if (sscanf(args, "%d %d %d", &x, &y, &b) < 2) {
+			reply(c, "err pointer X Y [BUTTONS]");
+			return;
+		}
+		pointer_track(x, y);
+		if (b >= 0)
+			pointer_buttons(b & 7);
 		reply(c, "ok");
 	} else if (strcmp(line, "speed") == 0) {
 		if (strcmp(args, "max") == 0)
@@ -343,9 +362,17 @@ static void command(struct client *c, char *line)
 		reply(c, msg);
 	} else if (strcmp(line, "status") == 0) {
 		const char *fp = freebee_floppy_path();
-		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s turbo=%d keys=%d leds=%d idle=%d",
+		char mouse[32] = "off";
+		int px, py;
+		if (state.kbd.mouse_enabled) {
+			if (pointer_get(&px, &py))
+				snprintf(mouse, sizeof(mouse), "%d,%d", px, py);
+			else
+				strcpy(mouse, "?");
+		}
+		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s turbo=%d keys=%d leds=%d idle=%d mouse=%s",
 			fp ? fp : "none", control_speed_max ? "max" : "real", control_turbo,
-			keys_pending(), state.leds, control_idle_pct);
+			keys_pending(), state.leds, control_idle_pct, mouse);
 		reply(c, msg);
 	} else if (strcmp(line, "quit") == 0) {
 		control_quit = true;
@@ -353,7 +380,7 @@ static void command(struct client *c, char *line)
 	} else if (*line == 0) {
 		reply(c, "err empty command");
 	} else {
-		reply(c, "err unknown command (type key floppy eject hd2 screenshot mouse speed status quit)");
+		reply(c, "err unknown command (type key floppy eject hd2 screenshot mouse pointer speed status quit)");
 	}
 }
 
