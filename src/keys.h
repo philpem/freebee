@@ -21,7 +21,7 @@ typedef struct {
 	uint8_t gap;	///< ticks after the release (0: default 1)
 } key_chord;
 
-enum { KEY_SHIFT = 0x48, KEY_CTRL = 0x4c, KEY_RETURN = 0x0d };
+enum { KEY_SHIFT = 0x48, KEY_CTRL = 0x4c, KEY_RETURN = 0x0d, KEY_UP = 0x01, KEY_DOWN = 0x0b };
 
 /// Push a chord. Returns its sequence number, or 0 when the queue is full.
 uint64_t keys_push(const key_chord *c);

@@ -22,6 +22,7 @@
 #include "fbmcp.h"
 #include "enet.h"
 #include "pointer.h"
+#include "wheel.h"
 
 extern int cpu_log_enabled;
 
@@ -142,6 +143,7 @@ void freebee_reset(void)
 	state.vram_updated = true;
 	keyboard_init(&state.kbd);
 	pointer_reset();
+	wheel_reset();
 	wd2797_reset(&state.fdc_ctx);
 	wd2010_reset(&state.hdc_ctx);
 	enet_reset();
@@ -449,6 +451,17 @@ bool HandleSDLEvents(SDL_Window *window)
 				} else if (mouse_seamless) {
 					track_host_pointer(event.button.x, event.button.y);
 					pointer_buttons(mouse_buttons);
+				}
+				break;
+			case SDL_MOUSEWHEEL:
+				// while the 3B1 has the mouse: it scrolls a window that has
+				// scroll arrows (wheel.c)
+				if (mouse_seamless || mouse_grabbed) {
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+					wheel_scroll(event.wheel.preciseY);
+#else
+					wheel_scroll(event.wheel.y);
+#endif
 				}
 				break;
 			default:
@@ -917,6 +930,7 @@ int main(int argc, char *argv[])
 				freebee_reset();
 			// the mouse: the seamless pointer, the kernel's copy of its place
 			pointer_tick();
+			wheel_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data

@@ -21,6 +21,8 @@
  *   mouse DX DY [B]    move the mouse, B = buttons (4 left, 2 mid, 1 right)
  *   pointer X Y [B]    as if the host pointer were at X,Y over the window,
  *                      with buttons B: the seamless mouse follows it
+ *   wheel N            as if the host's mouse wheel turned N steps (+ up,
+ *                      - down): it scrolls a window that has scroll arrows
  *   speed max|real     run as fast as the host can, or at 10 MHz
  *   status             floppy, speed, keys still queued, LEDs, idle: how
  *                      much of the last second the idle skip took off the
@@ -41,6 +43,7 @@
 #include "control.h"
 #include "keys.h"
 #include "pointer.h"
+#include "wheel.h"
 
 bool control_speed_max = false;
 int control_turbo = 1;
@@ -338,6 +341,14 @@ static void command(struct client *c, char *line)
 		if (b >= 0)
 			pointer_buttons(b & 7);
 		reply(c, "ok");
+	} else if (strcmp(line, "wheel") == 0) {
+		float n;
+		if (sscanf(args, "%f", &n) != 1) {
+			reply(c, "err wheel STEPS (+ up, - down)");
+			return;
+		}
+		wheel_scroll(n);
+		reply(c, "ok");
 	} else if (strcmp(line, "speed") == 0) {
 		if (strcmp(args, "max") == 0)
 			control_speed_max = true;
@@ -380,7 +391,7 @@ static void command(struct client *c, char *line)
 	} else if (*line == 0) {
 		reply(c, "err empty command");
 	} else {
-		reply(c, "err unknown command (type key floppy eject hd2 screenshot mouse pointer speed status quit)");
+		reply(c, "err unknown command (type key floppy eject hd2 screenshot mouse pointer wheel speed status quit)");
 	}
 }
 

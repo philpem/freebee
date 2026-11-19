@@ -174,6 +174,7 @@ record videos with sound. See [MCP.md](MCP.md).
 # Keyboard commands
 
   * F10 -- Grab/Release the mouse (the title bar shows which), only with `[mouse] seamless = false`. With the seamless mouse (the default) there is no grab: the 3B1's pointer follows the host's over the window, and the host's pointer hides there
+  * Mouse wheel -- Scrolls a 3B1 window that has scroll arrows on its border, such as the Office's list or a Help window, as a click on the arrows does (Roll Up/Down, Shift+Up/Down). The window must have the keyboard and the pointer must be over it. A shell window has no scroll arrows: there the wheel does nothing
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
 
