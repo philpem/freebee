@@ -46,6 +46,7 @@ for no sound on the host either (recordings still get the sound).
 | `FREEBEE_NAME=x` | The VM's name, over `[mcp]` `name` |
 | `FREEBEE_HEADLESS=1` | No window |
 | `[cpu]` `turbo` | The CPU runs N times as fast as a real 3B1's 10 MHz, while time stays real (default: 1) |
+| `[cpu]` `idle` | While UNIX is idle, FreeBee sleeps until the next interrupt instead of running the kernel's idle loop; vm-info shows how much of the last second it saved (default: `true`; off at max speed) |
 | `[modem]` `present` | Whether the kernel finds the built-in modem (default: `true`). See [The beep](#the-beep) |
 
 ## Tools

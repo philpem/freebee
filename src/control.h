@@ -22,6 +22,9 @@ extern bool control_speed_max;
 /// the 60Hz clock (and so the guest's time) stays real. 1 is a real 3B1.
 extern int control_turbo;
 #define TURBO_MAX 32
+/// How much of the last second the idle skip took off the CPU, in percent
+/// ([cpu] idle; set by main.c)
+extern int control_idle_pct;
 // set by the "quit" command
 extern bool control_quit;
 

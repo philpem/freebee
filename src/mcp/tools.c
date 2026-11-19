@@ -553,6 +553,10 @@ static const char *speed_text(char *buf, size_t n)
 			control_turbo, control_turbo, control_turbo * 10);
 	else
 		snprintf(buf, n, "real (10 MHz)");
+	// the idle skip: how much of the last second it took off the CPU
+	size_t const k = strlen(buf);
+	if (state.idle_skip && k < n)
+		snprintf(buf + k, n - k, ", idle %d%%", control_idle_pct);
 	return buf;
 }
 

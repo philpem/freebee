@@ -27,6 +27,9 @@ void enet_write(uint32_t address, uint32_t data, int bits);
 void enet_tick(uint32_t cycles);
 // The interrupt level the board asks for: 0 (none), 1 or 5
 int enet_irq(void);
+// True when the board has nothing to do before the next time slot (for the
+// idle skip in main.c): no frame waiting for the guest, no transmit asked for
+bool enet_quiet(void);
 
 // The host side of the network: call it often (about every millisecond)
 void enet_host_poll(void);

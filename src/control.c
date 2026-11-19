@@ -20,7 +20,8 @@
  *   screenshot PATH    save the screen as a 720x348 1-bit PNG
  *   mouse DX DY [B]    move the mouse, B = buttons (4 left, 2 mid, 1 right)
  *   speed max|real     run as fast as the host can, or at 10 MHz
- *   status             floppy, speed, keys still queued, LEDs
+ *   status             floppy, speed, keys still queued, LEDs, and idle: how
+ *                      much of the last second the idle skip took off the CPU
  *   quit               leave FreeBee (like Alt-F12)
  */
 #include <stdio.h>
@@ -38,6 +39,7 @@
 
 bool control_speed_max = false;
 int control_turbo = 1;
+int control_idle_pct = 0;
 bool control_quit = false;
 
 /* ---- typing (the key queue is in keys.c) ---- */
@@ -341,9 +343,9 @@ static void command(struct client *c, char *line)
 		reply(c, msg);
 	} else if (strcmp(line, "status") == 0) {
 		const char *fp = freebee_floppy_path();
-		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s turbo=%d keys=%d leds=%d",
+		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s turbo=%d keys=%d leds=%d idle=%d",
 			fp ? fp : "none", control_speed_max ? "max" : "real", control_turbo,
-			keys_pending(), state.leds);
+			keys_pending(), state.leds, control_idle_pct);
 		reply(c, msg);
 	} else if (strcmp(line, "quit") == 0) {
 		control_quit = true;

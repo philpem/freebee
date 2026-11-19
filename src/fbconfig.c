@@ -119,6 +119,7 @@ get_default_bool(const char *heading, const char *item)
 	} defaults[] = {
 		{ "vidpal", "installed", true },
 		{ "mcp", "enabled", true },
+		{ "cpu", "idle", true },
 		{ "modem", "present", true },
 		{ "network", "emu", true },
 		{ NULL, NULL, false }

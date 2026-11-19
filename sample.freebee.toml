@@ -38,6 +38,11 @@
 	# (10 MHz), 1 to 32. The 60Hz clock stays real, so the time of day, key
 	# repeat and timeouts are right. 1 is a real 3B1.
 	turbo = 1
+	# Idle skip: while UNIX has nothing to do, FreeBee sleeps until the next
+	# interrupt instead of running the kernel's idle loop, so an idle 3B1
+	# takes little of the host's CPU. The time of day stays right. It is
+	# off at max speed.
+	idle = true
 
 [memory]
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.

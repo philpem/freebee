@@ -510,6 +510,11 @@ int enet_irq(void)
 	return (enet.control & ENET_INT1) ? 1 : 5;
 }
 
+bool enet_quiet(void)
+{
+	return !enet.present || (enet.rxq_count == 0 && !enet.lance.tx_demand);
+}
+
 /*
  * The host side
  */

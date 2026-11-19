@@ -129,6 +129,8 @@ void freebee_reset(void)
 	state.pie = 0;
 	state.ee = 0;
 	state.leds = 0;
+	state.idle_pc = state.idle_passes = 0;
+	state.idle_hint = false;
 	state.genstat = 0;
 	state.bsr0 = state.bsr1 = 0;
 	state.timer_int_latch = state.timer_clrsint = false;
@@ -615,6 +617,10 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "[cpu] turbo must be 1 to %d (got %d); using 1\n", TURBO_MAX, control_turbo);
 		control_turbo = 1;
 	}
+	// [cpu] idle: the idle skip (see the end of the slice loop)
+	bool const idle_skip = fbc_get_bool("cpu", "idle");
+	uint64_t idle_skipped = 0, idle_total = 0;
+	uint32_t idle_slots = 0;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
@@ -653,6 +659,7 @@ int main(int argc, char *argv[])
 			clock_cycles = (uint32_t)((uint64_t)clock_cycles * turbo / last_turbo);
 			last_turbo = turbo;
 		}
+		state.idle_skip = idle_skip && !control_speed_max;
 		for (i = 0; i < CYCLES_PER_TIMESLOT * turbo; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
@@ -777,21 +784,60 @@ int main(int argc, char *argv[])
 			// The Ethernet board asks for level 1, or 5 if the driver
 			// picks that (5 is the expansion slots' other level).
 			int const enet_level = enet_irq();
+			int irq = 0;
 			if (state.timer_int_latch) {
-				m68k_set_irq(6);
+				irq = 6;
 			} else if (enet_level == 5) {
-				m68k_set_irq(5);
+				irq = 5;
 			} else if (i8274_get_irq(&state.serial_ctx)) {
-				m68k_set_irq(4);
+				irq = 4;
 			} else if (keyboard_get_irq(&state.kbd)) {
-				m68k_set_irq(3);
+				irq = 3;
 			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
-				m68k_set_irq(2);
+				irq = 2;
 			} else if (enet_level == 1) {
-				m68k_set_irq(1);
-			} else {
-				m68k_set_irq(0);
+				irq = 1;
 			}
+			m68k_set_irq(irq);
+
+			// The idle skip. The kernel's idle loop waits for an interrupt,
+			// has gone round IDLE_PASSES times with nothing to do, and
+			// memory.c stopped the CPU at its top (the MCR write). With no
+			// interrupt to take, no disk or floppy transfer waiting and
+			// nothing for the Ethernet board, the CPU would only go round it
+			// until the next interrupt. So count the rest of the time slot
+			// as run (the 60Hz clock stays right), and sleep instead. Not at
+			// max speed: guest time would race even more.
+			if (state.idle_hint) {
+				state.idle_hint = false;
+				if (state.idle_skip && irq == 0 &&
+						!wd2010_get_drq(&state.hdc_ctx) && !wd2797_get_drq(&state.fdc_ctx)) {
+					// frames from the host that came in meanwhile
+					uint32_t const ms = SDL_GetTicks();
+					if (ms != last_net_poll) {
+						last_net_poll = ms;
+						enet_host_poll();
+					}
+					if (enet_quiet()) {
+						uint32_t const total = CYCLES_PER_TIMESLOT * turbo;
+						uint32_t const done = i + cycles_run;
+						if (done < total) {
+							clock_cycles += total - done;
+							enet_tick(total - done);
+							idle_skipped += total - done;
+						}
+						break;
+					}
+				}
+			}
+		}
+		// How much of each second the idle skip took off the CPU (the
+		// control socket's status, MCP's vm-info)
+		idle_total += CYCLES_PER_TIMESLOT * turbo;
+		if (++idle_slots >= TIMESLOT_FREQUENCY) {
+			control_idle_pct = (int)(idle_skipped * 100 / idle_total);
+			idle_skipped = idle_total = 0;
+			idle_slots = 0;
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ * turbo) {
