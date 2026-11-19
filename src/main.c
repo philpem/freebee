@@ -395,6 +395,8 @@ bool HandleSDLEvents(SDL_Window *window)
 				return true;
 			case SDL_WINDOWEVENT:
 				window_dirty = true;
+				if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+					keyboard_focus_lost(&state.kbd);	// no key-ups come while away
 				if (event.window.event == SDL_WINDOWEVENT_LEAVE && mouse_seamless) {
 					// the 3B1's pointer stops at the edge the host's went out by
 					int gx, gy, wx, wy;

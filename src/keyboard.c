@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <string.h>
 #include "SDL.h"
 #include "utils.h"
 #include "keyboard.h"
@@ -173,46 +174,75 @@ void keyboard_init(KEYBOARD_STATE *ks)
 	ks->mouse_enabled = 0;
 	ks->lastdata_mouse = 0;
 	ks->mouse_left = 0;
+	memset(ks->host_down, 0, sizeof(ks->host_down));
+}
+
+// The 3B1 scan code for host key k, or -1. Alt changes only the keys that
+// have an Alt meaning (Esc = Exit, Backspace = Cancl, Return = Enter):
+// every other key types as it is, also while SDL thinks Alt is down.
+static int keymap_find(SDL_Keycode k, bool alt)
+{
+	int plain = -1;
+
+	for (size_t i = 0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
+		if (keymap[i].key != k)
+			continue;
+		if (keymap[i].extended) {
+			if (alt)
+				return keymap[i].scancode;
+		} else if (plain < 0) {
+			plain = keymap[i].scancode;
+		}
+	}
+	return plain;
 }
 
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
 {
-	int v = 0;
-	switch (ev->type) {
-		case SDL_KEYDOWN:
-			// Key down (pressed)
-			v = 1;
-			break;
-		case SDL_KEYUP:
-			// Key up (released)
-			v = 0;
-			break;
-		default:
-			// Not a keyboard event
-			return;
-	}
+	SDL_Scancode sc;
+	int code;
+	bool alt;
 
-	// scan the keymap
-	for (int i=0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
-		if (keymap[i].key == ev->key.keysym.sym) {
-			// Keycode match. Is this an Extended Map key?
-			if (keymap[i].extended) {
-				// Yes -- need ALT set when pressing the key for this to be a match
-				if (ev->key.keysym.mod & KMOD_ALT) {
-					ks->keystate[keymap[i].scancode] = v;
-					ks->update_flag = true;
-					break;
-				}
-			} else {
-				// Standard Map key. ALT must NOT be pressed for this to be a match
-				if (!(ev->key.keysym.mod & KMOD_ALT)) {
-					ks->keystate[keymap[i].scancode] = v;
-					ks->update_flag = true;
-					break;
-				}
-			}
+	if (ev->type != SDL_KEYDOWN && ev->type != SDL_KEYUP)
+		return;		// not a keyboard event
+	sc = ev->key.keysym.scancode;
+	if ((unsigned)sc >= SDL_NUM_SCANCODES)
+		return;
+	alt = (ev->key.keysym.mod & KMOD_ALT) != 0;
+
+	// A key-up lets go of the 3B1 key that its key-down pressed, so Alt let
+	// go first can't leave Exit, Enter or Cancl down. SDL's repeats of a
+	// held key keep that 3B1 key too. A key that went down before FreeBee
+	// saw it is looked up as it is now.
+	if (ks->host_down[sc])
+		code = ks->host_down[sc] - 1;
+	else
+		code = keymap_find(ev->key.keysym.sym, alt);
+	if (ev->type == SDL_KEYUP)
+		ks->host_down[sc] = 0;
+	if (code < 0)
+		return;
+	if (ev->type == SDL_KEYDOWN) {
+		ks->host_down[sc] = code + 1;
+		ks->keystate[code] = 1;
+	} else {
+		ks->keystate[code] = 0;
+	}
+	ks->update_flag = true;
+}
+
+void keyboard_focus_lost(KEYBOARD_STATE *ks)
+{
+	for (int i = 0; i < SDL_NUM_SCANCODES; i++) {
+		if (ks->host_down[i]) {
+			ks->keystate[ks->host_down[i] - 1] = 0;
+			ks->host_down[i] = 0;
+			ks->update_flag = true;
 		}
 	}
+	// SDL may not see a modifier's key-up while the window is away, and a
+	// stale Alt turned Return into Enter: keep only the lock keys
+	SDL_SetModState(SDL_GetModState() & (KMOD_CAPS | KMOD_NUM));
 }
 
 bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db)
