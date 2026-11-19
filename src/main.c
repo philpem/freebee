@@ -242,6 +242,10 @@ bool HandleSDLEvents(SDL_Window *window)
 			case SDL_QUIT:
 				// Quit button tagged. Exit.
 				return true;
+			case SDL_WINDOWEVENT:
+				if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+					keyboard_focus_lost(&state.kbd);	// no key-ups come while away
+				break;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
 					case SDLK_F10:
