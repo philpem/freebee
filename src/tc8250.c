@@ -4,6 +4,11 @@
 #include <time.h>
 #include "tc8250.h"
 
+#if defined(_WIN32) && !defined(localtime_r)
+// Windows has localtime_s, with the arguments the other way round
+#define localtime_r(t, tm)	(localtime_s((tm), (t)) == 0 ? (tm) : NULL)
+#endif
+
 #ifndef TC8250_DEBUG
 #define NDEBUG
 #endif

@@ -73,6 +73,7 @@ typedef struct {
  * This must be run once when the context is created.
  */
 int wd2010_init(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int heads);
+int wd2010_attach(WD2010_CTX *ctx, FILE *fp, int drivenum, int secsz, int spt, int heads);
 
 /**
  * @brief	Reset a WD2010 context.

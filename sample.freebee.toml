@@ -33,9 +33,54 @@
 [vidpal]
 	installed = true
 
+[cpu]
+	# Turbo: the 68010 runs this many times as fast as a real 3B1's
+	# (10 MHz), 1 to 32. The 60Hz clock stays real, so the time of day, key
+	# repeat and timeouts are right. 1 is a real 3B1.
+	turbo = 1
+	# Idle skip: while UNIX has nothing to do, FreeBee sleeps until the next
+	# interrupt instead of running the kernel's idle loop, so an idle 3B1
+	# takes little of the host's CPU. The time of day stays right. It is
+	# off at max speed.
+	idle = true
+
+[mouse]
+	# true: the seamless mouse. Over the window, the 3B1's pointer follows
+	# the host's, and the host's pointer hides there. There is no grab.
+	# false: F10 grabs the mouse for the 3B1, and F10 again lets it go.
+	seamless = true
+
 [memory]
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.
+
+[modem]
+	# Answer the kernel's boot probe of the built-in modem. The kernel
+	# starts its phone scan, which also times the system beep, only when
+	# it finds the modem: with false, the 3B1 never beeps.
+	present = true
+
+[control]
+	socket = "freebee.sock"		# commands over a Unix socket (optional)
+
+[mcp]
+	# The MCP server for AI agents: see MCP.md. FREEBEE_MCP=0 turns it off.
+	enabled = true
+	name = "myvm"			# the VM's name for the tools (default: the folder's name)
+
+[network]
+	# The Ethernet board (AT&T's, with an AMD LANCE) in an expansion slot,
+	# for the Wollongong WIN/3B TCP/IP software. See README.md.
+	enabled = false
+	slot = 1			# expansion slot 0-7
+	mac = "02:00:00:3b:00:01"	# give each VM its own
+	# "slirp": user mode network, as in QEMU's -netdev user. The 3B1 is
+	# 10.0.2.15, the host 10.0.2.2. "none": the cable is unplugged.
+	backend = "slirp"
+	# Host ports that go to the 3B1, as in QEMU:
+	# "[tcp:|udp:][hostaddr]:hostport-[guestaddr]:guestport", comma separated
+	hostfwd = "tcp:127.0.0.1:2323-:23, tcp:127.0.0.1:2121-:21"
+	emu = true			# slirp's FTP helper for the 3B1's ftp client
 
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep

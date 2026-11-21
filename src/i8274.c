@@ -33,6 +33,7 @@
 //
 
 #include "i8274.h"
+#include "fbmcp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -43,7 +44,7 @@
 #include "utils.h"
 #include "fbconfig.h"
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 // needed for PTY functions, unlink, symlink
 #define __USE_XOPEN_EXTENDED
 
@@ -207,9 +208,13 @@ static void end_of_interrupt(I8274_CTX *ctx)
 	// should we clear INT Pending bit? probably can rely on i8274_get_irq() for setting that
 }
 
+#if defined(__linux__) || defined(__APPLE__)
+static bool pty_flush(I8274_CTX *ctx);
+#endif
+
 static void pty_in(I8274_CTX *ctx)
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 	uint8_t inbuf[FIFOSIZE], *byteptr;
 	int bytes_read;
 
@@ -221,6 +226,14 @@ static void pty_in(I8274_CTX *ctx)
 			fifo_put(&ctx->chanA.rx_fifo, *(byteptr++));
 	}
 
+	// and what MCP serial-write and serial-run send
+	if (!fifo_full(&ctx->chanA.rx_fifo)) {
+		uint8_t mcpbuf[FIFOSIZE];
+		int n = fbmcp_serial_rx(mcpbuf, fifo_remaining(&ctx->chanA.rx_fifo));
+		for (int k = 0; k < n; k++)
+			fifo_put(&ctx->chanA.rx_fifo, mcpbuf[k]);
+	}
+
 	// set "Rx char available" flag and RxInt if needed
 	check_rx_available(ctx, &ctx->chanA);
 #endif
@@ -230,7 +243,26 @@ static void pty_in(I8274_CTX *ctx)
 // called from the 60Hz update
 void i8274_scan_incoming(I8274_CTX *ctx, i8274_CHANNEL_INDEX chan_id)
 {
-	if (chan_id == CHAN_A) pty_in(ctx);
+	if (chan_id != CHAN_A)
+		return;
+	pty_in(ctx);
+#if defined(__linux__) || defined(__APPLE__)
+	// output waiting for room in the pty (see pty_flush)
+	if (ctx->txcount > 0) {
+		if (!pty_flush(ctx) && ++ctx->tx_wait_ticks > 60) {
+			// nobody has read the pty for a second: drop output from now
+			// on, until a write goes through again
+			ctx->tx_discard = true;
+			pty_flush(ctx);
+		}
+		if (ctx->txcount == 0) {
+			// the waiting byte has gone out: transmitter free, TxInt
+			ctx->chanA.rr[0] |= RR0_TX_BUFFER_EMPTY;
+			if (ctx->chanA.wr[1] & WR1_TX_INT_ENABLE)
+				ctx->irq_request[IRQ_TXA] |= IRQ_REQUESTED;
+		}
+	}
+#endif
 }
 
 bool i8274_get_irq(I8274_CTX *ctx)
@@ -488,10 +520,39 @@ uint8_t i8274_data_in(I8274_CTX *ctx, i8274_CHANNEL_INDEX chan_id)
 	return data;
 }
 
-static void pty_out(I8274_CTX *ctx, uint8_t byte_out)
+#if defined(__linux__) || defined(__APPLE__)
+// Send the waiting output to the pty. The pty holds only about 1 KB, and the
+// 3B1 sends faster than that in one 60Hz slice, so bytes must wait for room
+// instead of being dropped. Returns true when nothing is left waiting.
+static bool pty_flush(I8274_CTX *ctx)
 {
-#ifdef __linux__
-	(void) write(ctx->ptyfd, &byte_out, 1);
+	while (ctx->txcount > 0) {
+		ssize_t n = write(ctx->ptyfd, ctx->txbuf, ctx->txcount);
+		if (n > 0) {
+			memmove(ctx->txbuf, ctx->txbuf + n, ctx->txcount - n);
+			ctx->txcount -= n;
+			ctx->tx_discard = false;	// somebody reads again
+		} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && !ctx->tx_discard) {
+			return false;
+		} else {
+			// an error, or nobody has read for a while: the output is lost
+			ctx->txcount = 0;
+		}
+	}
+	ctx->tx_wait_ticks = 0;
+	return true;
+}
+#endif
+
+// Queue a byte for the pty. Returns true if the transmitter is free again.
+static bool pty_out(I8274_CTX *ctx, uint8_t byte_out)
+{
+#if defined(__linux__) || defined(__APPLE__)
+	if (ctx->txcount < TXBUFSIZE)
+		ctx->txbuf[ctx->txcount++] = byte_out;
+	return pty_flush(ctx);
+#else
+	return true;
 #endif
 }
 
@@ -500,9 +561,16 @@ void i8274_data_out(I8274_CTX *ctx, i8274_CHANNEL_INDEX chan_id, uint8_t data)
 {
 	struct i8274_channel *chan = (chan_id==CHAN_A) ? &ctx->chanA : &ctx->chanB;
 	LOG("chan%c: data out >>> 0x%02X ('%c')", 'A'+chan_id, data, data);
+	if (chan_id == CHAN_A)
+		fbmcp_serial_tx(data);	// a copy for the MCP serial tools
 
-	// we immediately "process" the byte (send to PTY) so we can continue to say we are "buffer empty"
-	if (chan_id == CHAN_A) pty_out(ctx, data);
+	// Send the byte to the pty now if it has room, and say "buffer empty".
+	// If it has no room, the transmitter stays busy: i8274_scan_incoming()
+	// sends the byte later and then says "buffer empty" (and asks for TxInt).
+	if (chan_id == CHAN_A && !pty_out(ctx, data)) {
+		chan->rr[0] &= ~RR0_TX_BUFFER_EMPTY;
+		return;
+	}
 	chan->rr[0] |= RR0_TX_BUFFER_EMPTY;
 
 	// TODO: maybe do this TxInt Request in the 60Hz update so we aren't always immediately spamming TxInt back to the 3b1?
@@ -636,7 +704,7 @@ void i8274_control_write(I8274_CTX *ctx, i8274_CHANNEL_INDEX chan_id, uint8_t da
 #endif
 }
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 static void ttySetRaw(int fd)
 {
 	struct termios t;
@@ -664,7 +732,7 @@ static void ttySetRaw(int fd)
 
 static void pty_init(I8274_CTX *ctx)
 {
-#ifdef __linux__	
+#if defined(__linux__) || defined(__APPLE__)	
 	serial_pty_filename = fbc_get_string("serial", "symlink");
 	ctx->ptyfd = open("/dev/ptmx", O_RDWR | O_NONBLOCK);
 	(void)grantpt(ctx->ptyfd);
@@ -680,7 +748,7 @@ static void pty_init(I8274_CTX *ctx)
 
 static void pty_done(I8274_CTX *ctx)
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 	close(ctx->ptyfd);
 	unlink(serial_pty_filename);
 #endif	
@@ -694,6 +762,11 @@ void i8274_init(I8274_CTX *ctx)
 	ctx->chanB.id = CHAN_B;
 	channel_reset(ctx, CHAN_A);
 	channel_reset(ctx, CHAN_B);
+#if defined(__linux__) || defined(__APPLE__)
+	ctx->txcount = 0;
+	ctx->tx_wait_ticks = 0;
+	ctx->tx_discard = false;
+#endif
 	pty_init(ctx);
 }
 

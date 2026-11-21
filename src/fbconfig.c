@@ -67,6 +67,8 @@ get_default_string(const char *heading, const char *item)
 		{ "roms", "rom_15c", "roms/15c.bin" },
 		{ "serial", "symlink", "serial-pty" },
 		{ "display", "scale_quality", "linear" },
+		{ "network", "mac", "02:00:00:3b:00:01" },
+		{ "network", "backend", "slirp" },
 		{ NULL, NULL, NULL }
 	};
 
@@ -116,6 +118,11 @@ get_default_bool(const char *heading, const char *item)
 		bool value;
 	} defaults[] = {
 		{ "vidpal", "installed", true },
+		{ "mcp", "enabled", true },
+		{ "cpu", "idle", true },
+		{ "mouse", "seamless", true },
+		{ "modem", "present", true },
+		{ "network", "emu", true },
 		{ NULL, NULL, false }
 	};
 
@@ -147,6 +154,8 @@ get_default_int(const char *heading, const char *item)
 		{ "memory", "base_memory", 2048 },
 		{ "memory", "extended_memory", 2048 },
 		{ "beeper", "volume", 55 },
+		{ "cpu", "turbo", 1 },
+		{ "network", "slot", 1 },
 		{ NULL, NULL, 0 }
 	};
 
