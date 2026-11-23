@@ -162,6 +162,16 @@ its cable unplugged.
     have only active mode, and NAT breaks active FTP. `emu = true` turns
     on libslirp's own helpers, which rewrite the 3B1's PORT commands to
     servers on port 21.
+  * Two optional fixes for the 3B1's 1986 programs, off by default
+    (`src/netfix.c`):
+    * `fix_telnet_status = true`: telnet out of the 3B1 to a modern
+      telnetd fills the screen with "STATUS IS". This changes the
+      server's WILL/DO STATUS to WONT/DONT.
+    * `fix_ftp_port = true`: FTP into the 3B1 through `hostfwd`, with an
+      active mode client, such as
+      `lftp -e 'set ftp:passive-mode off' -p 2121 -u root,x localhost`.
+      The client asks the 3B1 to connect back to 127.0.0.1, which on the
+      3B1 is the 3B1 itself; this changes it to 10.0.2.2.
   * Each VM needs its own `mac`.
   * `FREEBEE_ENET_DEBUG=1` logs every frame and status word to stderr.
 

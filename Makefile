@@ -119,7 +119,7 @@ TARGET		=	freebee
 
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c
-SRC			+=	expcard.c lance.c enet.c netslirp.c
+SRC			+=	expcard.c lance.c enet.c netslirp.c netfix.c
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 
 # source type - either "c" or "cpp" (C or C++)
@@ -323,7 +323,7 @@ endif
 ####
 # targets
 ####
-.PHONY:	default all update-revision versionheader clean-versioninfo init cleandep clean tidy
+.PHONY:	default all test update-revision versionheader clean-versioninfo init cleandep clean tidy
 
 all:	update-revision
 	@$(MAKE) versionheader
@@ -389,6 +389,11 @@ init:
 # remove the dependency files
 cleandep:
 	-rm $(DEPFILES)
+
+# unit tests (with the host compiler: HOSTCC, or else cc)
+test:
+	$(or $(HOSTCC),cc) -Wall -Wextra -o tests/netfix_test tests/netfix_test.c src/netfix.c
+	./tests/netfix_test
 
 # remove the dependency files and any target or intermediate build files
 clean:	cleandep clean-versioninfo
