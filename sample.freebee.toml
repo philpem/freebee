@@ -37,6 +37,35 @@
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.
 
+[expansion]
+	# The cards in the expansion slots, by slot (slot0 to slot7). Cards:
+	# "ethernet", the AT&T 3B1 Ethernet board (see [network]).
+	#slot1 = "ethernet"
+
+[network]
+	# The Ethernet board's station address
+	mac = "02:00:00:3b:00:01"
+	# The host side: "slirp" (user mode networking, NAT, as in QEMU) or
+	# "none" (no cable). The 3B1 is 10.0.2.15, the host 10.0.2.2, DNS
+	# 10.0.2.3.
+	backend = "slirp"
+	# Host ports that go to the 3B1, comma separated, as in QEMU:
+	# [tcp:|udp:][hostaddr]:hostport-[guestaddr]:guestport
+	hostfwd = "tcp:127.0.0.1:2323-:23"
+	# libslirp's helpers for old protocols through NAT (they rewrite the
+	# guest's FTP PORT commands, for the 3B1's ftp, which has no passive
+	# mode). Off by default, as in QEMU.
+	emu = false
+	# Fixes for 1986 programs, in the frames to the 3B1 (src/netfix.c).
+	# fix_telnet_status: telnet out of the 3B1 to a server that offers
+	# STATUS (most do now) fills the screen with "STATUS IS"; this makes
+	# the server's WILL/DO STATUS a WONT/DONT.
+	# fix_ftp_port: an FTP client on the host's loopback tells the 3B1's
+	# ftpd (active mode only) to connect to 127.0.0.1; this makes it
+	# 10.0.2.2, the host as the 3B1 sees it.
+	fix_telnet_status = false
+	fix_ftp_port = false
+
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep
 	# (BEL) as well as DTMF dialling tones -- on real hardware they all come

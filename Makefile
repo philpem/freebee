@@ -119,6 +119,7 @@ TARGET		=	freebee
 
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c
+SRC			+=	expcard.c lance.c enet.c netslirp.c netfix.c
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 
 # source type - either "c" or "cpp" (C or C++)
@@ -275,6 +276,25 @@ ifeq ($(ENABLE_SDL),yes)
 	CFLAGS		+=	$(shell sdl2-config --cflags)
 endif
 
+####
+# libslirp, for the Ethernet board's user mode network (pkg-config slirp).
+# Without it the board is there, with its cable unplugged. make SLIRP=no
+# leaves it out. PKG_CONFIG, SLIRP_CFLAGS and SLIRP_LIBS can be set too.
+####
+PKG_CONFIG	?=	pkg-config
+SLIRP		?=	$(shell $(PKG_CONFIG) --exists slirp 2>/dev/null && echo yes)
+ifeq ($(SLIRP),yes)
+	SLIRP_CFLAGS	?=	$(shell $(PKG_CONFIG) --cflags slirp)
+	SLIRP_LIBS	?=	$(shell $(PKG_CONFIG) --libs slirp)
+	CFLAGS		+=	$(SLIRP_CFLAGS) -DHAVE_SLIRP
+	LIBLNK		+=	$(SLIRP_LIBS)
+ifeq ($(strip $(PLATFORM)),win32)
+	# winsock: WSAPoll and inet_pton are Windows Vista and up
+	CFLAGS		+=	-D_WIN32_WINNT=0x0600
+	LIBLNK		+=	-lws2_32 -liphlpapi
+endif
+endif
+
 
 ####
 # rules
@@ -303,7 +323,7 @@ endif
 ####
 # targets
 ####
-.PHONY:	default all update-revision versionheader clean-versioninfo init cleandep clean tidy
+.PHONY:	default all test update-revision versionheader clean-versioninfo init cleandep clean tidy
 
 all:	update-revision
 	@$(MAKE) versionheader
@@ -369,6 +389,11 @@ init:
 # remove the dependency files
 cleandep:
 	-rm $(DEPFILES)
+
+# unit tests (with the host compiler: HOSTCC, or else cc)
+test:
+	$(or $(HOSTCC),cc) -Wall -Wextra -o tests/netfix_test tests/netfix_test.c src/netfix.c
+	./tests/netfix_test
 
 # remove the dependency files and any target or intermediate build files
 clean:	cleandep clean-versioninfo
