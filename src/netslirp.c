@@ -22,6 +22,7 @@
 #include <libslirp.h>
 #include "netslirp.h"
 #include "enet.h"
+#include "netfix.h"
 #include "fbconfig.h"
 
 #define GUEST_ADDR	"10.0.2.15"
@@ -70,10 +71,17 @@ static bool ip4(const char *s, struct in_addr *a)
 typedef ssize_t slirp_ssize_t;
 #endif
 
-// A frame from slirp for the guest, as it is
+// A frame from slirp for the guest; netfix.c may change a copy of it
 static slirp_ssize_t send_packet(const void *buf, size_t len, void *opaque)
 {
+	static uint8_t frame[1514];
+
 	(void)opaque;
+	if (len <= sizeof(frame)) {
+		memcpy(frame, buf, len);
+		netfix_frame(frame, (int)len);
+		buf = frame;
+	}
 	enet_host_receive(buf, (int)len);
 	return len;
 }
@@ -279,6 +287,9 @@ bool netslirp_init(const char *hostfwd)
 	// NAT, which rewrite the guest's FTP PORT commands (the 3B1's ftp has
 	// no passive mode), and look at rlogin and IRC. Off, as in QEMU.
 	cfg.enable_emu = fbc_get_bool("network", "emu");
+	// fixes for 1986 programs (netfix.c), off by default
+	netfix_config(fbc_get_bool("network", "fix_telnet_status"),
+			fbc_get_bool("network", "fix_ftp_port"));
 
 	memset(&cb, 0, sizeof(cb));
 	cb.send_packet = send_packet;
