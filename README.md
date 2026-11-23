@@ -160,6 +160,7 @@ Set `seamless = false` in the `[mouse]` section of `.freebee.toml` for the
 old F10 grab, which sends the host's moves as they are.
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Mouse wheel -- Scrolls a 3B1 window that has scroll arrows on its border, such as the Office's list or a Help window, as a click on the arrows does (Roll Up/Down, Shift+Up/Down). The window must have the keyboard. A shell window has no scroll arrows: there the wheel does nothing. This needs UNIX 3.51: Freebee finds the window that has the keyboard in its window driver (see `src/keywin.c`)
+  * Alt-F9 (Option-F9 on a Mac) -- Close the program in the front window, also one that hangs or ignores Exit and Del, and go back to the Office. Freebee calls the 3B1 kernel's own `signal()` to kill the window's process group, as `kill -9` would. It never closes the Office, the Window Manager menu or the status line. The program's window must have the keyboard, and the result goes to Freebee's output. This needs UNIX 3.51: Freebee finds the window in its window driver (`src/keywin.c`) and `signal()` by its code (`src/closeapp.c`). F9 alone is still SUSPD
   * Alt-F12 -- Exit
 
 # 3b1-specific key mappings
