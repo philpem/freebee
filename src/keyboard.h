@@ -40,6 +40,9 @@ typedef struct {
 
 	/// Flag indicating whether last data sent was from the mouse
 	bool lastdata_mouse;
+
+	/// Bytes the guest must read before it has every mouse packet
+	size_t mouse_left;
 } KEYBOARD_STATE;
 
 /**
@@ -67,6 +70,11 @@ bool keyboard_get_irq(KEYBOARD_STATE *ks);
 uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr);
 void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val);
 
+/**
+ * Send the guest a mouse packet: dx, dy (-127..127, + is right and down)
+ * and the buttons (MOUSE_BUTTON_*). False if the guest has not turned the
+ * mouse on, or the keyboard buffer has no room for the packet.
+ */
 bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db);
 
 #endif

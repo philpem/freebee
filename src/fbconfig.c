@@ -116,6 +116,7 @@ get_default_bool(const char *heading, const char *item)
 		bool value;
 	} defaults[] = {
 		{ "vidpal", "installed", true },
+		{ "mouse", "seamless", true },
 		{ NULL, NULL, false }
 	};
 

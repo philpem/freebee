@@ -18,6 +18,7 @@
 #include "lightbar.c"
 #include "i8274.h"
 #include "dialer.h"
+#include "pointer.h"
 
 extern int cpu_log_enabled;
 
@@ -223,13 +224,51 @@ void refreshStatusBar(SDL_Renderer *r, SDL_Texture *lightbar_tex)
 	SDL_RenderCopy(r, lightbar_tex, (state.leds & 8) ? &red_led : &inactive_led, &dstrect);
 }
 
+// The mouse works one of two ways, set by [mouse] seamless:
+// - seamless (the default): the 3B1's pointer follows the host's over the
+//   window, and the host's hides there while the guest has the mouse on
+//   (pointer.c). There is no grab: F10 does nothing.
+// - grab: F10 grabs the mouse: the host pointer goes away and its moves go
+//   to the 3B1 as they are. F10 again lets it go.
+static bool mouse_grabbed, mouse_seamless, cursor_hidden;
+static int mouse_buttons;
+// window pixels per screen pixel
+static float win_scale_x = 1, win_scale_y = 1;
+
+/**
+ * @brief	Show in the title bar how the mouse works, and what F10 does.
+ */
+static void show_mouse_state(SDL_Window *window)
+{
+	SDL_SetWindowTitle(window, mouse_seamless
+		? "FreeBee 3B1 - Mouse: seamless"
+		: mouse_grabbed
+		? "FreeBee 3B1 - Mouse: GRABBED - F10 to release"
+		: "FreeBee 3B1 - Mouse: free - F10 to grab");
+}
+
+static int mouse_button_bit(Uint8 button)
+{
+	switch (button) {
+		case SDL_BUTTON_LEFT:	return MOUSE_BUTTON_LEFT;
+		case SDL_BUTTON_MIDDLE:	return MOUSE_BUTTON_MIDDLE;
+		case SDL_BUTTON_RIGHT:	return MOUSE_BUTTON_RIGHT;
+		default:		return 0;
+	}
+}
+
+// seamless: the host pointer over the window, in screen pixels
+static void track_host_pointer(int wx, int wy)
+{
+	pointer_track((int)floorf(wx / win_scale_x), (int)floorf(wy / win_scale_y));
+}
+
 /**
  * @brief	Handle events posted by SDL.
  */
 bool HandleSDLEvents(SDL_Window *window)
 {
 	SDL_Event event;
-	static int mouse_grabbed = 0, mouse_buttons = 0;
 	int dx = 0, dy = 0;
 
 	while (SDL_PollEvent(&event))
@@ -242,16 +281,24 @@ bool HandleSDLEvents(SDL_Window *window)
 			case SDL_QUIT:
 				// Quit button tagged. Exit.
 				return true;
+			case SDL_WINDOWEVENT:
+				if (event.window.event == SDL_WINDOWEVENT_LEAVE && mouse_seamless) {
+					// the 3B1's pointer stops at the edge the host's went out by
+					int gx, gy, wx, wy;
+					SDL_GetGlobalMouseState(&gx, &gy);
+					SDL_GetWindowPosition(window, &wx, &wy);
+					track_host_pointer(gx - wx, gy - wy);
+				}
+				break;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
 					case SDLK_F10:
-						if (mouse_grabbed){
-							SDL_SetRelativeMouseMode(SDL_FALSE);
-							mouse_grabbed = 0;
-						}else{
-							SDL_SetRelativeMouseMode(SDL_TRUE);
-							mouse_grabbed = 1;
-						}
+						if (mouse_seamless)
+							break;	// no grab
+						mouse_grabbed = !mouse_grabbed;
+						SDL_SetRelativeMouseMode(mouse_grabbed ? SDL_TRUE : SDL_FALSE);
+						SDL_GetRelativeMouseState(NULL, NULL);	// moves from before
+						show_mouse_state(window);
 						break;
 					case SDLK_F11:
 						if (state.fdc_disc) {
@@ -273,31 +320,26 @@ bool HandleSDLEvents(SDL_Window *window)
 				}
 				break;
 			case SDL_MOUSEMOTION:
+				// all the moves since the last call, and none left for later
 				SDL_GetRelativeMouseState(&dx, &dy);
-				if (dx==0 && dy==0) break;  // sometimes SDL returns 0 for both, don't process
+				if (mouse_grabbed) {
+					if (dx || dy)
+						mouse_event(&state.kbd, dx, dy, mouse_buttons);
+				} else if (mouse_seamless) {
+					track_host_pointer(event.motion.x, event.motion.y);
+				}
+				break;
 			case SDL_MOUSEBUTTONUP:
 			case SDL_MOUSEBUTTONDOWN:
-				if (mouse_grabbed){
-					if (event.type == SDL_MOUSEBUTTONDOWN) {
-						if (event.button.button == SDL_BUTTON_LEFT){
-							mouse_buttons |= MOUSE_BUTTON_LEFT;
-						}else if (event.button.button == SDL_BUTTON_MIDDLE){
-							mouse_buttons |= MOUSE_BUTTON_MIDDLE;
-						}else if (event.button.button == SDL_BUTTON_RIGHT){
-							mouse_buttons |= MOUSE_BUTTON_RIGHT;
-						}
-					} else if (event.type == SDL_MOUSEBUTTONUP) {
-						if (event.button.button == SDL_BUTTON_LEFT){
-							mouse_buttons &= ~MOUSE_BUTTON_LEFT;
-						}else if (event.button.button == SDL_BUTTON_MIDDLE){
-							mouse_buttons &= ~MOUSE_BUTTON_MIDDLE;
-						}else if (event.button.button == SDL_BUTTON_RIGHT){
-							mouse_buttons &= ~MOUSE_BUTTON_RIGHT;
-						}
-					}
-					mouse_event(&state.kbd, dx, dy, mouse_buttons);
-					dx = 0;
-					dy = 0;
+				if (event.type == SDL_MOUSEBUTTONDOWN)
+					mouse_buttons |= mouse_button_bit(event.button.button);
+				else
+					mouse_buttons &= ~mouse_button_bit(event.button.button);
+				if (mouse_grabbed) {
+					mouse_event(&state.kbd, 0, 0, mouse_buttons);
+				} else if (mouse_seamless) {
+					track_host_pointer(event.button.x, event.button.y);
+					pointer_buttons(mouse_buttons);
 				}
 				break;
 			default:
@@ -305,6 +347,12 @@ bool HandleSDLEvents(SDL_Window *window)
 		}
 	}
 
+	// seamless: hide the host pointer over the window while the 3B1 draws its own
+	bool const hide = mouse_seamless && state.kbd.mouse_enabled;
+	if (hide != cursor_hidden) {
+		SDL_ShowCursor(hide ? SDL_DISABLE : SDL_ENABLE);
+		cursor_hidden = hide;
+	}
 	return false;
 }
 
@@ -415,6 +463,10 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+	win_scale_x = scalex;
+	win_scale_y = scaley;
+	mouse_seamless = fbc_get_bool("mouse", "seamless");
+	show_mouse_state(window);
     // SDL default is "nearest", our default is "linear" if there's scaling
     if (scalex != 1.0 || scaley != 1.0)
 	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, fbc_get_string("display", "scale_quality"));
@@ -613,6 +665,8 @@ int main(int argc, char *argv[])
 			if (state.timer_clrsint) {
 				state.timer_int_latch = true;
 			}
+			// the mouse: the seamless pointer, the kernel's copy of its place
+			pointer_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
