@@ -18,6 +18,7 @@
 #include "lightbar.c"
 #include "i8274.h"
 #include "dialer.h"
+#include "wheel.h"
 
 extern int cpu_log_enabled;
 
@@ -299,6 +300,14 @@ bool HandleSDLEvents(SDL_Window *window)
 					dx = 0;
 					dy = 0;
 				}
+				break;
+			case SDL_MOUSEWHEEL:
+				// it scrolls a 3B1 window that has scroll arrows (wheel.c)
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+				wheel_scroll(event.wheel.preciseY);
+#else
+				wheel_scroll(event.wheel.y);
+#endif
 				break;
 			default:
 				break;
@@ -613,6 +622,8 @@ int main(int argc, char *argv[])
 			if (state.timer_clrsint) {
 				state.timer_int_latch = true;
 			}
+			// the mouse wheel: Roll keys
+			wheel_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data

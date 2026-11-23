@@ -1176,6 +1176,60 @@ static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
 	}
 }
 
+/*
+ * Guest memory for the emulator's own devices and helpers.
+ *
+ * mem_dma_read16 and mem_dma_write16 are bus master access (as an
+ * expansion card does it): a word at a logical address, through the page
+ * map as for disk DMA, so the page's accessed and dirty bits are set.
+ * False if the page is not present.
+ */
+bool mem_dma_read16(uint32_t logical, uint16_t *data)
+{
+	logical &= ~1;
+	if (logical >= 0x400000 || checkMemoryAccess(logical, false, true) != MEM_ALLOWED)
+		return false;
+	*data = ram_read_16(mapAddr(logical, false));
+	return true;
+}
+
+bool mem_dma_write16(uint32_t logical, uint16_t data, uint16_t mem_mask)
+{
+	logical &= ~1;
+	if (logical >= 0x400000 || checkMemoryAccess(logical, true, true) != MEM_ALLOWED)
+		return false;
+	uint32_t const phys = mapAddr(logical, true);
+	if (mem_mask != 0xffff)
+		data = (ram_read_16(phys) & ~mem_mask) | (data & mem_mask);
+	ram_write_16(phys, data);
+	return true;
+}
+
+// A look at a word through the page map that changes nothing: the page's
+// bits stay as they are. False if the page is not present.
+bool mem_peek16(uint32_t logical, uint16_t *data)
+{
+	logical &= ~1;
+	if (logical >= 0x400000)
+		return false;
+	uint16_t const page = (logical >> 12) & 0x3FF;
+	if (((state.map[page*2] >> 5) & 0x03) == 0)
+		return false;
+	*data = ram_read_16(map_address_debug(logical));
+	return true;
+}
+
+// A word of RAM at a physical address. False if there is no RAM there.
+bool mem_peek_phys16(uint32_t phys, uint16_t *data)
+{
+	phys &= ~1;
+	if (phys < 0x200000 ? phys >= state.base_ram_size
+			: phys - 0x200000 >= state.exp_ram_size)
+		return false;
+	*data = ram_read_16(phys);
+	return true;
+}
+
 /**
  * @brief Write M68K memory, 32-bit
  */
