@@ -136,6 +136,51 @@ about four minutes to boot. To make the CPU faster, set `turbo` in the
 The CPU then runs that many instructions in each time slot, but the 60Hz
 clock stays real, so the time of day, key repeat and timeouts are right.
 At 10, the boot takes about 20 seconds.
+## Expansion cards and networking
+
+The 3B1 has expansion slots. FreeBee has an interface for expansion cards
+(`src/expcard.h`): a card type is a struct of callbacks, and
+`[expansion] slot0` to `slot7` in `.freebee.toml` names the card in each
+slot. The bus answers the card identity bytes that the kernel reads, and
+the card reset. One card type is there now: `"ethernet"`.
+
+The Ethernet board is an AMD Am7990 LANCE (card id 0x1003). It works with
+the Wollongong WIN/3B TCP/IP software ("TWG-TCP/IP", `/etc/lddrv/ether`),
+which has telnet, ftp, rcp, rsh, rlogin and their servers. The slots are
+empty by default. Put the board in a slot:
+
+```toml
+[expansion]
+	slot1 = "ethernet"
+
+[network]
+	hostfwd = "tcp:127.0.0.1:2323-:23, tcp:127.0.0.1:2121-:21"
+```
+
+The board is on a user mode network (libslirp, as in QEMU's
+`-netdev user`). It needs no root and no setup on the host. Without
+libslirp at build time (or with `make SLIRP=no`) the board is there, with
+its cable unplugged.
+
+  * The 3B1 is 10.0.2.15, the host is 10.0.2.2 and DNS is 10.0.2.3. The
+    driver's `ether.rc` runs `ifconfig en0 <hostname>`, so give the 3B1's
+    name the address 10.0.2.15 in its `/etc/hosts`.
+  * From the 3B1 out: add a default route on the 3B1:
+    `/usr/bin/route add default 10.0.2.2 1`. Then the 3B1 reaches the
+    host's networks through NAT.
+  * Into the 3B1: `hostfwd` sends host ports to the 3B1, with the rule
+    format of QEMU's `hostfwd`. With the example above, `telnet localhost
+    2323` gets the 3B1's login.
+  * FreeBee passes every frame as it is. The 3B1's ftp and ftpd (1986)
+    have only active mode, and NAT breaks active FTP. `emu = true` turns
+    on libslirp's own helpers, which rewrite the 3B1's PORT commands to
+    servers on port 21.
+  * Each VM needs its own `mac`.
+  * `FREEBEE_ENET_DEBUG=1` logs every frame and status word to stderr.
+
+The LANCE is from MAME's am79c90 (BSD-3-Clause), the board from
+Visionik's AT&T 3B1 work in MAME (BSD-3-Clause and GPL-2.0-or-later). The
+licence texts are at the top of `src/lance.c` and `src/enet.c`.
 
 # Keyboard commands
 

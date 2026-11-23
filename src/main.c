@@ -21,6 +21,7 @@
 #include "pointer.h"
 #include "wheel.h"
 #include "closeapp.h"
+#include "expcard.h"
 
 extern int cpu_log_enabled;
 
@@ -558,6 +559,9 @@ int main(int argc, char *argv[])
 
 	load_hd();
 
+	// Expansion cards: [expansion] slot0 to slot7
+	expcard_init();
+
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * 60.821331Hz, with a 60Hz periodic interrupt.
@@ -585,6 +589,7 @@ int main(int argc, char *argv[])
 		printf("Turbo: the CPU runs %u times as fast as a real 3B1 (%u MHz)\n", turbo, turbo * 10);
 	// the CPU cycles in one time slot
 	const uint32_t slot_cycles = CYCLES_PER_TIMESLOT * turbo;
+	uint32_t card_slices = 0, last_host_poll = 0;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
@@ -596,6 +601,17 @@ int main(int argc, char *argv[])
 			// 41667 cycles per timeslot.
 			cycles_run = m68k_execute(CYCLES_PER_TIMESLOT / NUM_CPU_TIMESLOTS);
 			clock_cycles += cycles_run;
+
+			// Expansion cards; their host side (the network) about every
+			// millisecond
+			expcard_tick(cycles_run);
+			if ((++card_slices & 15) == 0) {
+				uint32_t const ms = SDL_GetTicks();
+				if (ms != last_host_poll) {
+					last_host_poll = ms;
+					expcard_host_poll();
+				}
+			}
 
 			// Run the DMA engine
 			if (state.dmaen) {
@@ -699,6 +715,14 @@ int main(int argc, char *argv[])
 			int irq = 0;
 			if (state.timer_int_latch) {
 				irq = 6;
+			//
+			// An expansion card asks for level 5 or 1, the expansion bus's
+			// two levels.
+			int const card_level = expcard_irq();
+			if (state.timer_int_latch) {
+				m68k_set_irq(6);
+			} else if (card_level == 5) {
+				m68k_set_irq(5);
 			} else if (i8274_get_irq(&state.serial_ctx)) {
 				irq = 4;
 			} else if (keyboard_get_irq(&state.kbd)) {
@@ -724,6 +748,11 @@ int main(int argc, char *argv[])
 						clock_cycles += slot_cycles - done;
 					break;
 				}
+				m68k_set_irq(2);
+			} else if (card_level == 1) {
+				m68k_set_irq(1);
+			} else {
+				m68k_set_irq(0);
 			}
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
@@ -796,6 +825,7 @@ int main(int argc, char *argv[])
 	}
 
 	dialer_done();
+	expcard_done();
 
 	// Clean up SDL
 	SDL_DestroyTexture(lightbarTexture);

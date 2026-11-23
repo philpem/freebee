@@ -119,6 +119,7 @@ TARGET		=	freebee
 
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c pointer.c keywin.c wheel.c closeapp.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c
+SRC			+=	expcard.c lance.c enet.c netslirp.c
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 
 # source type - either "c" or "cpp" (C or C++)
@@ -279,6 +280,25 @@ ifeq ($(ENABLE_SDL),yes)
 	SDL2_LIBS	?=	$(shell $(SDL2_CONFIG) --libs)
 	LIBLNK		+=	$(SDL2_LIBS)
 	CFLAGS		+=	$(SDL2_CFLAGS)
+endif
+
+####
+# libslirp, for the Ethernet board's user mode network (pkg-config slirp).
+# Without it the board is there, with its cable unplugged. make SLIRP=no
+# leaves it out. PKG_CONFIG, SLIRP_CFLAGS and SLIRP_LIBS can be set too.
+####
+PKG_CONFIG	?=	pkg-config
+SLIRP		?=	$(shell $(PKG_CONFIG) --exists slirp 2>/dev/null && echo yes)
+ifeq ($(SLIRP),yes)
+	SLIRP_CFLAGS	?=	$(shell $(PKG_CONFIG) --cflags slirp)
+	SLIRP_LIBS	?=	$(shell $(PKG_CONFIG) --libs slirp)
+	CFLAGS		+=	$(SLIRP_CFLAGS) -DHAVE_SLIRP
+	LIBLNK		+=	$(SLIRP_LIBS)
+ifeq ($(strip $(PLATFORM)),win32)
+	# winsock: WSAPoll and inet_pton are Windows Vista and up
+	CFLAGS		+=	-D_WIN32_WINNT=0x0600
+	LIBLNK		+=	-lws2_32 -liphlpapi
+endif
 endif
 
 

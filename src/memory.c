@@ -9,6 +9,7 @@
 #include "memory.h"
 #include "i8274.h"
 #include "dialer.h"
+#include "expcard.h"
 
 // Memory access debugging options, to reduce logspam
 #undef MEM_DEBUG_PAGEFAULTS
@@ -704,7 +705,9 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					case 0xD40000:		// Expansion slot 5
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
-						if ((address & 0x3FFF8) == 0x3FFF8)	// Software reset
+						if (expcard_present(address))
+							expcard_write(address, data, bits);
+						else if ((address & 0x3FFF8) == 0x3FFF8)	// Software reset
 							LOG("Expansion slot %i: Reset", ((address >> 18) & 7));
 						else
 							fprintf(stderr, "NOTE: WR%d to expansion card space, addr=0x%08X, data=0x%08X\n", bits, address, data);
@@ -971,6 +974,8 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 						// 0x3FFFB: Board ID MSB, 0X3FFF9: Board ID LSB
 						// 0x3FFFF: Two's complement of ID MSB, 0x3FFFD: Two's complement of ID LSB
 						// low byte of 0x3FFFB + 0x3FFFF and 0x3FFF9 + 0x3FFFD should equal 0
+						if (expcard_present(address))
+							return expcard_read(address, bits);
 						fprintf(stderr, "NOTE: RD%d from expansion card space, addr=0x%08X\n", bits, address);
 						handled = true;
 						break;
