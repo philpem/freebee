@@ -396,12 +396,12 @@ init:
 cleandep:
 	-rm $(DEPFILES)
 
-# remove the dependency files and any target or intermediate build files
 # unit tests (with the host compiler: HOSTCC, or else cc)
 test:
 	$(or $(HOSTCC),cc) -Wall -Wextra -o tests/netfix_test tests/netfix_test.c src/netfix.c
 	./tests/netfix_test
 
+# remove the dependency files and any target or intermediate build files
 clean:	cleandep clean-versioninfo
 	-rm $(OBJ) $(TARGET) $(GARBAGE)
 
