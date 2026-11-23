@@ -471,12 +471,25 @@ int main(int argc, char *argv[])
 	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, cycles_run;
+
+	// [cpu] turbo: the CPU runs that many times as fast as a real 3B1's.
+	// Each time slot runs turbo times as many cycles, and the 60Hz tick
+	// comes every turbo times as many cycles, so the clock stays real.
+	const int TURBO_MAX = 32;
+	int turbo_cfg = fbc_get_int("cpu", "turbo");
+	if (turbo_cfg < 1 || turbo_cfg > TURBO_MAX) {
+		fprintf(stderr, "[cpu] turbo must be 1 to %d (got %d); using 1\n", TURBO_MAX, turbo_cfg);
+		turbo_cfg = 1;
+	}
+	const uint32_t turbo = (uint32_t)turbo_cfg;
+	if (turbo > 1)
+		printf("Turbo: the CPU runs %u times as fast as a real 3B1 (%u MHz)\n", turbo, turbo * 10);
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
-		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
+		for (i = 0; i < CYCLES_PER_TIMESLOT * turbo; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
@@ -595,7 +608,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
-		if (clock_cycles > CLOCKS_PER_60HZ) {
+		if (clock_cycles > CLOCKS_PER_60HZ * turbo) {
 			// Refresh the screen if VRAM has been changed
 			if (state.vram_updated){
 				refreshScreen(screen, renderer, fbTexture);
@@ -618,7 +631,7 @@ int main(int argc, char *argv[])
 			// scan the serial pty for new data
 			i8274_scan_incoming(&state.serial_ctx, CHAN_A);
 			// decrement clock cycle counter, we've handled the intr.
-			clock_cycles -= CLOCKS_PER_60HZ;
+			clock_cycles -= CLOCKS_PER_60HZ * turbo;
 		}
 
 		// handle SDL events -- returns true if we need to exit
