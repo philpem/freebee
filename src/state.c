@@ -24,6 +24,9 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.pie = 0;
 	state.ee = 0;
 	state.leds = 0;
+	state.idle_skip = fbc_get_bool("cpu", "idle");
+	state.idle_pc = state.idle_passes = 0;
+	state.idle_hint = false;
 	state.genstat = 0;				// FIXME: check this
 	state.bsr0 = state.bsr1 = 0;	// FIXME: check this
 	// MCR reads back as zero after reset, so CLRSINT- starts asserted and
