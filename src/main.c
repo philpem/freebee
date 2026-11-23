@@ -23,6 +23,7 @@
 #include "closeapp.h"
 #include "expcard.h"
 #include "control.h"
+#include "fbmcp.h"
 
 extern int cpu_log_enabled;
 
@@ -34,6 +35,7 @@ void FAIL(char *err)
 }
 
 static char *floppy_path;
+static char *hd2_path;
 
 static int load_fd_path(const char *discim)
 {
@@ -107,8 +109,47 @@ int freebee_hd2_insert(const char *path)
 	if (state.hdc_disc1)
 		fclose(state.hdc_disc1);
 	state.hdc_disc1 = fp;
+	free(hd2_path);
+	hd2_path = strdup(path);
 	printf("Drive 1: Disc image '%s' loaded.\n", path);
 	return 1;
+}
+
+const char *freebee_hd2_path(void)
+{
+	return state.hdc_disc1 ? hd2_path : NULL;
+}
+
+// the reset button (MCP vm-power reset): the CPU starts again from the
+// boot ROM; memory and the disks stay
+void freebee_reset(void)
+{
+	state.romlmap = false;
+	state.idmarw = state.dmaen = false;
+	state.dma_count = state.dma_address = 0;
+	state.pie = 0;
+	state.ee = 0;
+	state.leds = 0;
+	state.idle_pc = state.idle_passes = 0;
+	state.idle_hint = false;
+	state.genstat = 0;
+	state.bsr0 = state.bsr1 = 0;
+	state.timer_int_latch = state.timer_clrsint = false;
+	state.nmi_latch = false;
+	state.dma_dev = DMA_DEV_UNDEF;
+	state.mcr2mirror = 0;
+	state.reverse_video = false;
+	state.vram_updated = true;
+	keyboard_init(&state.kbd);
+	pointer_reset();
+	wheel_reset();
+	closeapp_reset();
+	wd2797_reset(&state.fdc_ctx);
+	wd2010_reset(&state.hdc_ctx);
+	expcard_reset();
+	m68k_set_irq(0);
+	m68k_pulse_reset();
+	printf("Reset.\n");
 }
 
 static int load_hd()
@@ -510,6 +551,14 @@ void validate_memory(int base_memory, int extended_memory)
 
 int main(int argc, char *argv[])
 {
+	// the MCP server an agent starts: it only talks to running FreeBees
+	if (argc > 1 && strcmp(argv[1], "-mcp-bridge") == 0)
+		return fbmcp_bridge_main(argc, argv);
+	// no window (for agents and recordings): FREEBEE_HEADLESS=1
+	const char *headless = getenv("FREEBEE_HEADLESS");
+	if (headless && *headless && strcmp(headless, "0"))
+		SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
+
 	float scalex = fbc_get_double("display", "x_scale");
 	float scaley = fbc_get_double("display", "y_scale");
 
@@ -614,6 +663,9 @@ int main(int argc, char *argv[])
 	// the control socket ([control] socket, or FREEBEE_CONTROL)
 	control_init();
 
+	// MCP server (on unless [mcp] enabled = false or FREEBEE_MCP=0)
+	fbmcp_init();
+
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * 60.821331Hz, with a 60Hz periodic interrupt.
@@ -630,29 +682,70 @@ int main(int argc, char *argv[])
 	// [cpu] turbo: the CPU runs that many times as fast as a real 3B1's.
 	// Each time slot runs turbo times as many cycles, and the 60Hz tick
 	// comes every turbo times as many cycles, so the clock stays real.
-	const int TURBO_MAX = 32;
-	int turbo_cfg = fbc_get_int("cpu", "turbo");
-	if (turbo_cfg < 1 || turbo_cfg > TURBO_MAX) {
-		fprintf(stderr, "[cpu] turbo must be 1 to %d (got %d); using 1\n", TURBO_MAX, turbo_cfg);
-		turbo_cfg = 1;
+	// The control socket and MCP can change it (control_turbo).
+	control_turbo = fbc_get_int("cpu", "turbo");
+	if (control_turbo < 1 || control_turbo > TURBO_MAX) {
+		fprintf(stderr, "[cpu] turbo must be 1 to %d (got %d); using 1\n", TURBO_MAX, control_turbo);
+		control_turbo = 1;
 	}
-	const uint32_t turbo = (uint32_t)turbo_cfg;
-	if (turbo > 1)
-		printf("Turbo: the CPU runs %u times as fast as a real 3B1 (%u MHz)\n", turbo, turbo * 10);
-	// the CPU cycles in one time slot
-	const uint32_t slot_cycles = CYCLES_PER_TIMESLOT * turbo;
+	if (control_turbo > 1)
+		printf("Turbo: the CPU runs %d times as fast as a real 3B1 (%d MHz)\n", control_turbo, control_turbo * 10);
+	uint32_t last_turbo = 1;
+	// [cpu] idle: the idle skip, not at max speed
+	bool const idle_skip = state.idle_skip;
+	uint64_t idle_skipped = 0, idle_total = 0;
+	uint32_t idle_slots = 0;
 	uint32_t card_slices = 0, last_host_poll = 0;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
+		if (fbmcp_paused()) {
+			// MCP paused the CPU (or a breakpoint stopped it): MCP, the
+			// control socket and the window go on
+			fbmcp_service();
+			control_poll();
+			if (fbmcp_reset_wanted())
+				freebee_reset();
+			bool vram_changed = state.vram_updated;
+			if (vram_changed)
+				refreshScreen(screen, renderer, fbTexture);
+			if (vram_changed || last_leds != state.leds || window_dirty) {
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, fbTexture, NULL, NULL);
+				refreshStatusBar(renderer, lightbarTexture);
+				SDL_RenderPresent(renderer);
+				last_leds = state.leds;
+				window_dirty = false;
+			}
+			state.vram_updated = false;
+			if (HandleSDLEvents(window) || control_quit || fbmcp_quit())
+				break;
+			SDL_Delay(5);
+			next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
+			continue;
+		}
+		// Turbo: run the CPU that many times as fast, and stretch the 60Hz
+		// tick by as much, so the clock stays real. At max speed it is moot:
+		// the tick then comes as often as it can, and guest time races.
+		uint32_t const turbo = control_speed_max ? 1 : (uint32_t)control_turbo;
+		if (turbo != last_turbo) {
+			clock_cycles = (uint32_t)((uint64_t)clock_cycles * turbo / last_turbo);
+			last_turbo = turbo;
+		}
+		// the CPU cycles in this time slot
+		uint32_t const slot_cycles = CYCLES_PER_TIMESLOT * turbo;
+		state.idle_skip = idle_skip && !control_speed_max;
 		for (i = 0; i < slot_cycles; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
 			cycles_run = m68k_execute(CYCLES_PER_TIMESLOT / NUM_CPU_TIMESLOTS);
 			clock_cycles += cycles_run;
+			// an MCP breakpoint or step stopped the CPU before an instruction
+			if (fbmcp_cpu_stopped())
+				break;
 
 			// Expansion cards; their host side (the network) about every
 			// millisecond
@@ -798,11 +891,21 @@ int main(int argc, char *argv[])
 					// frames from the host network that came in meanwhile
 					expcard_host_poll();
 					uint32_t const done = i + cycles_run;
-					if (done < slot_cycles)
+					if (done < slot_cycles) {
 						clock_cycles += slot_cycles - done;
+						idle_skipped += slot_cycles - done;
+					}
 					break;
 				}
 			}
+		}
+		// How much of each second the idle skip took off the CPU (the
+		// control socket's status, MCP's vm-info)
+		idle_total += slot_cycles;
+		if (++idle_slots >= TIMESLOT_FREQUENCY) {
+			control_idle_pct = (int)(idle_skipped * 100 / idle_total);
+			idle_skipped = idle_total = 0;
+			idle_slots = 0;
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ * turbo) {
@@ -830,14 +933,20 @@ int main(int argc, char *argv[])
 			if (state.timer_clrsint) {
 				state.timer_int_latch = true;
 			}
+			// control socket commands, and the keys it queued
+			control_tick();
+			// MCP: the screen for tools and recordings, mouse packets, calls
+			fbmcp_tick(vram_changed);
+			if (fbmcp_quit())
+				exitEmu = true;
+			if (fbmcp_reset_wanted())
+				freebee_reset();
 			// the mouse: the seamless pointer, the kernel's copy of its place
 			pointer_tick();
 			// the mouse wheel: Roll keys
 			wheel_tick();
 			// Alt-F9: close the program in the front window
 			closeapp_tick();
-			// control socket commands, and the keys it queued
-			control_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
@@ -881,6 +990,7 @@ int main(int argc, char *argv[])
 	dialer_done();
 	expcard_done();
 	control_done();
+	fbmcp_done();
 
 	// Clean up SDL
 	SDL_DestroyTexture(lightbarTexture);

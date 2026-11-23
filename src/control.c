@@ -19,14 +19,19 @@
  *                      not be using it: nothing mounted, no cpio running)
  *   screenshot PATH    save the screen as a 720x348 1-bit PNG
  *   mouse DX DY [B]    move the mouse, B = buttons (4 left, 2 mid, 1 right)
+ *   pointer X Y [B]    as if the host pointer were at X,Y over the window,
+ *                      with buttons B: the seamless mouse follows it
+ *   wheel N            as if the host's mouse wheel turned N steps (+ up,
+ *                      - down): it scrolls a window that has scroll arrows
+ *   closeapp           like Alt-F9: close the program in the front window
+ *                      (kill its process group), not the Office's
+ *   closeapp result    what the last closeapp did
  *   speed max|real     run as fast as the host can, or at 10 MHz
- *   status             floppy, speed, keys still queued, LEDs, and whether
- *                      the guest turned the mouse on
+ *   status             floppy, speed, keys still queued, LEDs, idle: how
+ *                      much of the last second the idle skip took off the
+ *                      CPU, and the mouse: off, or where the pointer is
+ *                      (? = not known yet)
  *   quit               leave FreeBee (like Alt-F12)
- *
- * The socket is only for the user who runs FreeBee: it is a Unix socket
- * in the file system (not on Windows), with the file's permissions, and
- * it is off unless it is configured.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,8 +45,13 @@
 #include "keyboard.h"
 #include "control.h"
 #include "keys.h"
+#include "pointer.h"
+#include "wheel.h"
+#include "closeapp.h"
 
 bool control_speed_max = false;
+int control_turbo = 1;
+int control_idle_pct = 0;
 bool control_quit = false;
 
 /* ---- typing (the key queue is in keys.c) ---- */
@@ -347,6 +357,34 @@ static void command(struct client *c, char *line)
 			reply(c, "err the keyboard buffer is full");
 		else
 			reply(c, "ok");
+	} else if (strcmp(line, "pointer") == 0) {
+		int x = 0, y = 0, b = -1;
+		if (sscanf(args, "%d %d %d", &x, &y, &b) < 2) {
+			reply(c, "err pointer X Y [BUTTONS]");
+			return;
+		}
+		pointer_track(x, y);
+		if (b >= 0)
+			pointer_buttons(b & 7);
+		reply(c, "ok");
+	} else if (strcmp(line, "wheel") == 0) {
+		float n;
+		if (sscanf(args, "%f", &n) != 1) {
+			reply(c, "err wheel STEPS (+ up, - down)");
+			return;
+		}
+		wheel_scroll(n);
+		reply(c, "ok");
+	} else if (strcmp(line, "closeapp") == 0) {
+		if (strcmp(args, "result") == 0) {
+			snprintf(msg, sizeof(msg), "ok %s", closeapp_result());
+			reply(c, msg);
+		} else if (!*args) {
+			closeapp_request();
+			reply(c, "ok");
+		} else {
+			reply(c, "err closeapp [result]");
+		}
 	} else if (strcmp(line, "speed") == 0) {
 		if (strcmp(args, "max") == 0)
 			control_speed_max = true;
@@ -358,11 +396,30 @@ static void command(struct client *c, char *line)
 		}
 		snprintf(msg, sizeof(msg), "ok speed=%s", control_speed_max ? "max" : "real");
 		reply(c, msg);
+	} else if (strcmp(line, "turbo") == 0) {
+		int t;
+		if (*args) {
+			if (sscanf(args, "%d", &t) != 1 || t < 1 || t > TURBO_MAX) {
+				reply(c, "err turbo 1-32");
+				return;
+			}
+			control_turbo = t;
+		}
+		snprintf(msg, sizeof(msg), "ok turbo=%d", control_turbo);
+		reply(c, msg);
 	} else if (strcmp(line, "status") == 0) {
 		const char *fp = freebee_floppy_path();
-		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s keys=%d leds=%d mouse=%s",
-			fp ? fp : "none", control_speed_max ? "max" : "real",
-			keys_pending(), state.leds, state.kbd.mouse_enabled ? "on" : "off");
+		char mouse[32] = "off";
+		int px, py;
+		if (state.kbd.mouse_enabled) {
+			if (pointer_get(&px, &py))
+				snprintf(mouse, sizeof(mouse), "%d,%d", px, py);
+			else
+				strcpy(mouse, "?");
+		}
+		snprintf(msg, sizeof(msg), "ok floppy=%s speed=%s turbo=%d keys=%d leds=%d idle=%d mouse=%s",
+			fp ? fp : "none", control_speed_max ? "max" : "real", control_turbo,
+			keys_pending(), state.leds, control_idle_pct, mouse);
 		reply(c, msg);
 	} else if (strcmp(line, "quit") == 0) {
 		control_quit = true;
@@ -370,7 +427,7 @@ static void command(struct client *c, char *line)
 	} else if (*line == 0) {
 		reply(c, "err empty command");
 	} else {
-		reply(c, "err unknown command (type key floppy eject hd2 screenshot mouse speed status quit)");
+		reply(c, "err unknown command (type key floppy eject hd2 screenshot mouse pointer wheel closeapp speed status quit)");
 	}
 }
 
@@ -494,4 +551,9 @@ void control_tick(void)
 {
 	poll_socket();
 	keys_tick();
+}
+
+void control_poll(void)
+{
+	poll_socket();
 }

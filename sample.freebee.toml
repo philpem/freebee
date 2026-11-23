@@ -93,6 +93,11 @@
 	# See src/control.c. Off unless set here or in FREEBEE_CONTROL.
 	#socket = "freebee.sock"
 
+[mcp]
+	# The MCP server, for AI agents (see MCP.md). Anyone who can use its
+	# socket, in /tmp/freebee-<uid>/, can control the VM. Off by default.
+	#enabled = true
+
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep
 	# (BEL) as well as DTMF dialling tones -- on real hardware they all come

@@ -120,6 +120,12 @@ TARGET		=	freebee
 # source files that produce object files
 SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c pointer.c keywin.c wheel.c closeapp.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c control.c keys.c
 SRC			+=	expcard.c lance.c enet.c netslirp.c netfix.c
+ifeq ($(strip $(PLATFORM)),win32)
+# Windows has no pty, Unix sockets or MCP server: stubs for the MCP calls
+SRC			+=	mcp/stub.c
+else
+SRC			+=	mcp/json.c mcp/img.c mcp/server.c mcp/schemas.c mcp/tools.c mcp/record.c mcp/bridge.c
+endif
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 
 # source type - either "c" or "cpp" (C or C++)
@@ -129,7 +135,7 @@ SRC_TYPE	=	c
 EXT_OBJ		=
 # libraries to link in -- these will be specified as "-l" parameters, the -l
 # is prepended automatically
-LIB			= m
+LIB			= m pthread z
 # library paths -- where to search for the above libraries
 LIBPATH		=
 # include paths -- where to search for #include files (in addition to the
@@ -137,6 +143,7 @@ LIBPATH		=
 INCPATH		=
 # garbage files that should be deleted on a 'make clean' or 'make tidy'
 GARBAGE		=	obj/musashi/m68kmake obj/musashi/m68kmake.exe obj/musashi/m68kmake.o
+GARBAGE		+=	src/mcp/schema_data.h
 
 # extra dependencies - files that we don't necessarily know how to build, but
 # that are required for building the application; e.g. object files or
@@ -425,6 +432,12 @@ endif
 # extra rules
 # example:
 #src/parser.c:	src/parser.h
+
+# the MCP server's tool list and instructions, built into the binary
+src/mcp/schema_data.h:	src/mcp/tools.json src/mcp/instructions.txt src/mcp/embed.sh
+	sh src/mcp/embed.sh > $@.tmp && mv $@.tmp $@
+obj/mcp/schemas.o dep/mcp/schemas.d:	src/mcp/schema_data.h
+$(shell mkdir -p obj/mcp dep/mcp)
 
 
 ####

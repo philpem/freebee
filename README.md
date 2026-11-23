@@ -212,6 +212,11 @@ The commands: `type TEXT` (with `\n`, `{F1}`, `{CTRL-D}` and other keys),
 of `src/control.c`. The socket is a file, with the file's permissions; there
 is none on Windows.
 
+## MCP: AI agents
+
+FreeBee has a built-in MCP (Model Context Protocol) server, off by default,
+for AI agents: see [MCP.md](MCP.md). It is not built on Windows.
+
 # Keyboard commands
 
   * F10 -- Grab/Release the mouse (the title bar shows which), only with `[mouse] seamless = false`. With the seamless mouse (the default) there is no grab: the 3B1's pointer follows the host's over the window, and the host's pointer hides there while a 3B1 program uses the mouse

@@ -8,6 +8,8 @@
 
 /// the wheel turned; steps > 0 up (away from the user)
 void wheel_scroll(float steps);
+/// the machine was reset
+void wheel_reset(void);
 /// at every 60 Hz tick: press or let go of the Roll keys
 void wheel_tick(void);
 

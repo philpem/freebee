@@ -13,17 +13,14 @@
  * so the mouse needs no F10 grab. pointer_tick sends one packet a 60 Hz
  * tick (127 counts at most each way) toward the host pointer. A button
  * change waits in a queue with the place it happened at, so a quick click
- * lands where it was made and is not lost.
- *
- * What this takes from the guest (UNIX 3.51): the pointer moves one pixel
- * a count, with no acceleration, and stops at the edges, so pushing it
- * into a corner makes its place known with any kernel that works so. The
- * look at the kernel's copy (msinfo) is only a check: if mscan's code is
- * not found, the corner and the counts are used alone.
+ * lands where it was made and is not lost. Only the host pointer's moves
+ * start this, so the MCP tools and the control socket can move the 3B1's
+ * pointer too.
  */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "SDL.h"
 #include "state.h"
 #include "memory.h"
 #include "keyboard.h"
@@ -38,40 +35,65 @@ static int clamp(int v, int lo, int hi)
 
 // Where the pointer can be: x in xlo..xhi, y in ylo..yhi. The kernel stops
 // it at the edges, so a push into a corner makes both one point.
+static SDL_SpinLock lock;
 static int xlo, xhi = PTR_XMAX, ylo, yhi = PTR_YMAX;
-// the buttons the guest got last, and the ticks since a
+static bool from_kernel;
+// main thread: the buttons the guest got last, and the ticks since a
 // packet was last on its way to the kernel
 static int last_buttons, quiet;
 
 void pointer_moved(int dx, int dy, int buttons)
 {
+	SDL_AtomicLock(&lock);
 	xlo = clamp(xlo + dx, 0, PTR_XMAX);
 	xhi = clamp(xhi + dx, 0, PTR_XMAX);
 	ylo = clamp(ylo + dy, 0, PTR_YMAX);
 	yhi = clamp(yhi + dy, 0, PTR_YMAX);
+	SDL_AtomicUnlock(&lock);
 	last_buttons = buttons;
 	quiet = 0;
 }
 
 void pointer_forget(void)
 {
+	SDL_AtomicLock(&lock);
 	xlo = ylo = 0;
 	xhi = PTR_XMAX;
 	yhi = PTR_YMAX;
+	from_kernel = false;
+	SDL_AtomicUnlock(&lock);
 }
 
 bool pointer_get(int *x, int *y)
 {
+	SDL_AtomicLock(&lock);
 	bool const known = xlo == xhi && ylo == yhi;
 	*x = (xlo + xhi) / 2;
 	*y = (ylo + yhi) / 2;
+	SDL_AtomicUnlock(&lock);
 	return known;
 }
 
-static void set_place(int x, int y)
+static void set_place(int x, int y, bool kernel)
 {
+	SDL_AtomicLock(&lock);
 	xlo = xhi = clamp(x, 0, PTR_XMAX);
 	ylo = yhi = clamp(y, 0, PTR_YMAX);
+	from_kernel = kernel;
+	SDL_AtomicUnlock(&lock);
+}
+
+void pointer_set(int x, int y)
+{
+	set_place(x, y, false);
+}
+
+bool pointer_from_kernel(void)
+{
+	SDL_AtomicLock(&lock);
+	bool const k = from_kernel;
+	SDL_AtomicUnlock(&lock);
+	return k;
 }
 
 /* ---- the kernel's own copy ---- */
@@ -139,6 +161,9 @@ static void sync_kernel(void)
 	if (!clamps_at(ms_code)) {
 		// another kernel is running: look again
 		ms_state = MS_LOOK;
+		SDL_AtomicLock(&lock);
+		from_kernel = false;
+		SDL_AtomicUnlock(&lock);
 		return;
 	}
 	uint16_t w[4];
@@ -148,7 +173,7 @@ static void sync_kernel(void)
 	int32_t const x = (int32_t)(((uint32_t)w[0] << 16) | w[1]);
 	int32_t const y = (int32_t)(((uint32_t)w[2] << 16) | w[3]);
 	if (x >= 0 && x <= PTR_XMAX && y >= 0 && y <= PTR_YMAX)
-		set_place(x, y);
+		set_place(x, y, true);
 }
 
 /* ---- the seamless mouse ---- */
@@ -187,6 +212,16 @@ void pointer_stop(void)
 {
 	following = false;
 	spot_count = 0;
+}
+
+void pointer_reset(void)
+{
+	pointer_forget();
+	pointer_stop();
+	ms_state = MS_LOOK;
+	was_enabled = false;
+	last_buttons = 0;
+	quiet = 0;
 }
 
 void pointer_tick(void)

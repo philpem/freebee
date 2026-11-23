@@ -33,6 +33,7 @@
 //
 
 #include "i8274.h"
+#include "fbmcp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -223,6 +224,14 @@ static void pty_in(I8274_CTX *ctx)
 		byteptr = inbuf;
 		while(bytes_read--)
 			fifo_put(&ctx->chanA.rx_fifo, *(byteptr++));
+	}
+
+	// and what MCP serial-write and serial-run send
+	if (!fifo_full(&ctx->chanA.rx_fifo)) {
+		uint8_t mcpbuf[FIFOSIZE];
+		int n = fbmcp_serial_rx(mcpbuf, fifo_remaining(&ctx->chanA.rx_fifo));
+		for (int k = 0; k < n; k++)
+			fifo_put(&ctx->chanA.rx_fifo, mcpbuf[k]);
 	}
 
 	// set "Rx char available" flag and RxInt if needed
@@ -552,6 +561,8 @@ void i8274_data_out(I8274_CTX *ctx, i8274_CHANNEL_INDEX chan_id, uint8_t data)
 {
 	struct i8274_channel *chan = (chan_id==CHAN_A) ? &ctx->chanA : &ctx->chanB;
 	LOG("chan%c: data out >>> 0x%02X ('%c')", 'A'+chan_id, data, data);
+	if (chan_id == CHAN_A)
+		fbmcp_serial_tx(data);	// a copy for the MCP serial tools
 
 	// Send the byte to the pty now if it has room, and say "buffer empty".
 	// If it has no room, the transmitter stays busy: i8274_scan_incoming()

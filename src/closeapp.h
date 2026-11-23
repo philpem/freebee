@@ -9,6 +9,10 @@
  * Office, the window manager or the status line.
  */
 
+/// the machine was reset
+void closeapp_reset(void);
+/// what the last request did, for the control socket
+const char *closeapp_result(void);
 /// close the program in the window that has the keyboard, as
 /// soon as the CPU is at a safe place (within 2 seconds)
 void closeapp_request(void);

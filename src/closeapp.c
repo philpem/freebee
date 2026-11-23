@@ -37,6 +37,7 @@
 #include "musashi/m68k.h"
 #include "memory.h"
 #include "keywin.h"
+#include "fbmcp.h"
 #include "closeapp.h"
 
 // signal() in UNIX 3.51m; words 9-10 are &proc, 28-29 &v.ve_proc. 0x70 is
@@ -285,6 +286,10 @@ void closeapp_tick(void)
 		printf("Alt-F9: %s\n", result);
 		return;
 	}
+	// not while the MCP debugger steps or has breakpoints: its hook
+	// would stop the CPU inside the call
+	if (fbmcp_dbg_active)
+		return;
 	// only where an interrupt could come
 	if (m68k_get_reg(NULL, M68K_REG_SR) & 0x0700)
 		return;
@@ -292,4 +297,15 @@ void closeapp_tick(void)
 	close_now();
 	printf("Alt-F9: %s\n", result);
 	fflush(stdout);
+}
+
+void closeapp_reset(void)
+{
+	pending = false;
+	signal_at = proc_var = end_var = 0;
+}
+
+const char *closeapp_result(void)
+{
+	return pending ? "waiting for the CPU" : result;
 }

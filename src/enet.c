@@ -138,6 +138,7 @@ static struct {
 	bool host;			// the host network is up
 	const char *backend;
 	unsigned long tx_frames, rx_frames, rx_dropped, dma_faults;
+	char info[200];
 	bool debug;			// FREEBEE_ENET_DEBUG=1: log frames and ring words
 } enet;
 
@@ -565,6 +566,20 @@ static void card_destroy(EXPCARD *card)
 	free(enet.rxq);
 	enet.rxq = NULL;
 	enet.present = false;
+}
+
+// for MCP vm-info: the board, or NULL if there is none
+const char *enet_info(void)
+{
+	if (!enet.present)
+		return NULL;
+	snprintf(enet.info, sizeof(enet.info),
+			"slot %d, %02x:%02x:%02x:%02x:%02x:%02x, %s, %s; frames out %lu, in %lu, dropped %lu",
+			enet.card.slot, enet.mac[0], enet.mac[1], enet.mac[2], enet.mac[3], enet.mac[4], enet.mac[5],
+			enet.host ? enet.backend : "no host network",
+			(enet.lance.csr[0] & LANCE_CSR0_RXON) ? "running" : "stopped",
+			enet.tx_frames, enet.rx_frames, enet.rx_dropped);
+	return enet.info;
 }
 
 const EXPCARD_TYPE enet_card = {

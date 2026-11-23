@@ -12,10 +12,19 @@
 bool control_init(void);
 // Called at every 60Hz tick: reads commands, feeds queued keys.
 void control_tick(void);
+// Commands only, no keys (while MCP has the CPU paused).
+void control_poll(void);
 void control_done(void);
 
 // true while "speed max" is on: the main loop does not wait for real time.
 extern bool control_speed_max;
+/// [cpu] turbo: the CPU runs this many times as fast as a real 3B1's, while
+/// the 60Hz clock (and so the guest's time) stays real. 1 is a real 3B1.
+extern int control_turbo;
+#define TURBO_MAX 32
+/// How much of the last second the idle skip took off the CPU, in percent
+/// ([cpu] idle; set by main.c)
+extern int control_idle_pct;
 // set by the "quit" command
 extern bool control_quit;
 

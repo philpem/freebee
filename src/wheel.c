@@ -92,3 +92,14 @@ void wheel_tick(void)
 	roll_ticks = 0;
 	set_key(KEY_SHIFT, true);
 }
+
+void wheel_reset(void)
+{
+	steps = 0;
+	look_wait = 0;
+	if (roll_key) {
+		set_key(roll_key, false);
+		set_key(KEY_SHIFT, false);
+		roll_key = 0;
+	}
+}
