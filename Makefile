@@ -158,6 +158,7 @@ ifeq ($(strip $(PLATFORM)),win32)
 	TARGET := $(addsuffix .exe,$(TARGET))
 	# console mode application
 	EXT_CFLAGS = -mconsole
+	EXT_LDFLAGS = -mconsole
 endif
 
 
@@ -242,8 +243,8 @@ ifeq ($(PLATFORM),linux)
 	CXXFLAGS	+= -DMUSASHI_CNF=\"../m68kconf.h\"
 endif
 ifeq ($(PLATFORM),win32)
-	CFLAGS		+= -DMUSASHI_CNF="../m68kconf.h"
-	CXXFLAGS	+= -DMUSASHI_CNF="../m68kconf.h"
+	CFLAGS		+= -DMUSASHI_CNF=\"../m68kconf.h\"
+	CXXFLAGS	+= -DMUSASHI_CNF=\"../m68kconf.h\"
 endif
 
 ####
@@ -270,9 +271,14 @@ endif
 ####
 # SDL support
 ####
+# SDL2_CONFIG, SDL2_CFLAGS and SDL2_LIBS can be set on the command line,
+# for a static SDL or a cross build.
 ifeq ($(ENABLE_SDL),yes)
-	LIBLNK		+=	$(shell sdl2-config --libs)
-	CFLAGS		+=	$(shell sdl2-config --cflags)
+	SDL2_CONFIG	?=	sdl2-config
+	SDL2_CFLAGS	?=	$(shell $(SDL2_CONFIG) --cflags)
+	SDL2_LIBS	?=	$(shell $(SDL2_CONFIG) --libs)
+	LIBLNK		+=	$(SDL2_LIBS)
+	CFLAGS		+=	$(SDL2_CFLAGS)
 endif
 
 
@@ -398,9 +404,11 @@ endif
 
 ####
 ## musashi build rules
-# 68k CPU builder
-obj/musashi/m68kmake:	obj/musashi/m68kmake.o
-	$(CC) $(CFLAGS) $(CPPFLAGS) obj/musashi/m68kmake.o -o $@
+# 68k CPU builder: it runs during the build, so a cross build makes it
+# with HOSTCC, the compiler for the machine that builds
+HOSTCC		?=	$(CC)
+obj/musashi/m68kmake:	src/musashi/m68kmake.c
+	$(HOSTCC) -O2 $< -o $@
 # 68k CPU sources
 src/musashi/m68kops.h src/musashi/m68kops.c:	obj/musashi/m68kmake src/musashi/m68k_in.c
 	./obj/musashi/m68kmake src/musashi src/musashi/m68k_in.c
