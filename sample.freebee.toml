@@ -76,6 +76,15 @@
 	# guest's FTP PORT commands, for the 3B1's ftp, which has no passive
 	# mode). Off by default, as in QEMU.
 	emu = false
+	# Fixes for 1986 programs, in the frames to the 3B1 (src/netfix.c).
+	# fix_telnet_status: telnet out of the 3B1 to a server that offers
+	# STATUS (most do now) fills the screen with "STATUS IS"; this makes
+	# the server's WILL/DO STATUS a WONT/DONT.
+	# fix_ftp_port: an FTP client on the host's loopback tells the 3B1's
+	# ftpd (active mode only) to connect to 127.0.0.1; this makes it
+	# 10.0.2.2, the host as the 3B1 sees it.
+	fix_telnet_status = false
+	fix_ftp_port = false
 
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep

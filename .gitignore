@@ -41,3 +41,4 @@ discs
 
 # serial port pty link
 serial-pty
+tests/netfix_test
