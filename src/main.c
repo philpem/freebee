@@ -712,23 +712,23 @@ int main(int argc, char *argv[])
 			// hasn't got around to taking it yet (e.g. it is sat at SPL6).
 			//
 			// TODO: MCR2.F_MASK (0x0400) masks the floppy interrupt
-			int irq = 0;
-			if (state.timer_int_latch) {
-				irq = 6;
 			//
 			// An expansion card asks for level 5 or 1, the expansion bus's
 			// two levels.
 			int const card_level = expcard_irq();
+			int irq = 0;
 			if (state.timer_int_latch) {
-				m68k_set_irq(6);
+				irq = 6;
 			} else if (card_level == 5) {
-				m68k_set_irq(5);
+				irq = 5;
 			} else if (i8274_get_irq(&state.serial_ctx)) {
 				irq = 4;
 			} else if (keyboard_get_irq(&state.kbd)) {
 				irq = 3;
 			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
 				irq = 2;
+			} else if (card_level == 1) {
+				irq = 1;
 			}
 			m68k_set_irq(irq);
 
@@ -743,16 +743,13 @@ int main(int argc, char *argv[])
 				state.idle_hint = false;
 				if (state.idle_skip && irq == 0 &&
 						!wd2010_get_drq(&state.hdc_ctx) && !wd2797_get_drq(&state.fdc_ctx)) {
+					// frames from the host network that came in meanwhile
+					expcard_host_poll();
 					uint32_t const done = i + cycles_run;
 					if (done < slot_cycles)
 						clock_cycles += slot_cycles - done;
 					break;
 				}
-				m68k_set_irq(2);
-			} else if (card_level == 1) {
-				m68k_set_irq(1);
-			} else {
-				m68k_set_irq(0);
 			}
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
