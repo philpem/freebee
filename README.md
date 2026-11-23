@@ -139,7 +139,7 @@ At 10, the boot takes about 20 seconds.
 
 # Keyboard commands
 
-  * F10 -- Grab/Release mouse cursor
+  * F10 -- Grab/Release mouse cursor (the title bar shows which)
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
 
