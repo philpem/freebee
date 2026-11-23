@@ -114,7 +114,7 @@ This is also called my "to-do" list...
   - Files can be imported using the 3b1 `msdos` command which allows reading a 360k MS-DOS floppy image.
     * Use dosbox to copy files to a DOS disk image named `floppy.img`. This image must be in the same directory as the Freebee executable (or path specified in the .freebee.toml config file).
     * If the floppy.img file wasn't present on boot or was updated, hit F11 to load/unload the floppy image.
-    * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
+    * Run `msdos` from the 3b1 command prompt, then COPY files to the hard drive. It uses the mouse: point and click in the window (with `[mouse] seamless = false`, grab the mouse with F10 first).
   - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
   - A third option is to use TAR to archive the files, and Kermit over the emulated serial port (Linux only) to send them to the 3B1.
 
@@ -139,7 +139,25 @@ At 10, the boot takes about 20 seconds.
 
 # Keyboard commands
 
-  * F10 -- Grab/Release mouse cursor (the title bar shows which)
+  * F10 -- Grab/Release the mouse (the title bar shows which), only with `[mouse] seamless = false`. With the seamless mouse (the default) there is no grab: the 3B1's pointer follows the host's over the window, and the host's pointer hides there while a 3B1 program uses the mouse
+
+## The seamless mouse
+
+The 3B1 mouse sends moves, not places, so Freebee moves the 3B1's pointer
+toward the host's pointer, one mouse packet each 60Hz tick. This takes from
+the guest OS:
+
+  * A count moves the pointer one pixel, with no acceleration, and the
+    pointer stops at the screen edges (UNIX 3.51 keeps it in 0..719 across
+    and 0..694 down). Freebee finds the pointer by pushing it into the top
+    left corner, then counts its moves.
+  * To stay exact, Freebee also reads the UNIX 3.51 kernel's own copy of
+    the pointer (`msinfo`). It finds it by the code of the kernel's `mscan`,
+    which holds no addresses. If that code is not there (another OS), the
+    corner and the counts are used alone.
+
+Set `seamless = false` in the `[mouse]` section of `.freebee.toml` for the
+old F10 grab, which sends the host's moves as they are.
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
   * Alt-F12 -- Exit
 
