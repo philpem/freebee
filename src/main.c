@@ -197,10 +197,14 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 		SDL_UnlockSurface(s);
 	}
 
-	// Update framebuffer texture
+	// Update framebuffer texture. The caller draws it (in the main loop):
+	// after SDL_RenderPresent the back buffer is undefined (on macOS/Metal it
+	// is an empty buffer), so every frame must be drawn whole.
 	SDL_UpdateTexture(t, NULL, s->pixels, s->pitch);
-	SDL_RenderCopy(r, t, NULL, NULL);
 }
+
+// set when the window needs drawing again (exposed, resized, restored)
+static bool window_dirty = true;
 
 #define LED_SIZE 8
 
@@ -242,6 +246,9 @@ bool HandleSDLEvents(SDL_Window *window)
 			case SDL_QUIT:
 				// Quit button tagged. Exit.
 				return true;
+			case SDL_WINDOWEVENT:
+				window_dirty = true;
+				break;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
 					case SDLK_F10:
@@ -596,16 +603,23 @@ int main(int argc, char *argv[])
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?
 		if (clock_cycles > CLOCKS_PER_60HZ) {
-			// Refresh the screen if VRAM has been changed
-			if (state.vram_updated){
+			// Refresh the screen if VRAM has been changed. Draw the whole
+			// window (screen + LEDs) and present it only when something
+			// changed: presenting a frame that was not drawn whole makes
+			// the window flicker on macOS.
+			bool vram_changed = state.vram_updated;
+			if (vram_changed){
 				refreshScreen(screen, renderer, fbTexture);
 			}
-			if (state.vram_updated || last_leds != state.leds){
+			if (vram_changed || last_leds != state.leds || window_dirty){
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, fbTexture, NULL, NULL);
 				refreshStatusBar(renderer, lightbarTexture);
+				SDL_RenderPresent(renderer);
 				last_leds = state.leds;
+				window_dirty = false;
 			}
 			state.vram_updated = false;
-			SDL_RenderPresent(renderer);
 
 			// Latch the 60Hz interrupt. If CLRSINT- is being held low the
 			// clear input is asserted, so the latch can't set and this tick
