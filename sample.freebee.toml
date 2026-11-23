@@ -33,6 +33,12 @@
 [vidpal]
 	installed = true
 
+[cpu]
+	# Turbo: the 68010 runs this many times as fast as a real 3B1's
+	# (10 MHz), 1 to 32. The 60Hz clock stays real, so the time of day, key
+	# repeat and timeouts are right. 1 is a real 3B1.
+	turbo = 1
+
 [memory]
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.
