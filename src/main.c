@@ -18,6 +18,7 @@
 #include "lightbar.c"
 #include "i8274.h"
 #include "dialer.h"
+#include "closeapp.h"
 
 extern int cpu_log_enabled;
 
@@ -228,6 +229,8 @@ void refreshStatusBar(SDL_Renderer *r, SDL_Texture *lightbar_tex)
  */
 bool HandleSDLEvents(SDL_Window *window)
 {
+	// F9 went down with Alt: Alt-F9, not Suspd
+	static bool closeapp_key_down;
 	SDL_Event event;
 	static int mouse_grabbed = 0, mouse_buttons = 0;
 	int dx = 0, dy = 0;
@@ -235,6 +238,21 @@ bool HandleSDLEvents(SDL_Window *window)
 	while (SDL_PollEvent(&event))
 	{
 		if ((event.type == SDL_KEYDOWN) || (event.type == SDL_KEYUP)) {
+			// Alt-F9 (Option-F9): close the program in the front window.
+			// Then F9 is not the Suspd key, down or up.
+			if (event.key.keysym.sym == SDLK_F9) {
+				bool const down = event.type == SDL_KEYDOWN;
+				if (down && !event.key.repeat) {
+					closeapp_key_down = (event.key.keysym.mod & KMOD_ALT) != 0;
+					if (closeapp_key_down)
+						closeapp_request();
+				}
+				if (closeapp_key_down) {
+					if (!down)
+						closeapp_key_down = false;
+					continue;
+				}
+			}
 			keyboard_event(&state.kbd, &event);
 		}
 
@@ -613,6 +631,8 @@ int main(int argc, char *argv[])
 			if (state.timer_clrsint) {
 				state.timer_int_latch = true;
 			}
+			// Alt-F9: close the program in the front window
+			closeapp_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
