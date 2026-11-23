@@ -2,6 +2,7 @@
 #include "SDL.h"
 #include "utils.h"
 #include "keyboard.h"
+#include "pointer.h"
 
 // Enable/disable KBC debugging
 #define kbc_debug false
@@ -171,6 +172,7 @@ void keyboard_init(KEYBOARD_STATE *ks)
 
 	ks->mouse_enabled = 0;
 	ks->lastdata_mouse = 0;
+	ks->mouse_left = 0;
 }
 
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev)
@@ -217,12 +219,20 @@ bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db)
 {
 	uint8_t flags = 0, xbyte, ybyte;
 
-	if (!ks->mouse_enabled){
-		return (1);
-	}
+	if (!ks->mouse_enabled)
+		return false;
+	// room for the whole packet (5 bytes with a doubled 0xDF): a packet
+	// cut short would throw the pointer off
+	if (ks->buflen + 5 > KEYBOARD_BUFFER_SIZE)
+		return false;
+	if (dx > 127) dx = 127;
+	if (dx < -127) dx = -127;
+	if (dy > 127) dy = 127;
+	if (dy < -127) dy = -127;
+
 	ks->buffer[ks->writep] = KEY_BEGIN_MOUSE;
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+	ks->buflen++;
 
 	/* The first byte of mouse data contains the signs of X and Y as well as the
 	 * buttons (strangely, the signs of X and Y are opposite)*/
@@ -237,29 +247,42 @@ bool mouse_event(KEYBOARD_STATE *ks, int dx, int dy, int db)
 
 	ks->buffer[ks->writep] = flags;
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+	ks->buflen++;
 
 	/* Second and third bytes are X and Y deltas */
-	xbyte = (abs(dx) > 127) ? 127 : abs(dx);
+	xbyte = abs(dx);
 	ks->buffer[ks->writep] = xbyte;
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+	ks->buflen++;
 
-	ybyte = (abs(dy) > 127) ? 127 : abs(dy);
+	ybyte = abs(dy);
 	ybyte |= 0x80;
 	ks->buffer[ks->writep] = ybyte;
 	ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-	if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+	ks->buflen++;
 
 	// need to double send if KEY_BEGIN_KEYBOARD value ever encountered
+	// (the kernel's klow takes 0xDF 0xDF as one 0xDF for the mouse)
 	if (ybyte == KEY_BEGIN_KEYBOARD) {
 		ks->buffer[ks->writep] = ybyte;
 		ks->writep = (ks->writep + 1) % KEYBOARD_BUFFER_SIZE;
-		if (ks->buflen < KEYBOARD_BUFFER_SIZE) ks->buflen++;
+		ks->buflen++;
 	}
 
 	ks->lastdata_mouse = 1;
-	return 1;
+	ks->mouse_left = ks->buflen;
+	pointer_moved(dx, dy, db);
+	return true;
+}
+
+// The guest threw the buffer away. If mouse bytes were still in it, the
+// kernel missed a move, and where the pointer is is not known any more.
+static void keyboard_flush(KEYBOARD_STATE *ks)
+{
+	if (ks->mouse_left)
+		pointer_forget();
+	ks->readp = ks->writep = ks->buflen = 0;
+	ks->mouse_left = 0;
 }
 
 
@@ -347,6 +370,7 @@ uint8_t keyboard_read(KEYBOARD_STATE *ks, uint8_t addr)
 		uint8_t x = ks->buffer[ks->readp];
 		ks->readp = (ks->readp + 1) % KEYBOARD_BUFFER_SIZE;
 		if (ks->buflen > 0) ks->buflen--;
+		if (ks->mouse_left > 0) ks->mouse_left--;
 		//LOG_IF(kbc_debug, "\tKBC DBG: rxd=%02X\n", x);
 		return x;
 	}
@@ -361,7 +385,7 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 
 		// CR0,1 = divider registers. When =11, do a software reset
 		if ((val & 3) == 3) {
-			ks->readp = ks->writep = ks->buflen = 0;
+			keyboard_flush(ks);
 		}
 
 		// Ignore CR2,3,4 (word length)...
@@ -375,7 +399,7 @@ void keyboard_write(KEYBOARD_STATE *ks, uint8_t addr, uint8_t val)
 		// Write command to KBC
 		if (val == KEY_CMD_RESET) {
 			LOG_IFS(kbc_debug, "KBC: KEYBOARD RESET!\n");
-			ks->readp = ks->writep = ks->buflen = 0;
+			keyboard_flush(ks);
 		} else if (val == KEY_CMD_MOUSE_ENABLE){
 			ks->mouse_enabled = 1;
 		} else if (val == KEY_CMD_MOUSE_DISABLE){
