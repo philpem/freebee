@@ -123,6 +123,25 @@ You can scale the display by setting scale factors in the `.freebee.toml` file.
 Scale values must be greater than zero and less than or equal to 45. This
 facility is useful on large displays.
 
+## Scripting: the control socket
+
+With `[control] socket = "freebee.sock"` in `.freebee.toml` (or
+`FREEBEE_CONTROL=freebee.sock`), FreeBee takes one-line commands on that
+Unix socket, and answers each with one line, `ok ...` or `err ...`:
+
+```
+$ printf 'speed max\ntype root\\n\nscreenshot s.png\n' | nc -U freebee.sock
+ok speed=max
+ok
+ok s.png
+```
+
+The commands: `type TEXT` (with `\n`, `{F1}`, `{CTRL-D}` and other keys),
+`key NAME..`, `floppy PATH`, `eject`, `hd2 PATH`, `screenshot PATH` (a PNG),
+`mouse DX DY [BUTTONS]`, `speed max|real`, `status` and `quit`. See the top
+of `src/control.c`. The socket is a file, with the file's permissions; there
+is none on Windows.
+
 # Keyboard commands
 
   * F10 -- Grab/Release mouse cursor
