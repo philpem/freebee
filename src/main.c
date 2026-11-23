@@ -22,6 +22,7 @@
 #include "wheel.h"
 #include "closeapp.h"
 #include "expcard.h"
+#include "control.h"
 
 extern int cpu_log_enabled;
 
@@ -32,11 +33,11 @@ void FAIL(char *err)
 	exit(EXIT_FAILURE);
 }
 
-static int load_fd()
+static char *floppy_path;
+
+static int load_fd_path(const char *discim)
 {
 	int writeable = 1;
-
-	const char *discim = fbc_get_string("floppy", "disk");
 
 	// disk = "" in [floppy]: the drive stays empty, with no error
 	if (!discim || !*discim)
@@ -57,8 +58,57 @@ static int load_fd()
 			state.fdc_disc = NULL;
 			return (0);
 		}
+		free(floppy_path);
+		floppy_path = strdup(discim);
 		return (1);
 	}
+}
+
+static int load_fd()
+{
+	return load_fd_path(fbc_get_string("floppy", "disk"));
+}
+
+// for the control socket
+int freebee_floppy_insert(const char *path)
+{
+	return load_fd_path(path);
+}
+
+void freebee_floppy_eject(void)
+{
+	if (state.fdc_disc) {
+		wd2797_unload(&state.fdc_ctx);
+		fclose(state.fdc_disc);
+		state.fdc_disc = NULL;
+		printf("Floppy image unloaded.\n");
+	}
+	free(floppy_path);
+	floppy_path = NULL;
+}
+
+const char *freebee_floppy_path(void)
+{
+	return state.fdc_disc ? floppy_path : NULL;
+}
+
+// change the second hard disk's image (control socket "hd2")
+int freebee_hd2_insert(const char *path)
+{
+	FILE *fp = fopen(path, "r+b");
+	if (!fp)
+		return 0;
+	if (wd2010_attach(&state.hdc_ctx, fp, 1, 512,
+			fbc_get_int("hard_disk", "sectors_per_track"),
+			fbc_get_int("hard_disk", "heads")) != WD2010_ERR_OK) {
+		fclose(fp);
+		return 0;
+	}
+	if (state.hdc_disc1)
+		fclose(state.hdc_disc1);
+	state.hdc_disc1 = fp;
+	printf("Drive 1: Disc image '%s' loaded.\n", path);
+	return 1;
 }
 
 static int load_hd()
@@ -561,6 +611,8 @@ int main(int argc, char *argv[])
 
 	// Expansion cards: [expansion] slot0 to slot7
 	expcard_init();
+	// the control socket ([control] socket, or FREEBEE_CONTROL)
+	control_init();
 
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
@@ -784,6 +836,8 @@ int main(int argc, char *argv[])
 			wheel_tick();
 			// Alt-F9: close the program in the front window
 			closeapp_tick();
+			// control socket commands, and the keys it queued
+			control_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
@@ -793,12 +847,15 @@ int main(int argc, char *argv[])
 		}
 
 		// handle SDL events -- returns true if we need to exit
-		if (HandleSDLEvents(window))
+		if (HandleSDLEvents(window) || control_quit)
 			exitEmu = true;
 
 		// make sure frame rate is equal to real time
 		uint32_t now = SDL_GetTicks();
-		if (now < next_timeslot) {
+		if (control_speed_max) {
+			// "speed max" on the control socket: no waiting
+			next_timeslot = now;
+		} else if (now < next_timeslot) {
 			// timeslot finished early -- eat up some time
 			SDL_Delay(next_timeslot - now);
 		} else {
@@ -823,6 +880,7 @@ int main(int argc, char *argv[])
 
 	dialer_done();
 	expcard_done();
+	control_done();
 
 	// Clean up SDL
 	SDL_DestroyTexture(lightbarTexture);

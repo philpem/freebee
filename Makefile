@@ -118,7 +118,7 @@ BUILD_TYPE	?=	release
 TARGET		=	freebee
 
 # source files that produce object files
-SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c pointer.c keywin.c wheel.c closeapp.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c
+SRC			=	main.c state.c memory.c wd279x.c wd2010.c keyboard.c pointer.c keywin.c wheel.c closeapp.c tc8250.c diskraw.c diskimd.c i8274.c fbconfig.c toml.c dialer.c control.c keys.c
 SRC			+=	expcard.c lance.c enet.c netslirp.c netfix.c
 SRC			+=	musashi/m68kcpu.c musashi/m68kdasm.c musashi/m68kops.c musashi/softfloat/softfloat.c
 

@@ -57,6 +57,7 @@
 	# starts its phone scan, which also times the system beep, only when
 	# it finds the modem: with false, the 3B1 never beeps.
 	present = true
+
 [expansion]
 	# The cards in the expansion slots, by slot (slot0 to slot7). Cards:
 	# "ethernet", the AT&T 3B1 Ethernet board (see [network]).
@@ -85,6 +86,12 @@
 	# 10.0.2.2, the host as the 3B1 sees it.
 	fix_telnet_status = false
 	fix_ftp_port = false
+
+[control]
+	# A Unix socket for scripts (not on Windows): one command a line, such
+	# as "type root\n", "floppy disk.img", "screenshot s.png", "speed max".
+	# See src/control.c. Off unless set here or in FREEBEE_CONTROL.
+	#socket = "freebee.sock"
 
 [beeper]
 	# Volume of the dialer's tone output, 0-100. This covers the system beep

@@ -126,8 +126,8 @@ facility is useful on large displays.
 
 ## CPU speed
 
-A real 3B1 is a 10 MHz 68010, and Freebee runs at that speed: UNIX takes
-about four minutes to boot. To make the CPU faster, set `turbo` in the
+A real 3B1 is a 10 MHz 68010, and Freebee runs at that speed: UNIX 3.51
+takes about five minutes to boot. To make the CPU faster, set `turbo` in the
 `[cpu]` section of `.freebee.toml` (1 to 32; 1 is a real 3B1):
 
     [cpu]
@@ -135,7 +135,8 @@ about four minutes to boot. To make the CPU faster, set `turbo` in the
 
 The CPU then runs that many instructions in each time slot, but the 60Hz
 clock stays real, so the time of day, key repeat and timeouts are right.
-At 10, the boot takes about 20 seconds.
+At 10, it boots in under a minute.
+
 ## Expansion cards and networking
 
 The 3B1 has expansion slots. FreeBee has an interface for expansion cards
@@ -191,6 +192,25 @@ its cable unplugged.
 The LANCE is from MAME's am79c90 (BSD-3-Clause), the board from
 Visionik's AT&T 3B1 work in MAME (BSD-3-Clause and GPL-2.0-or-later). The
 licence texts are at the top of `src/lance.c` and `src/enet.c`.
+
+## Scripting: the control socket
+
+With `[control] socket = "freebee.sock"` in `.freebee.toml` (or
+`FREEBEE_CONTROL=freebee.sock`), FreeBee takes one-line commands on that
+Unix socket, and answers each with one line, `ok ...` or `err ...`:
+
+```
+$ printf 'speed max\ntype root\\n\nscreenshot s.png\n' | nc -U freebee.sock
+ok speed=max
+ok
+ok s.png
+```
+
+The commands: `type TEXT` (with `\n`, `{F1}`, `{CTRL-D}` and other keys),
+`key NAME..`, `floppy PATH`, `eject`, `hd2 PATH`, `screenshot PATH` (a PNG),
+`mouse DX DY [BUTTONS]`, `speed max|real`, `status` and `quit`. See the top
+of `src/control.c`. The socket is a file, with the file's permissions; there
+is none on Windows.
 
 # Keyboard commands
 
