@@ -123,6 +123,19 @@ You can scale the display by setting scale factors in the `.freebee.toml` file.
 Scale values must be greater than zero and less than or equal to 45. This
 facility is useful on large displays.
 
+## CPU speed
+
+A real 3B1 is a 10 MHz 68010, and Freebee runs at that speed: UNIX takes
+about four minutes to boot. To make the CPU faster, set `turbo` in the
+`[cpu]` section of `.freebee.toml` (1 to 32; 1 is a real 3B1):
+
+    [cpu]
+    	turbo = 10
+
+The CPU then runs that many instructions in each time slot, but the 60Hz
+clock stays real, so the time of day, key repeat and timeouts are right.
+At 10, the boot takes about 20 seconds.
+
 # Keyboard commands
 
   * F10 -- Grab/Release mouse cursor
