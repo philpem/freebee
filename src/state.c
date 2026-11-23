@@ -24,6 +24,9 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	state.pie = 0;
 	state.ee = 0;
 	state.leds = 0;
+	state.idle_skip = fbc_get_bool("cpu", "idle");
+	state.idle_pc = state.idle_passes = 0;
+	state.idle_hint = false;
 	state.genstat = 0;				// FIXME: check this
 	state.bsr0 = state.bsr1 = 0;	// FIXME: check this
 	// MCR reads back as zero after reset, so CLRSINT- starts asserted and
@@ -36,6 +39,11 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 
 	// Enable VIDPAL mod (allows user writing to VRAM), per config setting
 	state.vidpal = fbc_get_bool("vidpal", "installed");
+
+	// The kernel starts its phone scan, which also times the system beep,
+	// only when its boot probe finds the modem
+	state.modem_present = fbc_get_bool("modem", "present");
+	state.modem_wr0 = 0;
 
 	// Allocate Base RAM, making sure the user has specified a valid RAM amount first
 	// Basically: 512KiB minimum, 2MiB maximum, in increments of 512KiB.

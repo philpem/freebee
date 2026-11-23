@@ -20,6 +20,11 @@ obj/musashi/m68kmake
 # version header
 src/version.h
 
+# MCP tool list, made from src/mcp/tools.json
+src/mcp/schema_data.h
+dep/mcp/*.d
+obj/mcp/*.o
+
 # final executable binary
 freebee
 3b1emu
@@ -41,3 +46,4 @@ discs
 
 # serial port pty link
 serial-pty
+tests/netfix_test

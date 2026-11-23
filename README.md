@@ -55,6 +55,7 @@ This is also called my "to-do" list...
   * Printer port
   * Modem
     * You will get errors that '/dev/ph0 cannot be opened' and that there was a problem with the modem. Ignore these.
+    * Only the kernel's boot probe of the modem is answered (`[modem] present`, on by default): the kernel then starts its phone scan, which times the system beep.
   * Expansion cards
     * Expansion RAM is emulated, but other cards are of little utility and largely undocumented, so are unlikely to be added.
     * With that said: the serial combo card might be useful to add an extra serial port (or several).
@@ -113,7 +114,7 @@ This is also called my "to-do" list...
   - Files can be imported using the 3b1 `msdos` command which allows reading a 360k MS-DOS floppy image.
     * Use dosbox to copy files to a DOS disk image named `floppy.img`. This image must be in the same directory as the Freebee executable (or path specified in the .freebee.toml config file).
     * If the floppy.img file wasn't present on boot or was updated, hit F11 to load/unload the floppy image.
-    * Run `msdos` from the 3b1 command prompt, grab the mouse cursor with F10 if you haven't already, then COPY files to the hard drive.
+    * Run `msdos` from the 3b1 command prompt, then COPY files to the hard drive. It uses the mouse: point and click in the window (with `[mouse] seamless = false`, grab the mouse with F10 first).
   - Another option is to use the s4tools [here](https://github.com/dgesswein/s4-3b1-pc7300) which allow you to export the file system image out of the disk image and import the fs image back. In particular, there is an updated `sysv` Linux kernel module which allows mounting the fs image as a usable filesystem under Linux.
   - A third option is to use TAR to archive the files, and Kermit over the emulated serial port (Linux only) to send them to the 3B1.
 
@@ -123,10 +124,123 @@ You can scale the display by setting scale factors in the `.freebee.toml` file.
 Scale values must be greater than zero and less than or equal to 45. This
 facility is useful on large displays.
 
+## CPU speed
+
+A real 3B1 is a 10 MHz 68010, and Freebee runs at that speed: UNIX 3.51
+takes about five minutes to boot. To make the CPU faster, set `turbo` in the
+`[cpu]` section of `.freebee.toml` (1 to 32; 1 is a real 3B1):
+
+    [cpu]
+    	turbo = 10
+
+The CPU then runs that many instructions in each time slot, but the 60Hz
+clock stays real, so the time of day, key repeat and timeouts are right.
+At 10, it boots in under a minute.
+
+## Expansion cards and networking
+
+The 3B1 has expansion slots. FreeBee has an interface for expansion cards
+(`src/expcard.h`): a card type is a struct of callbacks, and
+`[expansion] slot0` to `slot7` in `.freebee.toml` names the card in each
+slot. The bus answers the card identity bytes that the kernel reads, and
+the card reset. One card type is there now: `"ethernet"`.
+
+The Ethernet board is an AMD Am7990 LANCE (card id 0x1003). It works with
+the Wollongong WIN/3B TCP/IP software ("TWG-TCP/IP", `/etc/lddrv/ether`),
+which has telnet, ftp, rcp, rsh, rlogin and their servers. The slots are
+empty by default. Put the board in a slot:
+
+```toml
+[expansion]
+	slot1 = "ethernet"
+
+[network]
+	hostfwd = "tcp:127.0.0.1:2323-:23, tcp:127.0.0.1:2121-:21"
+```
+
+The board is on a user mode network (libslirp, as in QEMU's
+`-netdev user`). It needs no root and no setup on the host. Without
+libslirp at build time (or with `make SLIRP=no`) the board is there, with
+its cable unplugged.
+
+  * The 3B1 is 10.0.2.15, the host is 10.0.2.2 and DNS is 10.0.2.3. The
+    driver's `ether.rc` runs `ifconfig en0 <hostname>`, so give the 3B1's
+    name the address 10.0.2.15 in its `/etc/hosts`.
+  * From the 3B1 out: add a default route on the 3B1:
+    `/usr/bin/route add default 10.0.2.2 1`. Then the 3B1 reaches the
+    host's networks through NAT.
+  * Into the 3B1: `hostfwd` sends host ports to the 3B1, with the rule
+    format of QEMU's `hostfwd`. With the example above, `telnet localhost
+    2323` gets the 3B1's login.
+  * FreeBee passes every frame as it is. The 3B1's ftp and ftpd (1986)
+    have only active mode, and NAT breaks active FTP. `emu = true` turns
+    on libslirp's own helpers, which rewrite the 3B1's PORT commands to
+    servers on port 21.
+  * Two optional fixes for the 3B1's 1986 programs, off by default
+    (`src/netfix.c`):
+    * `fix_telnet_status = true`: telnet out of the 3B1 to a modern
+      telnetd fills the screen with "STATUS IS". This changes the
+      server's WILL/DO STATUS to WONT/DONT.
+    * `fix_ftp_port = true`: FTP into the 3B1 through `hostfwd`, with an
+      active mode client, such as
+      `lftp -e 'set ftp:passive-mode off' -p 2121 -u root,x localhost`.
+      The client asks the 3B1 to connect back to 127.0.0.1, which on the
+      3B1 is the 3B1 itself; this changes it to 10.0.2.2.
+  * Each VM needs its own `mac`.
+  * `FREEBEE_ENET_DEBUG=1` logs every frame and status word to stderr.
+
+The LANCE is from MAME's am79c90 (BSD-3-Clause), the board from
+Visionik's AT&T 3B1 work in MAME (BSD-3-Clause and GPL-2.0-or-later). The
+licence texts are at the top of `src/lance.c` and `src/enet.c`.
+
+## Scripting: the control socket
+
+With `[control] socket = "freebee.sock"` in `.freebee.toml` (or
+`FREEBEE_CONTROL=freebee.sock`), FreeBee takes one-line commands on that
+Unix socket, and answers each with one line, `ok ...` or `err ...`:
+
+```
+$ printf 'speed max\ntype root\\n\nscreenshot s.png\n' | nc -U freebee.sock
+ok speed=max
+ok
+ok s.png
+```
+
+The commands: `type TEXT` (with `\n`, `{F1}`, `{CTRL-D}` and other keys),
+`key NAME..`, `floppy PATH`, `eject`, `hd2 PATH`, `screenshot PATH` (a PNG),
+`mouse DX DY [BUTTONS]`, `speed max|real`, `status` and `quit`. See the top
+of `src/control.c`. The socket is a file, with the file's permissions; there
+is none on Windows.
+
+## MCP: AI agents
+
+FreeBee has a built-in MCP (Model Context Protocol) server, off by default,
+for AI agents: see [MCP.md](MCP.md). It is not built on Windows.
+
 # Keyboard commands
 
-  * F10 -- Grab/Release mouse cursor
+  * F10 -- Grab/Release the mouse (the title bar shows which), only with `[mouse] seamless = false`. With the seamless mouse (the default) there is no grab: the 3B1's pointer follows the host's over the window, and the host's pointer hides there while a 3B1 program uses the mouse
+
+## The seamless mouse
+
+The 3B1 mouse sends moves, not places, so Freebee moves the 3B1's pointer
+toward the host's pointer, one mouse packet each 60Hz tick. This takes from
+the guest OS:
+
+  * A count moves the pointer one pixel, with no acceleration, and the
+    pointer stops at the screen edges (UNIX 3.51 keeps it in 0..719 across
+    and 0..694 down). Freebee finds the pointer by pushing it into the top
+    left corner, then counts its moves.
+  * To stay exact, Freebee also reads the UNIX 3.51 kernel's own copy of
+    the pointer (`msinfo`). It finds it by the code of the kernel's `mscan`,
+    which holds no addresses. If that code is not there (another OS), the
+    corner and the counts are used alone.
+
+Set `seamless = false` in the `[mouse]` section of `.freebee.toml` for the
+old F10 grab, which sends the host's moves as they are.
   * F11 -- Load/Unload floppy disk image (`floppy.img`)
+  * Mouse wheel -- Scrolls a 3B1 window that has scroll arrows on its border, such as the Office's list or a Help window, as a click on the arrows does (Roll Up/Down, Shift+Up/Down). The window must have the keyboard. A shell window has no scroll arrows: there the wheel does nothing. This needs UNIX 3.51: Freebee finds the window that has the keyboard in its window driver (see `src/keywin.c`)
+  * Alt-F9 (Option-F9 on a Mac) -- Close the program in the front window, also one that hangs or ignores Exit and Del, and go back to the Office. Freebee calls the 3B1 kernel's own `signal()` to kill the window's process group, as `kill -9` would. It never closes the Office, the Window Manager menu or the status line. The program's window must have the keyboard, and the result goes to Freebee's output. This needs UNIX 3.51: Freebee finds the window in its window driver (`src/keywin.c`) and `signal()` by its code (`src/closeapp.c`). F9 alone is still SUSPD
   * Alt-F12 -- Exit
 
 # 3b1-specific key mappings

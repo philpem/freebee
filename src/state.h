@@ -58,6 +58,16 @@ typedef struct {
 	bool		dma_reading;		///< True if Disc DMA reads from the controller, false otherwise
 	uint8_t		leds;				///< LED status, 1=on, in order red3/green2/yellow1/red0 from bit3 to bit0
 
+	/// The idle skip: the MCR write in memory.c finds the kernel's idle
+	/// loop, the slice loop in main.c skips it
+	bool		idle_skip;			///< on: [cpu] idle
+	uint32_t	idle_pc;			///< where the idle loop writes the MCR
+	uint32_t	idle_passes;		///< how many passes it has made since
+	bool		idle_hint;			///< it has made enough, and stopped the CPU
+/// Passes the idle loop makes before a skip: it looks at its work flags
+/// (serial input, clock work) on each pass
+#define IDLE_PASSES 2
+
 	/// The latched 60Hz interrupt request (level 6). Set by the periodic
 	/// timer, cleared only by pulsing MCR.CLRSINT low.
 	bool		timer_int_latch;
@@ -120,6 +130,11 @@ typedef struct {
 
 	/// VIDPAL mod (allows user writing to VRAM)
 	bool vidpal;
+
+	/// Modem (882A): whether the kernel's probe finds it, and the last line
+	/// control word (WR0) the guest wrote
+	bool modem_present;
+	uint16_t modem_wr0;
 
 	/// Update screen only when VRAM has been changed
 	bool vram_updated;

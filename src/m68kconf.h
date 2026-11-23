@@ -166,8 +166,12 @@
 /* If ON, CPU will call the instruction hook callback before every
  * instruction.
  */
-#define M68K_INSTRUCTION_HOOK       OPT_OFF
-#define M68K_INSTRUCTION_CALLBACK(pc) your_instruction_hook_function(pc)
+/* FreeBee: the MCP debugger (src/fbmcp.h) stops the CPU before an
+ * instruction by leaving m68k_execute's loop. */
+#define M68K_INSTRUCTION_HOOK       OPT_SPECIFY_HANDLER
+extern volatile int fbmcp_dbg_active;
+int fbmcp_dbg_hook(unsigned int pc);
+#define M68K_INSTRUCTION_CALLBACK(pc) if (fbmcp_dbg_active && fbmcp_dbg_hook(pc)) break
 
 
 /* If ON, the CPU will emulate the 4-byte prefetch queue of a real 68000 */

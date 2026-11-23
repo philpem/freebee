@@ -18,6 +18,12 @@
 #include "lightbar.c"
 #include "i8274.h"
 #include "dialer.h"
+#include "pointer.h"
+#include "wheel.h"
+#include "closeapp.h"
+#include "expcard.h"
+#include "control.h"
+#include "fbmcp.h"
 
 extern int cpu_log_enabled;
 
@@ -28,11 +34,16 @@ void FAIL(char *err)
 	exit(EXIT_FAILURE);
 }
 
-static int load_fd()
+static char *floppy_path;
+static char *hd2_path;
+
+static int load_fd_path(const char *discim)
 {
 	int writeable = 1;
 
-	const char *discim = fbc_get_string("floppy", "disk");
+	// disk = "" in [floppy]: the drive stays empty, with no error
+	if (!discim || !*discim)
+		return (0);
 	state.fdc_disc = fopen(discim, "r+b");
 	if (!state.fdc_disc){
 		writeable = 0;
@@ -43,9 +54,102 @@ static int load_fd()
 		state.fdc_disc = NULL;
 		return (0);
 	}else{
-		wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 2, 40, writeable);
+		if (wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 2, 40, writeable) != WD2797_ERR_OK) {
+			fprintf(stderr, "ERROR: floppy image '%s' is too small, or of a geometry FreeBee does not know.\n", discim);
+			fclose(state.fdc_disc);
+			state.fdc_disc = NULL;
+			return (0);
+		}
+		free(floppy_path);
+		floppy_path = strdup(discim);
 		return (1);
 	}
+}
+
+static int load_fd()
+{
+	return load_fd_path(fbc_get_string("floppy", "disk"));
+}
+
+// for the control socket
+int freebee_floppy_insert(const char *path)
+{
+	return load_fd_path(path);
+}
+
+void freebee_floppy_eject(void)
+{
+	if (state.fdc_disc) {
+		wd2797_unload(&state.fdc_ctx);
+		fclose(state.fdc_disc);
+		state.fdc_disc = NULL;
+		printf("Floppy image unloaded.\n");
+	}
+	free(floppy_path);
+	floppy_path = NULL;
+}
+
+const char *freebee_floppy_path(void)
+{
+	return state.fdc_disc ? floppy_path : NULL;
+}
+
+// change the second hard disk's image (control socket "hd2")
+int freebee_hd2_insert(const char *path)
+{
+	FILE *fp = fopen(path, "r+b");
+	if (!fp)
+		return 0;
+	if (wd2010_attach(&state.hdc_ctx, fp, 1, 512,
+			fbc_get_int("hard_disk", "sectors_per_track"),
+			fbc_get_int("hard_disk", "heads")) != WD2010_ERR_OK) {
+		fclose(fp);
+		return 0;
+	}
+	if (state.hdc_disc1)
+		fclose(state.hdc_disc1);
+	state.hdc_disc1 = fp;
+	free(hd2_path);
+	hd2_path = strdup(path);
+	printf("Drive 1: Disc image '%s' loaded.\n", path);
+	return 1;
+}
+
+const char *freebee_hd2_path(void)
+{
+	return state.hdc_disc1 ? hd2_path : NULL;
+}
+
+// the reset button (MCP vm-power reset): the CPU starts again from the
+// boot ROM; memory and the disks stay
+void freebee_reset(void)
+{
+	state.romlmap = false;
+	state.idmarw = state.dmaen = false;
+	state.dma_count = state.dma_address = 0;
+	state.pie = 0;
+	state.ee = 0;
+	state.leds = 0;
+	state.idle_pc = state.idle_passes = 0;
+	state.idle_hint = false;
+	state.genstat = 0;
+	state.bsr0 = state.bsr1 = 0;
+	state.timer_int_latch = state.timer_clrsint = false;
+	state.nmi_latch = false;
+	state.dma_dev = DMA_DEV_UNDEF;
+	state.mcr2mirror = 0;
+	state.reverse_video = false;
+	state.vram_updated = true;
+	keyboard_init(&state.kbd);
+	pointer_reset();
+	wheel_reset();
+	closeapp_reset();
+	wd2797_reset(&state.fdc_ctx);
+	wd2010_reset(&state.hdc_ctx);
+	expcard_reset();
+	m68k_set_irq(0);
+	m68k_pulse_reset();
+	printf("Reset.\n");
 }
 
 static int load_hd()
@@ -74,6 +178,10 @@ static int load_hd()
 		}
 	}
 
+	// disk2 = "" in [hard_disk]: no second disk, with no error
+	state.hdc_disc1 = NULL;
+	if (!disk2 || !*disk2)
+		return ret;
 	state.hdc_disc1 = fopen(disk2, "r+b");
 	if (!state.hdc_disc1){
 		fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
@@ -197,10 +305,14 @@ void refreshScreen(SDL_Surface *s, SDL_Renderer *r, SDL_Texture *t)
 		SDL_UnlockSurface(s);
 	}
 
-	// Update framebuffer texture
+	// Update framebuffer texture. The caller draws it (in the main loop):
+	// after SDL_RenderPresent the back buffer is undefined (on macOS/Metal it
+	// is an empty buffer), so every frame must be drawn whole.
 	SDL_UpdateTexture(t, NULL, s->pixels, s->pitch);
-	SDL_RenderCopy(r, t, NULL, NULL);
 }
+
+// set when the window needs drawing again (exposed, resized, restored)
+static bool window_dirty = true;
 
 #define LED_SIZE 8
 
@@ -223,18 +335,73 @@ void refreshStatusBar(SDL_Renderer *r, SDL_Texture *lightbar_tex)
 	SDL_RenderCopy(r, lightbar_tex, (state.leds & 8) ? &red_led : &inactive_led, &dstrect);
 }
 
+// The mouse works one of two ways, set by [mouse] seamless:
+// - seamless (the default): the 3B1's pointer follows the host's over the
+//   window, and the host's hides there while the guest has the mouse on
+//   (pointer.c). There is no grab: F10 does nothing.
+// - grab: F10 grabs the mouse: the host pointer goes away and its moves go
+//   to the 3B1 as they are. F10 again lets it go.
+static bool mouse_grabbed, mouse_seamless, cursor_hidden;
+static int mouse_buttons;
+// window pixels per screen pixel
+static float win_scale_x = 1, win_scale_y = 1;
+
+/**
+ * @brief	Show in the title bar how the mouse works, and what F10 does.
+ */
+static void show_mouse_state(SDL_Window *window)
+{
+	SDL_SetWindowTitle(window, mouse_seamless
+		? "FreeBee 3B1 - Mouse: seamless"
+		: mouse_grabbed
+		? "FreeBee 3B1 - Mouse: GRABBED - F10 to release"
+		: "FreeBee 3B1 - Mouse: free - F10 to grab");
+}
+
+static int mouse_button_bit(Uint8 button)
+{
+	switch (button) {
+		case SDL_BUTTON_LEFT:	return MOUSE_BUTTON_LEFT;
+		case SDL_BUTTON_MIDDLE:	return MOUSE_BUTTON_MIDDLE;
+		case SDL_BUTTON_RIGHT:	return MOUSE_BUTTON_RIGHT;
+		default:		return 0;
+	}
+}
+
+// seamless: the host pointer over the window, in screen pixels
+static void track_host_pointer(int wx, int wy)
+{
+	pointer_track((int)floorf(wx / win_scale_x), (int)floorf(wy / win_scale_y));
+}
+
 /**
  * @brief	Handle events posted by SDL.
  */
 bool HandleSDLEvents(SDL_Window *window)
 {
+	// F9 went down with Alt: Alt-F9, not Suspd
+	static bool closeapp_key_down;
 	SDL_Event event;
-	static int mouse_grabbed = 0, mouse_buttons = 0;
 	int dx = 0, dy = 0;
 
 	while (SDL_PollEvent(&event))
 	{
 		if ((event.type == SDL_KEYDOWN) || (event.type == SDL_KEYUP)) {
+			// Alt-F9 (Option-F9): close the program in the front window.
+			// Then F9 is not the Suspd key, down or up.
+			if (event.key.keysym.sym == SDLK_F9) {
+				bool const down = event.type == SDL_KEYDOWN;
+				if (down && !event.key.repeat) {
+					closeapp_key_down = (event.key.keysym.mod & KMOD_ALT) != 0;
+					if (closeapp_key_down)
+						closeapp_request();
+				}
+				if (closeapp_key_down) {
+					if (!down)
+						closeapp_key_down = false;
+					continue;
+				}
+			}
 			keyboard_event(&state.kbd, &event);
 		}
 
@@ -242,16 +409,27 @@ bool HandleSDLEvents(SDL_Window *window)
 			case SDL_QUIT:
 				// Quit button tagged. Exit.
 				return true;
+			case SDL_WINDOWEVENT:
+				window_dirty = true;
+				if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+					keyboard_focus_lost(&state.kbd);	// no key-ups come while away
+				if (event.window.event == SDL_WINDOWEVENT_LEAVE && mouse_seamless) {
+					// the 3B1's pointer stops at the edge the host's went out by
+					int gx, gy, wx, wy;
+					SDL_GetGlobalMouseState(&gx, &gy);
+					SDL_GetWindowPosition(window, &wx, &wy);
+					track_host_pointer(gx - wx, gy - wy);
+				}
+				break;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
 					case SDLK_F10:
-						if (mouse_grabbed){
-							SDL_SetRelativeMouseMode(SDL_FALSE);
-							mouse_grabbed = 0;
-						}else{
-							SDL_SetRelativeMouseMode(SDL_TRUE);
-							mouse_grabbed = 1;
-						}
+						if (mouse_seamless)
+							break;	// no grab
+						mouse_grabbed = !mouse_grabbed;
+						SDL_SetRelativeMouseMode(mouse_grabbed ? SDL_TRUE : SDL_FALSE);
+						SDL_GetRelativeMouseState(NULL, NULL);	// moves from before
+						show_mouse_state(window);
 						break;
 					case SDLK_F11:
 						if (state.fdc_disc) {
@@ -273,38 +451,47 @@ bool HandleSDLEvents(SDL_Window *window)
 				}
 				break;
 			case SDL_MOUSEMOTION:
+				// all the moves since the last call, and none left for later
 				SDL_GetRelativeMouseState(&dx, &dy);
-				if (dx==0 && dy==0) break;  // sometimes SDL returns 0 for both, don't process
+				if (mouse_grabbed) {
+					if (dx || dy)
+						mouse_event(&state.kbd, dx, dy, mouse_buttons);
+				} else if (mouse_seamless) {
+					track_host_pointer(event.motion.x, event.motion.y);
+				}
+				break;
 			case SDL_MOUSEBUTTONUP:
 			case SDL_MOUSEBUTTONDOWN:
-				if (mouse_grabbed){
-					if (event.type == SDL_MOUSEBUTTONDOWN) {
-						if (event.button.button == SDL_BUTTON_LEFT){
-							mouse_buttons |= MOUSE_BUTTON_LEFT;
-						}else if (event.button.button == SDL_BUTTON_MIDDLE){
-							mouse_buttons |= MOUSE_BUTTON_MIDDLE;
-						}else if (event.button.button == SDL_BUTTON_RIGHT){
-							mouse_buttons |= MOUSE_BUTTON_RIGHT;
-						}
-					} else if (event.type == SDL_MOUSEBUTTONUP) {
-						if (event.button.button == SDL_BUTTON_LEFT){
-							mouse_buttons &= ~MOUSE_BUTTON_LEFT;
-						}else if (event.button.button == SDL_BUTTON_MIDDLE){
-							mouse_buttons &= ~MOUSE_BUTTON_MIDDLE;
-						}else if (event.button.button == SDL_BUTTON_RIGHT){
-							mouse_buttons &= ~MOUSE_BUTTON_RIGHT;
-						}
-					}
-					mouse_event(&state.kbd, dx, dy, mouse_buttons);
-					dx = 0;
-					dy = 0;
+				if (event.type == SDL_MOUSEBUTTONDOWN)
+					mouse_buttons |= mouse_button_bit(event.button.button);
+				else
+					mouse_buttons &= ~mouse_button_bit(event.button.button);
+				if (mouse_grabbed) {
+					mouse_event(&state.kbd, 0, 0, mouse_buttons);
+				} else if (mouse_seamless) {
+					track_host_pointer(event.button.x, event.button.y);
+					pointer_buttons(mouse_buttons);
 				}
+				break;
+			case SDL_MOUSEWHEEL:
+				// it scrolls a 3B1 window that has scroll arrows (wheel.c)
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+				wheel_scroll(event.wheel.preciseY);
+#else
+				wheel_scroll(event.wheel.y);
+#endif
 				break;
 			default:
 				break;
 		}
 	}
 
+	// seamless: hide the host pointer over the window while the 3B1 draws its own
+	bool const hide = mouse_seamless && state.kbd.mouse_enabled;
+	if (hide != cursor_hidden) {
+		SDL_ShowCursor(hide ? SDL_DISABLE : SDL_ENABLE);
+		cursor_hidden = hide;
+	}
 	return false;
 }
 
@@ -364,6 +551,14 @@ void validate_memory(int base_memory, int extended_memory)
 
 int main(int argc, char *argv[])
 {
+	// the MCP server an agent starts: it only talks to running FreeBees
+	if (argc > 1 && strcmp(argv[1], "-mcp-bridge") == 0)
+		return fbmcp_bridge_main(argc, argv);
+	// no window (for agents and recordings): FREEBEE_HEADLESS=1
+	const char *headless = getenv("FREEBEE_HEADLESS");
+	if (headless && *headless && strcmp(headless, "0"))
+		SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
+
 	float scalex = fbc_get_double("display", "x_scale");
 	float scaley = fbc_get_double("display", "y_scale");
 
@@ -415,6 +610,10 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Error creating SDL window: %s.\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+	win_scale_x = scalex;
+	win_scale_y = scaley;
+	mouse_seamless = fbc_get_bool("mouse", "seamless");
+	show_mouse_state(window);
     // SDL default is "nearest", our default is "linear" if there's scaling
     if (scalex != 1.0 || scaley != 1.0)
 	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, fbc_get_string("display", "scale_quality"));
@@ -459,6 +658,14 @@ int main(int argc, char *argv[])
 
 	load_hd();
 
+	// Expansion cards: [expansion] slot0 to slot7
+	expcard_init();
+	// the control socket ([control] socket, or FREEBEE_CONTROL)
+	control_init();
+
+	// MCP server (on unless [mcp] enabled = false or FREEBEE_MCP=0)
+	fbmcp_init();
+
 	/***
 	 * The 3B1 CPU runs at 10MHz, with DMA running at 1MHz and video refreshing at
 	 * 60.821331Hz, with a 60Hz periodic interrupt.
@@ -471,17 +678,85 @@ int main(int argc, char *argv[])
 	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, cycles_run;
+
+	// [cpu] turbo: the CPU runs that many times as fast as a real 3B1's.
+	// Each time slot runs turbo times as many cycles, and the 60Hz tick
+	// comes every turbo times as many cycles, so the clock stays real.
+	// The control socket and MCP can change it (control_turbo).
+	control_turbo = fbc_get_int("cpu", "turbo");
+	if (control_turbo < 1 || control_turbo > TURBO_MAX) {
+		fprintf(stderr, "[cpu] turbo must be 1 to %d (got %d); using 1\n", TURBO_MAX, control_turbo);
+		control_turbo = 1;
+	}
+	if (control_turbo > 1)
+		printf("Turbo: the CPU runs %d times as fast as a real 3B1 (%d MHz)\n", control_turbo, control_turbo * 10);
+	uint32_t last_turbo = 1;
+	// [cpu] idle: the idle skip, not at max speed
+	bool const idle_skip = state.idle_skip;
+	uint64_t idle_skipped = 0, idle_total = 0;
+	uint32_t idle_slots = 0;
+	uint32_t card_slices = 0, last_host_poll = 0;
 	bool exitEmu = false;
 	uint8_t last_leds = 255;
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
-		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
+		if (fbmcp_paused()) {
+			// MCP paused the CPU (or a breakpoint stopped it): MCP, the
+			// control socket and the window go on
+			fbmcp_service();
+			control_poll();
+			if (fbmcp_reset_wanted())
+				freebee_reset();
+			bool vram_changed = state.vram_updated;
+			if (vram_changed)
+				refreshScreen(screen, renderer, fbTexture);
+			if (vram_changed || last_leds != state.leds || window_dirty) {
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, fbTexture, NULL, NULL);
+				refreshStatusBar(renderer, lightbarTexture);
+				SDL_RenderPresent(renderer);
+				last_leds = state.leds;
+				window_dirty = false;
+			}
+			state.vram_updated = false;
+			if (HandleSDLEvents(window) || control_quit || fbmcp_quit())
+				break;
+			SDL_Delay(5);
+			next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
+			continue;
+		}
+		// Turbo: run the CPU that many times as fast, and stretch the 60Hz
+		// tick by as much, so the clock stays real. At max speed it is moot:
+		// the tick then comes as often as it can, and guest time races.
+		uint32_t const turbo = control_speed_max ? 1 : (uint32_t)control_turbo;
+		if (turbo != last_turbo) {
+			clock_cycles = (uint32_t)((uint64_t)clock_cycles * turbo / last_turbo);
+			last_turbo = turbo;
+		}
+		// the CPU cycles in this time slot
+		uint32_t const slot_cycles = CYCLES_PER_TIMESLOT * turbo;
+		state.idle_skip = idle_skip && !control_speed_max;
+		for (i = 0; i < slot_cycles; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
 			cycles_run = m68k_execute(CYCLES_PER_TIMESLOT / NUM_CPU_TIMESLOTS);
 			clock_cycles += cycles_run;
+			// an MCP breakpoint or step stopped the CPU before an instruction
+			if (fbmcp_cpu_stopped())
+				break;
+
+			// Expansion cards; their host side (the network) about every
+			// millisecond
+			expcard_tick(cycles_run);
+			if ((++card_slices & 15) == 0) {
+				uint32_t const ms = SDL_GetTicks();
+				if (ms != last_host_poll) {
+					last_host_poll = ms;
+					expcard_host_poll();
+				}
+			}
 
 			// Run the DMA engine
 			if (state.dmaen) {
@@ -582,30 +857,75 @@ int main(int argc, char *argv[])
 			// hasn't got around to taking it yet (e.g. it is sat at SPL6).
 			//
 			// TODO: MCR2.F_MASK (0x0400) masks the floppy interrupt
+			//
+			// An expansion card asks for level 5 or 1, the expansion bus's
+			// two levels.
+			int const card_level = expcard_irq();
+			int irq = 0;
 			if (state.timer_int_latch) {
-				m68k_set_irq(6);
+				irq = 6;
+			} else if (card_level == 5) {
+				irq = 5;
 			} else if (i8274_get_irq(&state.serial_ctx)) {
-				m68k_set_irq(4);
+				irq = 4;
 			} else if (keyboard_get_irq(&state.kbd)) {
-				m68k_set_irq(3);
+				irq = 3;
 			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
-				m68k_set_irq(2);
-			} else {
-				m68k_set_irq(0);
+				irq = 2;
+			} else if (card_level == 1) {
+				irq = 1;
+			}
+			m68k_set_irq(irq);
+
+			// The idle skip. The kernel's idle loop waits for an interrupt,
+			// has gone round IDLE_PASSES times with nothing to do, and
+			// memory.c stopped the CPU at its top (the MCR write). With no
+			// interrupt to take and no disk or floppy transfer waiting, the
+			// CPU would only go round it until the next interrupt. So count
+			// the rest of the time slot as run (the 60Hz clock stays
+			// right), and sleep instead.
+			if (state.idle_hint) {
+				state.idle_hint = false;
+				if (state.idle_skip && irq == 0 &&
+						!wd2010_get_drq(&state.hdc_ctx) && !wd2797_get_drq(&state.fdc_ctx)) {
+					// frames from the host network that came in meanwhile
+					expcard_host_poll();
+					uint32_t const done = i + cycles_run;
+					if (done < slot_cycles) {
+						clock_cycles += slot_cycles - done;
+						idle_skipped += slot_cycles - done;
+					}
+					break;
+				}
 			}
 		}
+		// How much of each second the idle skip took off the CPU (the
+		// control socket's status, MCP's vm-info)
+		idle_total += slot_cycles;
+		if (++idle_slots >= TIMESLOT_FREQUENCY) {
+			control_idle_pct = (int)(idle_skipped * 100 / idle_total);
+			idle_skipped = idle_total = 0;
+			idle_slots = 0;
+		}
 		// Is it time to run the 60Hz periodic interrupt yet?
-		if (clock_cycles > CLOCKS_PER_60HZ) {
-			// Refresh the screen if VRAM has been changed
-			if (state.vram_updated){
+		if (clock_cycles > CLOCKS_PER_60HZ * turbo) {
+			// Refresh the screen if VRAM has been changed. Draw the whole
+			// window (screen + LEDs) and present it only when something
+			// changed: presenting a frame that was not drawn whole makes
+			// the window flicker on macOS.
+			bool vram_changed = state.vram_updated;
+			if (vram_changed){
 				refreshScreen(screen, renderer, fbTexture);
 			}
-			if (state.vram_updated || last_leds != state.leds){
+			if (vram_changed || last_leds != state.leds || window_dirty){
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, fbTexture, NULL, NULL);
 				refreshStatusBar(renderer, lightbarTexture);
+				SDL_RenderPresent(renderer);
 				last_leds = state.leds;
+				window_dirty = false;
 			}
 			state.vram_updated = false;
-			SDL_RenderPresent(renderer);
 
 			// Latch the 60Hz interrupt. If CLRSINT- is being held low the
 			// clear input is asserted, so the latch can't set and this tick
@@ -613,21 +933,38 @@ int main(int argc, char *argv[])
 			if (state.timer_clrsint) {
 				state.timer_int_latch = true;
 			}
+			// control socket commands, and the keys it queued
+			control_tick();
+			// MCP: the screen for tools and recordings, mouse packets, calls
+			fbmcp_tick(vram_changed);
+			if (fbmcp_quit())
+				exitEmu = true;
+			if (fbmcp_reset_wanted())
+				freebee_reset();
+			// the mouse: the seamless pointer, the kernel's copy of its place
+			pointer_tick();
+			// the mouse wheel: Roll keys
+			wheel_tick();
+			// Alt-F9: close the program in the front window
+			closeapp_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
 			i8274_scan_incoming(&state.serial_ctx, CHAN_A);
 			// decrement clock cycle counter, we've handled the intr.
-			clock_cycles -= CLOCKS_PER_60HZ;
+			clock_cycles -= CLOCKS_PER_60HZ * turbo;
 		}
 
 		// handle SDL events -- returns true if we need to exit
-		if (HandleSDLEvents(window))
+		if (HandleSDLEvents(window) || control_quit)
 			exitEmu = true;
 
 		// make sure frame rate is equal to real time
 		uint32_t now = SDL_GetTicks();
-		if (now < next_timeslot) {
+		if (control_speed_max) {
+			// "speed max" on the control socket: no waiting
+			next_timeslot = now;
+		} else if (now < next_timeslot) {
 			// timeslot finished early -- eat up some time
 			SDL_Delay(next_timeslot - now);
 		} else {
@@ -651,6 +988,9 @@ int main(int argc, char *argv[])
 	}
 
 	dialer_done();
+	expcard_done();
+	control_done();
+	fbmcp_done();
 
 	// Clean up SDL
 	SDL_DestroyTexture(lightbarTexture);

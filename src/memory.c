@@ -9,6 +9,7 @@
 #include "memory.h"
 #include "i8274.h"
 #include "dialer.h"
+#include "expcard.h"
 
 // Memory access debugging options, to reduce logspam
 #undef MEM_DEBUG_PAGEFAULTS
@@ -408,6 +409,51 @@ inline static void ENFORCE_SIZE_W(int bits, uint32_t address, int allowed, char 
 	ENFORCE_SIZE(bits, address, false, allowed, regname);
 }
 
+// The idle skip: true if the CPU has just written the MCR in UNIX 3.5's
+// idle(n) loop, and that will go on until an interrupt. The loop:
+//
+//	loop:	andi.w	#$fbff,mcr_save		green LED on
+//		move.w	mcr_save,$4a0000	<- this write
+//		tst.l	8(a6)			n: passes left, -1 = no limit
+//		...				serial and clock work
+//		tst.l	idleflag		every return from an interrupt clears it
+//		beq	out
+//		tst.l	8(a6)
+//		bne	loop
+//
+// swtch() calls idle(-1) when nothing can run: that one can be skipped.
+// panic() calls idle(2000), a wait that counts passes: a skip would stretch
+// it. idleflag 0: an interrupt came in just before this write, and the loop
+// ends at its next test (the process it woke runs). Other code: no skip.
+// write: where the MCR write is.
+static bool idle_until_interrupt(uint32_t write)
+{
+	uint32_t const pc = m68k_get_reg(NULL, M68K_REG_PC);
+	uint16_t w[7], d16, hi, lo;
+	if (!mem_peek16(pc, &w[0]) || w[0] != 0x4AAE || !mem_peek16(pc + 2, &d16))
+		return false;
+	uint32_t const n = m68k_get_reg(NULL, M68K_REG_A6) + (int16_t)d16;
+	if (!mem_peek16(n, &hi) || !(hi & 0x8000))
+		return false;
+	// find the idleflag test at the bottom of the loop
+	for (uint32_t a = pc + 4; a < pc + 0x60; a += 2) {
+		if (!mem_peek16(a, &w[0]))
+			return false;
+		if (w[0] != 0x4AB9)
+			continue;
+		int k;
+		for (k = 1; k < 7 && mem_peek16(a + 2 * k, &w[k]); k++)
+			;
+		if (k < 7 || (w[3] & 0xFF00) != 0x6700 || w[4] != 0x4AAE ||
+				w[5] != d16 || (w[6] & 0xFF00) != 0x6600 ||
+				a + 14 + (int8_t)(w[6] & 0xFF) > write)
+			continue;
+		uint32_t const flag = ((uint32_t)w[1] << 16) | w[2];
+		return mem_peek16(flag, &hi) && mem_peek16(flag + 2, &lo) && (hi | lo);
+	}
+	return false;
+}
+
 void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 {
 	bool handled = false;
@@ -521,6 +567,28 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 							(state.leds & 2) ? "Y" : "-",
 							(state.leds & 1) ? "R" : "-");
 #endif
+				}
+				// The idle skip (main.c). The kernel's idle loop turns the
+				// green LED on and writes this register at the top of every
+				// pass, at IPL 0. After IDLE_PASSES passes, if it waits for an
+				// interrupt (see idle_until_interrupt), stop the CPU right
+				// after the write, so that main.c can skip the rest of the
+				// time slot.
+				if (data & 0x0400) {
+					state.idle_passes = 0;			// green LED off: work to do
+				} else if (state.idle_skip &&
+						(m68k_get_reg(NULL, M68K_REG_SR) & 0x2700) == 0x2000) {
+					uint32_t const pc = m68k_get_reg(NULL, M68K_REG_PPC);
+					if (pc != state.idle_pc) {
+						state.idle_pc = pc;
+						state.idle_passes = 0;
+					}
+					if (state.idle_passes < IDLE_PASSES) {
+						state.idle_passes++;
+					} else if (idle_until_interrupt(pc)) {
+						state.idle_hint = true;
+						m68k_end_timeslice();
+					}
 				}
 				handled = true;
 				break;
@@ -637,7 +705,9 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 					case 0xD40000:		// Expansion slot 5
 					case 0xD80000:		// Expansion slot 6
 					case 0xDC0000:		// Expansion slot 7
-						if ((address & 0x3FFF8) == 0x3FFF8)	// Software reset
+						if (expcard_present(address))
+							expcard_write(address, data, bits);
+						else if ((address & 0x3FFF8) == 0x3FFF8)	// Software reset
 							LOG("Expansion slot %i: Reset", ((address >> 18) & 7));
 						else
 							fprintf(stderr, "NOTE: WR%d to expansion card space, addr=0x%08X, data=0x%08X\n", bits, address, data);
@@ -756,6 +826,7 @@ void IoWrite(uint32_t address, uint32_t data, int bits)/*{{{*/
 						handled = true;
 						switch (address & 0x00F000) {
 							case 0x0000:
+								state.modem_wr0 = data;
 								LOG("Modem WR0 - Line control (%06X) write: %04X = talk mode: %i, offhook: %i, data mode: %i, DTR: %i, power reset: %i",
 									address, data, ((data & 0x40)==0x40), ((data & 0x20)==0x20), ((data & 0x10)==0x10), ((data & 0x04)==0x04), ((data & 0x01)==0x01));
 								break;
@@ -840,7 +911,14 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 				if (state.mcr2mirror) {
 					data |= 0x10;
 				}
-				LOG("phone status reg (%06X) RD%i: onhook, not ringing, no msg waiting, MCR2 bit 4 mirror: %i", address, bits, state.mcr2mirror);
+				{
+					// the kernel's phone scan reads it many times a second:
+					// log it only when it changes
+					static int last_logged = -1;
+					if (data != last_logged)
+						LOG("phone status reg (%06X) RD%i: onhook, not ringing, no msg waiting, MCR2 bit 4 mirror: %i", address, bits, state.mcr2mirror);
+					last_logged = data;
+				}
 				return data;
 				break;
 			case 0x060000:				// DMA Count
@@ -896,6 +974,8 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 						// 0x3FFFB: Board ID MSB, 0X3FFF9: Board ID LSB
 						// 0x3FFFF: Two's complement of ID MSB, 0x3FFFD: Two's complement of ID LSB
 						// low byte of 0x3FFFB + 0x3FFFF and 0x3FFF9 + 0x3FFFD should equal 0
+						if (expcard_present(address))
+							return expcard_read(address, bits);
 						fprintf(stderr, "NOTE: RD%d from expansion card space, addr=0x%08X\n", bits, address);
 						handled = true;
 						break;
@@ -962,8 +1042,17 @@ uint32_t IoRead(uint32_t address, int bits)/*{{{*/
 							case 0x2000:  // modem.h: Modem status to terminal interface
 								// 0x80: failed self test, 0x40: test mode, 0x20: data mode (incoming call answered), 0x10: DSR on
 								// 0x04: 1200 baud, 0x02: data valid (set after modem handshake), 0x01: CTS on
-								data = 0xFF; 	// FF interpreted as "no modem"
-								LOG("Modem RR2 (%06X) - Modem status RD%i returning: no modem", address, bits);
+								// FF means "no modem". With a modem, the kernel's
+								// boot probe raises DTR and wants DSR back (0x10);
+								// it starts the phone scan, which also times the
+								// system beep, only then. No phone line is emulated:
+								// DSR simply follows DTR.
+								if (!state.modem_present) {
+									LOG("Modem RR2 (%06X) - Modem status RD%i returning: no modem", address, bits);
+									return 0xFF;
+								}
+								data = (state.modem_wr0 & 0x04) ? 0x10 : 0x00;
+								LOG("Modem RR2 (%06X) - Modem status RD%i returning: %02X", address, bits, data);
 								return data;
 								break;
 							case 0x3000: // modem.h: Modem status to lamps and relays
@@ -1174,6 +1263,60 @@ static void ram_write_16(uint32_t address, uint32_t value)/*{{{*/
 			WR16(state.exp_ram, address - 0x200000, state.exp_ram_size - 1, value);
 		}
 	}
+}
+
+/*
+ * Guest memory for the emulator's own devices and helpers.
+ *
+ * mem_dma_read16 and mem_dma_write16 are bus master access (as an
+ * expansion card does it): a word at a logical address, through the page
+ * map as for disk DMA, so the page's accessed and dirty bits are set.
+ * False if the page is not present.
+ */
+bool mem_dma_read16(uint32_t logical, uint16_t *data)
+{
+	logical &= ~1;
+	if (logical >= 0x400000 || checkMemoryAccess(logical, false, true) != MEM_ALLOWED)
+		return false;
+	*data = ram_read_16(mapAddr(logical, false));
+	return true;
+}
+
+bool mem_dma_write16(uint32_t logical, uint16_t data, uint16_t mem_mask)
+{
+	logical &= ~1;
+	if (logical >= 0x400000 || checkMemoryAccess(logical, true, true) != MEM_ALLOWED)
+		return false;
+	uint32_t const phys = mapAddr(logical, true);
+	if (mem_mask != 0xffff)
+		data = (ram_read_16(phys) & ~mem_mask) | (data & mem_mask);
+	ram_write_16(phys, data);
+	return true;
+}
+
+// A look at a word through the page map that changes nothing: the page's
+// bits stay as they are. False if the page is not present.
+bool mem_peek16(uint32_t logical, uint16_t *data)
+{
+	logical &= ~1;
+	if (logical >= 0x400000)
+		return false;
+	uint16_t const page = (logical >> 12) & 0x3FF;
+	if (((state.map[page*2] >> 5) & 0x03) == 0)
+		return false;
+	*data = ram_read_16(map_address_debug(logical));
+	return true;
+}
+
+// A word of RAM at a physical address. False if there is no RAM there.
+bool mem_peek_phys16(uint32_t phys, uint16_t *data)
+{
+	phys &= ~1;
+	if (phys < 0x200000 ? phys >= state.base_ram_size
+			: phys - 0x200000 >= state.exp_ram_size)
+		return false;
+	*data = ram_read_16(phys);
+	return true;
 }
 
 /**
