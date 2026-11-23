@@ -261,6 +261,8 @@ bool HandleSDLEvents(SDL_Window *window)
 				return true;
 			case SDL_WINDOWEVENT:
 				window_dirty = true;
+				if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+					keyboard_focus_lost(&state.kbd);	// no key-ups come while away
 				break;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
