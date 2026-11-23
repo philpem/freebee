@@ -19,6 +19,7 @@
 #include "i8274.h"
 #include "dialer.h"
 #include "pointer.h"
+#include "wheel.h"
 
 extern int cpu_log_enabled;
 
@@ -361,6 +362,14 @@ bool HandleSDLEvents(SDL_Window *window)
 					track_host_pointer(event.button.x, event.button.y);
 					pointer_buttons(mouse_buttons);
 				}
+				break;
+			case SDL_MOUSEWHEEL:
+				// it scrolls a 3B1 window that has scroll arrows (wheel.c)
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+				wheel_scroll(event.wheel.preciseY);
+#else
+				wheel_scroll(event.wheel.y);
+#endif
 				break;
 			default:
 				break;
@@ -727,6 +736,8 @@ int main(int argc, char *argv[])
 			}
 			// the mouse: the seamless pointer, the kernel's copy of its place
 			pointer_tick();
+			// the mouse wheel: Roll keys
+			wheel_tick();
 			// scan the keyboard
 			keyboard_scan(&state.kbd);
 			// scan the serial pty for new data
