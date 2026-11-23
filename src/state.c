@@ -37,6 +37,11 @@ int state_init(size_t base_ram_size, size_t exp_ram_size)
 	// Enable VIDPAL mod (allows user writing to VRAM), per config setting
 	state.vidpal = fbc_get_bool("vidpal", "installed");
 
+	// The kernel starts its phone scan, which also times the system beep,
+	// only when its boot probe finds the modem
+	state.modem_present = fbc_get_bool("modem", "present");
+	state.modem_wr0 = 0;
+
 	// Allocate Base RAM, making sure the user has specified a valid RAM amount first
 	// Basically: 512KiB minimum, 2MiB maximum, in increments of 512KiB.
 	if ((base_ram_size < 512*1024) || (base_ram_size > 2048*1024) || ((base_ram_size % (512*1024)) != 0))
