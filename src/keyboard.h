@@ -40,6 +40,10 @@ typedef struct {
 
 	/// Flag indicating whether last data sent was from the mouse
 	bool lastdata_mouse;
+
+	/// The 3B1 key that each host key pressed, by SDL scan code: its
+	/// scan code + 1, 0 for none. The key-up lets go of that key.
+	uint8_t host_down[SDL_NUM_SCANCODES];
 } KEYBOARD_STATE;
 
 /**
@@ -55,6 +59,12 @@ void keyboard_init(KEYBOARD_STATE *ks);
  * Call this when an SDL keyup or keydown event is received.
  */
 void keyboard_event(KEYBOARD_STATE *ks, SDL_Event *ev);
+
+/**
+ * The window lost the keyboard: let go of the keys the host holds down,
+ * and of SDL's modifiers (their key-ups may never come).
+ */
+void keyboard_focus_lost(KEYBOARD_STATE *ks);
 
 /**
  * Keyboard scan routine.
