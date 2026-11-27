@@ -33,6 +33,10 @@ static int load_fd()
 	int writeable = 1;
 
 	const char *discim = fbc_get_string("floppy", "disk");
+
+	// disk = "" in [floppy]: the drive stays empty, with no error
+	if (!discim || !*discim)
+		return (0);
 	state.fdc_disc = fopen(discim, "r+b");
 	if (!state.fdc_disc){
 		writeable = 0;
@@ -43,7 +47,12 @@ static int load_fd()
 		state.fdc_disc = NULL;
 		return (0);
 	}else{
-		wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 2, 40, writeable);
+		if (wd2797_load(&state.fdc_ctx, state.fdc_disc, 512, 2, 40, writeable) != WD2797_ERR_OK) {
+			fprintf(stderr, "ERROR: floppy image '%s' is too small, or of a geometry FreeBee does not know.\n", discim);
+			fclose(state.fdc_disc);
+			state.fdc_disc = NULL;
+			return (0);
+		}
 		return (1);
 	}
 }
@@ -74,6 +83,10 @@ static int load_hd()
 		}
 	}
 
+	// disk2 = "" in [hard_disk]: no second disk, with no error
+	state.hdc_disc1 = NULL;
+	if (!disk2 || !*disk2)
+		return ret;
 	state.hdc_disc1 = fopen(disk2, "r+b");
 	if (!state.hdc_disc1){
 		fprintf(stderr, "Drive 1: ERROR loading disc image '%s'.\n", disk2);
