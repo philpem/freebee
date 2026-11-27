@@ -493,6 +493,8 @@ int main(int argc, char *argv[])
 	const uint32_t MILLISECS_PER_TIMESLOT = 1e3 / TIMESLOT_FREQUENCY;
 	const uint32_t CYCLES_PER_TIMESLOT = SYSTEM_CLOCK / TIMESLOT_FREQUENCY;
 	const uint32_t CLOCKS_PER_60HZ = (SYSTEM_CLOCK / 60);
+	// the CPU cycles in one time slot
+	const uint32_t slot_cycles = CYCLES_PER_TIMESLOT;
 	const uint32_t NUM_CPU_TIMESLOTS = 500;
 	uint32_t next_timeslot = SDL_GetTicks() + MILLISECS_PER_TIMESLOT;
 	uint32_t clock_cycles = 0, cycles_run;
@@ -501,7 +503,7 @@ int main(int argc, char *argv[])
 
 	/*bool lastirq_fdc = false;*/
 	for (;;) {
-		for (i = 0; i < CYCLES_PER_TIMESLOT; i += cycles_run){
+		for (i = 0; i < slot_cycles; i += cycles_run){
 			// Run the CPU for however many cycles we need to. CPU core clock is
 			// 10MHz, and we're running at 240Hz/timeslot. Thus: 10e6/240 or
 			// 41667 cycles per timeslot.
@@ -607,16 +609,34 @@ int main(int argc, char *argv[])
 			// hasn't got around to taking it yet (e.g. it is sat at SPL6).
 			//
 			// TODO: MCR2.F_MASK (0x0400) masks the floppy interrupt
+			int irq = 0;
 			if (state.timer_int_latch) {
-				m68k_set_irq(6);
+				irq = 6;
 			} else if (i8274_get_irq(&state.serial_ctx)) {
-				m68k_set_irq(4);
+				irq = 4;
 			} else if (keyboard_get_irq(&state.kbd)) {
-				m68k_set_irq(3);
+				irq = 3;
 			} else if (wd2797_get_irq(&state.fdc_ctx) || wd2010_get_irq(&state.hdc_ctx)) {
-				m68k_set_irq(2);
-			} else {
-				m68k_set_irq(0);
+				irq = 2;
+			}
+			m68k_set_irq(irq);
+
+			// The idle skip. The kernel's idle loop waits for an interrupt,
+			// has gone round IDLE_PASSES times with nothing to do, and
+			// memory.c stopped the CPU at its top (the MCR write). With no
+			// interrupt to take and no disk or floppy transfer waiting, the
+			// CPU would only go round it until the next interrupt. So count
+			// the rest of the time slot as run (the 60Hz clock stays
+			// right), and sleep instead.
+			if (state.idle_hint) {
+				state.idle_hint = false;
+				if (state.idle_skip && irq == 0 &&
+						!wd2010_get_drq(&state.hdc_ctx) && !wd2797_get_drq(&state.fdc_ctx)) {
+					uint32_t const done = i + cycles_run;
+					if (done < slot_cycles)
+						clock_cycles += slot_cycles - done;
+					break;
+				}
 			}
 		}
 		// Is it time to run the 60Hz periodic interrupt yet?

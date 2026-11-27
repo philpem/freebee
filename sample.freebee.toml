@@ -33,6 +33,12 @@
 [vidpal]
 	installed = true
 
+[cpu]
+	# Idle skip: while UNIX has nothing to do, FreeBee sleeps until the next
+	# interrupt instead of running the kernel's idle loop, so an idle 3B1
+	# takes little of the host's CPU. The time of day stays right.
+	idle = true
+
 [memory]
 	base_memory = 2048		# Units of 1K bytes, 2048 is the max.
 	extended_memory = 2048		# Units of 1K bytes, 2048 is the max.
